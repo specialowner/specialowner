@@ -11,13 +11,17 @@
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
+<div class="lang-toggle">
+  <button data-lang="en">EN</button>
+  <button data-lang="ar">عربي</button>
+</div>
 <div class="app-shell">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px">
       <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
       <div>
-        <h1>Admin</h1>
-        <div class="sub">Special Owner · Compound control</div>
+        <h1 data-i18n="adminTitle">Admin</h1>
+        <div class="sub" data-i18n="adminSub">Special Owner · Compound control</div>
       </div>
     </div>
     <button class="icon-btn" id="logoutBtn">⎋</button>
@@ -28,83 +32,84 @@
     <!-- OVERVIEW -->
     <section id="tab-overview">
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="stat-box"><div class="num" id="statResidents">0</div><div class="lbl">Residents</div></div>
-        <div class="stat-box"><div class="num" id="statWorkers">0</div><div class="lbl">Active workers</div></div>
-        <div class="stat-box"><div class="num" id="statPending">0</div><div class="lbl">Pending requests</div></div>
-        <div class="stat-box"><div class="num" id="statOverdue">0</div><div class="lbl">Overdue payments</div></div>
+        <div class="stat-box"><div class="num" id="statResidents">0</div><div class="lbl" data-i18n="residents">Residents</div></div>
+        <div class="stat-box"><div class="num" id="statWorkers">0</div><div class="lbl" data-i18n="activeWorkers">Active workers</div></div>
+        <div class="stat-box"><div class="num" id="statPending">0</div><div class="lbl" data-i18n="pendingRequests">Pending requests</div></div>
+        <div class="stat-box"><div class="num" id="statOverdue">0</div><div class="lbl" data-i18n="overduePayments">Overdue payments</div></div>
       </div>
       <div class="card">
-        <h3>Post an announcement</h3>
-        <div class="field"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday"></div>
-        <div class="field"><label>Details</label><textarea id="annBody" placeholder="Details for residents"></textarea></div>
-        <button class="btn btn-primary" id="postAnnBtn">Publish</button>
+        <h3 data-i18n="postAnnouncement">Post an announcement</h3>
+        <div class="field"><label data-i18n="title">Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday" data-i18n-placeholder="titlePh"></div>
+        <div class="field"><label data-i18n="details">Details</label><textarea id="annBody" placeholder="Details for residents" data-i18n-placeholder="detailsPh"></textarea></div>
+        <button class="btn btn-primary" id="postAnnBtn" data-i18n="publish">Publish</button>
       </div>
     </section>
 
     <!-- ACCESS -->
     <section id="tab-access" style="display:none">
       <div class="card">
-        <h3>Scan guest / worker QR</h3>
+        <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
         <div id="qrReader" style="border-radius:10px;overflow:hidden"></div>
         <p id="scanResult" style="margin-top:10px;font-size:13px"></p>
       </div>
       <div class="card">
-        <h3>Recent access log</h3>
-        <div id="accessList"><p class="empty-state">No entries yet.</p></div>
+        <h3 data-i18n="recentAccessLog">Recent access log</h3>
+        <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
       </div>
     </section>
 
     <!-- WORKERS -->
     <section id="tab-workers" style="display:none">
       <div class="card">
-        <h3>Add worker</h3>
-        <div class="field"><label>Name</label><input type="text" id="workerName" placeholder="Worker full name"></div>
-        <div class="field"><label>Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician"></div>
-        <div class="field"><label>Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx"></div>
-        <button class="btn btn-primary" id="addWorkerBtn">Add worker</button>
+        <h3 data-i18n="addWorker">Add worker</h3>
+        <div class="field"><label data-i18n="workerName">Name</label><input type="text" id="workerName" placeholder="Worker full name" data-i18n-placeholder="workerNamePh"></div>
+        <div class="field"><label data-i18n="workerRole">Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician" data-i18n-placeholder="workerRolePh"></div>
+        <div class="field"><label data-i18n="workerPhone">Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="workerPhonePh"></div>
+        <button class="btn btn-primary" id="addWorkerBtn" data-i18n="addWorker">Add worker</button>
       </div>
       <div class="card">
-        <h3>Workers</h3>
-        <div id="workersList"><p class="empty-state">No workers added yet.</p></div>
+        <h3 data-i18n="workers">Workers</h3>
+        <div id="workersList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
       </div>
     </section>
 
     <!-- FINANCES -->
     <section id="tab-finance" style="display:none">
       <div class="card">
-        <h3>Add payment record</h3>
-        <div class="field"><label>Resident unit</label><input type="text" id="payUnit" placeholder="e.g. B-204"></div>
-        <div class="field"><label>Resident email</label><input type="text" id="payEmail" placeholder="resident's account email"></div>
-        <div class="field"><label>Amount (EGP)</label><input type="number" id="payAmount" placeholder="0"></div>
-        <div class="field"><label>Due date</label><input type="date" id="payDue"></div>
-        <div class="field"><label>Description</label><input type="text" id="payDesc" placeholder="e.g. Monthly maintenance fee"></div>
-        <button class="btn btn-primary" id="addPayBtn">Add record</button>
+        <h3 data-i18n="addPaymentRecord">Add payment record</h3>
+        <div class="field"><label data-i18n="residentUnit">Resident unit</label><input type="text" id="payUnit" placeholder="e.g. B-204" data-i18n-placeholder="unitNumberPh"></div>
+        <div class="field"><label data-i18n="residentEmail">Resident email</label><input type="text" id="payEmail" placeholder="resident's account email" data-i18n-placeholder="residentEmailPh"></div>
+        <div class="field"><label data-i18n="amount">Amount (EGP)</label><input type="number" id="payAmount" placeholder="0"></div>
+        <div class="field"><label data-i18n="dueDate">Due date</label><input type="date" id="payDue"></div>
+        <div class="field"><label data-i18n="description">Description</label><input type="text" id="payDesc" placeholder="e.g. Monthly maintenance fee" data-i18n-placeholder="descriptionPh"></div>
+        <button class="btn btn-primary" id="addPayBtn" data-i18n="addRecord">Add record</button>
       </div>
       <div class="card">
-        <h3>All payments</h3>
-        <div id="financeList"><p class="empty-state">No payment records yet.</p></div>
+        <h3 data-i18n="allPayments">All payments</h3>
+        <div id="financeList"><p class="empty-state" data-i18n="noPaymentRecords">No payment records yet.</p></div>
       </div>
     </section>
 
     <!-- MAINTENANCE -->
     <section id="tab-maint" style="display:none">
       <div class="card">
-        <h3>Maintenance requests</h3>
-        <div id="adminMaintList"><p class="empty-state">No requests yet.</p></div>
+        <h3 data-i18n="maintenanceRequests">Maintenance requests</h3>
+        <div id="adminMaintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
       </div>
     </section>
 
   </div>
 
   <div class="tabbar">
-    <button class="tab-btn active" data-tab="overview"><span class="tab-icon">📊</span>Overview</button>
-    <button class="tab-btn" data-tab="access"><span class="tab-icon">🔑</span>Access</button>
-    <button class="tab-btn" data-tab="workers"><span class="tab-icon">👷</span>Workers</button>
-    <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span>Finance</button>
-    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span>Maint.</button>
+    <button class="tab-btn active" data-tab="overview"><span class="tab-icon">📊</span><span data-i18n="tabOverview">Overview</span></button>
+    <button class="tab-btn" data-tab="access"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
+    <button class="tab-btn" data-tab="workers"><span class="tab-icon">👷</span><span data-i18n="tabWorkers">Workers</span></button>
+    <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabMaintShort">Maint.</span></button>
   </div>
 </div>
 
+<script src="i18n.js"></script>
 <script type="module" src="admin.js"></script>
 </body>
 </html>

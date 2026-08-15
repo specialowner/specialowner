@@ -4,6 +4,7 @@ const APP_SHELL = [
   "/resident.html",
   "/admin.html",
   "/style.css",
+  "/i18n.js",
   "/manifest.json"
 ];
 

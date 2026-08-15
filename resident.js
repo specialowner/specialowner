@@ -8,7 +8,7 @@ const { user, profile } = await requireAuth("resident");
 
 function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
-  return window.SO_I18N.translations[lang][key];
+  return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
 function renderGreeting() {

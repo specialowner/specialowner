@@ -10,12 +10,23 @@ import {
 
 let mode = "login"; // 'login' | 'register'
 
+function t(key) {
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
+}
+
 const modeToggle = document.getElementById("modeToggle");
 const nameField = document.getElementById("nameField");
 const unitField = document.getElementById("unitField");
 const submitBtn = document.getElementById("submitBtn");
 const authForm = document.getElementById("authForm");
 const authError = document.getElementById("authError");
+
+function syncSubmitLabel() {
+  submitBtn.textContent = mode === "register" ? t("createAccount") : t("login");
+}
+syncSubmitLabel();
+window.addEventListener("so-lang-changed", syncSubmitLabel);
 
 modeToggle.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
@@ -25,7 +36,7 @@ modeToggle.addEventListener("click", (e) => {
   const isRegister = mode === "register";
   nameField.style.display = isRegister ? "block" : "none";
   unitField.style.display = isRegister ? "block" : "none";
-  submitBtn.textContent = isRegister ? "Create account" : "Log in";
+  syncSubmitLabel();
 });
 
 authForm.addEventListener("submit", async (e) => {
