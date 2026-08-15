@@ -101,8 +101,10 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
       createdAt: serverTimestamp()
     });
 
-    const qrPayload = JSON.stringify({ inviteId: ref.id, token });
+    const qrPayload = JSON.stringify({ inviteId: ref.id, token, ts: Date.now() });
     const canvas = document.getElementById("qrCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe any previously drawn QR first
     await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0f6e5f" } });
     document.getElementById("qrResultCard").style.display = "block";
     document.getElementById("guestName").value = "";
@@ -194,5 +196,5 @@ function fmtDate(v) {
   return v;
 }
 function cryptoToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(8))).map(b => b.toString(16).padStart(2, "0")).join("");
+  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
 }
