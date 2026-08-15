@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Resident</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 id="greetName">Hi 👋</h1>
+        <div class="sub" id="greetUnit">Unit —</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+
+    <!-- HOME -->
+    <section id="tab-home">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-box">
+          <div class="num" id="pointsNum">0</div>
+          <div class="lbl">Points balance</div>
+        </div>
+        <div class="stat-box">
+          <div class="num" id="dueNum">EGP 0</div>
+          <div class="lbl">Outstanding due</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Payment status</h3>
+        <div id="paymentsList"><p class="empty-state">No payment records yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3>Announcements</h3>
+        <div id="announcementsList"><p class="empty-state">No announcements yet.</p></div>
+      </div>
+    </section>
+
+    <!-- INVITATIONS -->
+    <section id="tab-invites" style="display:none">
+      <div class="card">
+        <h3>New invitation</h3>
+        <div class="field">
+          <label>Guest name</label>
+          <input type="text" id="guestName" placeholder="e.g. Mona Youssef">
+        </div>
+        <div class="field">
+          <label>Guest phone (optional)</label>
+          <input type="text" id="guestPhone" placeholder="01xxxxxxxxx">
+        </div>
+        <div class="field">
+          <label>Visit date</label>
+          <input type="date" id="guestDate">
+        </div>
+        <button class="btn btn-primary" id="createInviteBtn">Generate QR invitation</button>
+      </div>
+
+      <div class="card" id="qrResultCard" style="display:none">
+        <h3>Share this QR with your guest</h3>
+        <div class="qr-box"><canvas id="qrCanvas"></canvas></div>
+      </div>
+
+      <div class="card">
+        <h3>My invitations</h3>
+        <div id="invitesList"><p class="empty-state">No invitations yet.</p></div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE -->
+    <section id="tab-maint" style="display:none">
+      <div class="card">
+        <h3>New maintenance request</h3>
+        <div class="field">
+          <label>Category</label>
+          <select id="maintCategory">
+            <option>Plumbing</option>
+            <option>Electrical</option>
+            <option>AC / Cooling</option>
+            <option>Carpentry</option>
+            <option>Cleaning</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Describe the issue</label>
+          <textarea id="maintDesc" placeholder="What's going on?"></textarea>
+        </div>
+        <button class="btn btn-primary" id="createMaintBtn">Submit request</button>
+      </div>
+      <div class="card">
+        <h3>My requests</h3>
+        <div id="maintList"><p class="empty-state">No requests yet.</p></div>
+      </div>
+    </section>
+
+    <!-- SHOPS -->
+    <section id="tab-shops" style="display:none">
+      <div class="card" style="text-align:center">
+        <div class="label">Your points balance</div>
+        <div style="font-size:26px;font-weight:800;color:var(--primary)" id="shopsPoints">0</div>
+      </div>
+      <div id="shopsList"><p class="empty-state">No partner shops yet.</p></div>
+    </section>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span>Home</button>
+    <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span>Invites</button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span>Maintenance</button>
+    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span>Shops</button>
+  </div>
+</div>
+
+<script type="module" src="resident.js"></script>
+</body>
+</html>

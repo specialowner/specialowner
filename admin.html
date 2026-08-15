@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Admin</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a4f45">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+</head>
+<body>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1>Admin</h1>
+        <div class="sub">Special Owner · Compound control</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+
+    <!-- OVERVIEW -->
+    <section id="tab-overview">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-box"><div class="num" id="statResidents">0</div><div class="lbl">Residents</div></div>
+        <div class="stat-box"><div class="num" id="statWorkers">0</div><div class="lbl">Active workers</div></div>
+        <div class="stat-box"><div class="num" id="statPending">0</div><div class="lbl">Pending requests</div></div>
+        <div class="stat-box"><div class="num" id="statOverdue">0</div><div class="lbl">Overdue payments</div></div>
+      </div>
+      <div class="card">
+        <h3>Post an announcement</h3>
+        <div class="field"><label>Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday"></div>
+        <div class="field"><label>Details</label><textarea id="annBody" placeholder="Details for residents"></textarea></div>
+        <button class="btn btn-primary" id="postAnnBtn">Publish</button>
+      </div>
+    </section>
+
+    <!-- ACCESS -->
+    <section id="tab-access" style="display:none">
+      <div class="card">
+        <h3>Scan guest / worker QR</h3>
+        <div id="qrReader" style="border-radius:10px;overflow:hidden"></div>
+        <p id="scanResult" style="margin-top:10px;font-size:13px"></p>
+      </div>
+      <div class="card">
+        <h3>Recent access log</h3>
+        <div id="accessList"><p class="empty-state">No entries yet.</p></div>
+      </div>
+    </section>
+
+    <!-- WORKERS -->
+    <section id="tab-workers" style="display:none">
+      <div class="card">
+        <h3>Add worker</h3>
+        <div class="field"><label>Name</label><input type="text" id="workerName" placeholder="Worker full name"></div>
+        <div class="field"><label>Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician"></div>
+        <div class="field"><label>Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx"></div>
+        <button class="btn btn-primary" id="addWorkerBtn">Add worker</button>
+      </div>
+      <div class="card">
+        <h3>Workers</h3>
+        <div id="workersList"><p class="empty-state">No workers added yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FINANCES -->
+    <section id="tab-finance" style="display:none">
+      <div class="card">
+        <h3>Add payment record</h3>
+        <div class="field"><label>Resident unit</label><input type="text" id="payUnit" placeholder="e.g. B-204"></div>
+        <div class="field"><label>Resident email</label><input type="text" id="payEmail" placeholder="resident's account email"></div>
+        <div class="field"><label>Amount (EGP)</label><input type="number" id="payAmount" placeholder="0"></div>
+        <div class="field"><label>Due date</label><input type="date" id="payDue"></div>
+        <div class="field"><label>Description</label><input type="text" id="payDesc" placeholder="e.g. Monthly maintenance fee"></div>
+        <button class="btn btn-primary" id="addPayBtn">Add record</button>
+      </div>
+      <div class="card">
+        <h3>All payments</h3>
+        <div id="financeList"><p class="empty-state">No payment records yet.</p></div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE -->
+    <section id="tab-maint" style="display:none">
+      <div class="card">
+        <h3>Maintenance requests</h3>
+        <div id="adminMaintList"><p class="empty-state">No requests yet.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="overview"><span class="tab-icon">📊</span>Overview</button>
+    <button class="tab-btn" data-tab="access"><span class="tab-icon">🔑</span>Access</button>
+    <button class="tab-btn" data-tab="workers"><span class="tab-icon">👷</span>Workers</button>
+    <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span>Finance</button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span>Maint.</button>
+  </div>
+</div>
+
+<script type="module" src="admin.js"></script>
+</body>
+</html>
