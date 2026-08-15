@@ -6,8 +6,18 @@ import {
 
 const { user, profile } = await requireAuth("resident");
 
-document.getElementById("greetName").textContent = `Hi, ${profile.name?.split(" ")[0] || "there"} 👋`;
-document.getElementById("greetUnit").textContent = `Unit ${profile.unit || "—"}`;
+function t(key) {
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  return window.SO_I18N.translations[lang][key];
+}
+
+function renderGreeting() {
+  document.getElementById("greetName").textContent = `${t("hiThere")}, ${profile.name?.split(" ")[0] || ""} 👋`;
+  document.getElementById("greetUnit").textContent = `${t("unitLabel")} ${profile.unit || "—"}`;
+}
+renderGreeting();
+window.addEventListener("so-lang-changed", renderGreeting);
+
 document.getElementById("pointsNum").textContent = profile.points ?? 0;
 document.getElementById("shopsPoints").textContent = profile.points ?? 0;
 document.getElementById("logoutBtn").addEventListener("click", logout);
@@ -23,14 +33,14 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 }));
 
 // ---------- Payments ----------
-const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid), orderBy("dueDate", "desc"));
+const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
   const el = document.getElementById("paymentsList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">No payment records yet.</p>`; return; }
   let totalDue = 0;
   el.innerHTML = "";
-  snap.forEach(d => {
-    const p = d.data();
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+  rows.forEach(p => {
     if (p.status !== "paid") totalDue += Number(p.amount || 0);
     el.innerHTML += `
       <div class="list-item">
@@ -69,34 +79,51 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
   const guestDate = document.getElementById("guestDate").value;
   if (!guestName || !guestDate) { alert("Please fill in the guest name and visit date."); return; }
 
-  const token = cryptoToken();
-  const ref = await addDoc(collection(db, "invitations"), {
-    residentId: user.uid,
-    residentUnit: profile.unit || "",
-    guestName, guestPhone,
-    visitDate: guestDate,
-    token,
-    status: "pending",
-    type: "guest",
-    createdAt: serverTimestamp()
-  });
+  const btn = document.getElementById("createInviteBtn");
+  const originalLabel = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = "…";
 
-  const qrPayload = JSON.stringify({ inviteId: ref.id, token });
-  const canvas = document.getElementById("qrCanvas");
-  await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0f6e5f" } });
-  document.getElementById("qrResultCard").style.display = "block";
-  document.getElementById("guestName").value = "";
-  document.getElementById("guestPhone").value = "";
-  document.getElementById("guestDate").value = "";
+  try {
+    if (typeof QRCode === "undefined") {
+      throw new Error("QR library did not load. Check your internet connection or ad-blocker and reload the page.");
+    }
+
+    const token = cryptoToken();
+    const ref = await addDoc(collection(db, "invitations"), {
+      residentId: user.uid,
+      residentUnit: profile.unit || "",
+      guestName, guestPhone,
+      visitDate: guestDate,
+      token,
+      status: "pending",
+      type: "guest",
+      createdAt: serverTimestamp()
+    });
+
+    const qrPayload = JSON.stringify({ inviteId: ref.id, token });
+    const canvas = document.getElementById("qrCanvas");
+    await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0f6e5f" } });
+    document.getElementById("qrResultCard").style.display = "block";
+    document.getElementById("guestName").value = "";
+    document.getElementById("guestPhone").value = "";
+    document.getElementById("guestDate").value = "";
+  } catch (err) {
+    console.error("Invite creation failed:", err);
+    alert("Could not create the invitation: " + (err.message || err));
+  } finally {
+    btn.disabled = false;
+    btn.textContent = originalLabel;
+  }
 });
 
-const invitesQ = query(collection(db, "invitations"), where("residentId", "==", user.uid), orderBy("createdAt", "desc"));
+const invitesQ = query(collection(db, "invitations"), where("residentId", "==", user.uid));
 onSnapshot(invitesQ, (snap) => {
   const el = document.getElementById("invitesList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">No invitations yet.</p>`; return; }
   el.innerHTML = "";
-  snap.forEach(d => {
-    const i = d.data();
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  rows.forEach(i => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
@@ -124,13 +151,13 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
   document.getElementById("maintDesc").value = "";
 });
 
-const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid), orderBy("createdAt", "desc"));
+const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid));
 onSnapshot(maintQ, (snap) => {
   const el = document.getElementById("maintList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">No requests yet.</p>`; return; }
   el.innerHTML = "";
-  snap.forEach(d => {
-    const m = d.data();
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  rows.forEach(m => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">

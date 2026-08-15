@@ -8,9 +8,13 @@
 <meta name="theme-color" content="#0f6e5f">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="icon-192.png">
-<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<script src="https://unpkg.com/qrcode@1.5.3/build/qrcode.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js'"></script>
 </head>
 <body>
+<div class="lang-toggle">
+  <button data-lang="en">EN</button>
+  <button data-lang="ar">عربي</button>
+</div>
 <div class="app-shell">
   <div class="topbar">
     <div style="display:flex;align-items:center;gap:10px">
@@ -30,61 +34,61 @@
       <div class="grid-2" style="margin-bottom:14px">
         <div class="stat-box">
           <div class="num" id="pointsNum">0</div>
-          <div class="lbl">Points balance</div>
+          <div class="lbl" data-i18n="pointsBalance">Points balance</div>
         </div>
         <div class="stat-box">
           <div class="num" id="dueNum">EGP 0</div>
-          <div class="lbl">Outstanding due</div>
+          <div class="lbl" data-i18n="outstandingDue">Outstanding due</div>
         </div>
       </div>
 
       <div class="card">
-        <h3>Payment status</h3>
-        <div id="paymentsList"><p class="empty-state">No payment records yet.</p></div>
+        <h3 data-i18n="paymentStatus">Payment status</h3>
+        <div id="paymentsList"><p class="empty-state" data-i18n="noPayments">No payment records yet.</p></div>
       </div>
 
       <div class="card">
-        <h3>Announcements</h3>
-        <div id="announcementsList"><p class="empty-state">No announcements yet.</p></div>
+        <h3 data-i18n="announcements">Announcements</h3>
+        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
       </div>
     </section>
 
     <!-- INVITATIONS -->
     <section id="tab-invites" style="display:none">
       <div class="card">
-        <h3>New invitation</h3>
+        <h3 data-i18n="newInvitation">New invitation</h3>
         <div class="field">
-          <label>Guest name</label>
-          <input type="text" id="guestName" placeholder="e.g. Mona Youssef">
+          <label data-i18n="guestName">Guest name</label>
+          <input type="text" id="guestName" placeholder="e.g. Mona Youssef" data-i18n-placeholder="guestNamePh">
         </div>
         <div class="field">
-          <label>Guest phone (optional)</label>
-          <input type="text" id="guestPhone" placeholder="01xxxxxxxxx">
+          <label data-i18n="guestPhone">Guest phone (optional)</label>
+          <input type="text" id="guestPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="guestPhonePh">
         </div>
         <div class="field">
-          <label>Visit date</label>
+          <label data-i18n="visitDate">Visit date</label>
           <input type="date" id="guestDate">
         </div>
-        <button class="btn btn-primary" id="createInviteBtn">Generate QR invitation</button>
+        <button class="btn btn-primary" id="createInviteBtn" data-i18n="generateQr">Generate QR invitation</button>
       </div>
 
       <div class="card" id="qrResultCard" style="display:none">
-        <h3>Share this QR with your guest</h3>
+        <h3 data-i18n="shareQr">Share this QR with your guest</h3>
         <div class="qr-box"><canvas id="qrCanvas"></canvas></div>
       </div>
 
       <div class="card">
-        <h3>My invitations</h3>
-        <div id="invitesList"><p class="empty-state">No invitations yet.</p></div>
+        <h3 data-i18n="myInvitations">My invitations</h3>
+        <div id="invitesList"><p class="empty-state" data-i18n="noInvitations">No invitations yet.</p></div>
       </div>
     </section>
 
     <!-- MAINTENANCE -->
     <section id="tab-maint" style="display:none">
       <div class="card">
-        <h3>New maintenance request</h3>
+        <h3 data-i18n="newMaintRequest">New maintenance request</h3>
         <div class="field">
-          <label>Category</label>
+          <label data-i18n="category">Category</label>
           <select id="maintCategory">
             <option>Plumbing</option>
             <option>Electrical</option>
@@ -95,36 +99,37 @@
           </select>
         </div>
         <div class="field">
-          <label>Describe the issue</label>
-          <textarea id="maintDesc" placeholder="What's going on?"></textarea>
+          <label data-i18n="describeIssue">Describe the issue</label>
+          <textarea id="maintDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
         </div>
-        <button class="btn btn-primary" id="createMaintBtn">Submit request</button>
+        <button class="btn btn-primary" id="createMaintBtn" data-i18n="submitRequest">Submit request</button>
       </div>
       <div class="card">
-        <h3>My requests</h3>
-        <div id="maintList"><p class="empty-state">No requests yet.</p></div>
+        <h3 data-i18n="myRequests">My requests</h3>
+        <div id="maintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
       </div>
     </section>
 
     <!-- SHOPS -->
     <section id="tab-shops" style="display:none">
       <div class="card" style="text-align:center">
-        <div class="label">Your points balance</div>
+        <div class="label" data-i18n="yourPointsBalance">Your points balance</div>
         <div style="font-size:26px;font-weight:800;color:var(--primary)" id="shopsPoints">0</div>
       </div>
-      <div id="shopsList"><p class="empty-state">No partner shops yet.</p></div>
+      <div id="shopsList"><p class="empty-state" data-i18n="noShops">No partner shops yet.</p></div>
     </section>
 
   </div>
 
   <div class="tabbar">
-    <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span>Home</button>
-    <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span>Invites</button>
-    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span>Maintenance</button>
-    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span>Shops</button>
+    <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabHome">Home</span></button>
+    <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabMaint">Maintenance</span></button>
+    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
   </div>
 </div>
 
+<script src="i18n.js"></script>
 <script type="module" src="resident.js"></script>
 </body>
 </html>
