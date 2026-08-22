@@ -1,13 +1,13 @@
-const CACHE_NAME = "special-owner-v3";
+const CACHE_NAME = "special-owner-v4";
 const APP_SHELL = [
-  "/index.html",
-  "/resident.html",
-  "/admin.html",
-  "/style.css",
-  "/i18n.js",
-  "/qrcode.min.js",
-  "/html5-qrcode.min.js",
-  "/manifest.json"
+  "index.html",
+  "resident.html",
+  "admin.html",
+  "style.css",
+  "i18n.js",
+  "qrcode.min.js",
+  "html5-qrcode.min.js",
+  "manifest.json"
 ];
 
 self.addEventListener("install", (event) => {
