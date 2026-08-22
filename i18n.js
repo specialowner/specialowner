@@ -108,7 +108,7 @@ const translations = {
     maintenanceRequests: "Maintenance requests"
   },
   ar: {
-    appName: "سبيشيال أونر",
+    appName: "Special Owner",
     tagline: "كمباوندك في تطبيق واحد",
     login: "تسجيل الدخول",
     signup: "إنشاء حساب",
@@ -162,7 +162,7 @@ const translations = {
 
     // Admin
     adminTitle: "الأدمن",
-    adminSub: "سبيشيال أونر · إدارة الكمباوند",
+    adminSub: "Special Owner · إدارة الكمباوند",
     residents: "السكان",
     activeWorkers: "العمال النشطين",
     pendingRequests: "الطلبات المعلقة",
@@ -211,7 +211,7 @@ const translations = {
 };
 
 function getLang() {
-  return localStorage.getItem("so_lang") || "en";
+  return localStorage.getItem("so_lang") || "ar";
 }
 
 function applyLang(lang) {
