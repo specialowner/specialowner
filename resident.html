@@ -31,6 +31,7 @@
 
     <!-- HOME -->
     <section id="tab-home">
+      <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
       <div class="grid-2" style="margin-bottom:14px">
         <div class="stat-box">
           <div class="num" id="pointsNum">0</div>
@@ -55,6 +56,13 @@
 
     <!-- INVITATIONS -->
     <section id="tab-invites" style="display:none">
+      <div class="card" id="invitesLockCard" style="display:none;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🔒</div>
+        <h3 data-i18n="lockedTitle">This feature is locked</h3>
+        <p style="font-size:13px;color:var(--muted);margin:8px 0 14px" id="invitesLockMsg" data-i18n="lockedMsgPending">Your account is awaiting admin approval to use this feature.</p>
+        <button class="btn btn-accent" id="requestActivationBtnInvites" data-i18n="requestActivation">Request activation</button>
+      </div>
+      <div id="invitesUnlockedArea">
       <div class="card">
         <h3 data-i18n="newInvitation">New invitation</h3>
         <div class="field">
@@ -81,10 +89,18 @@
         <h3 data-i18n="myInvitations">My invitations</h3>
         <div id="invitesList"><p class="empty-state" data-i18n="noInvitations">No invitations yet.</p></div>
       </div>
+      </div>
     </section>
 
     <!-- MAINTENANCE -->
     <section id="tab-maint" style="display:none">
+      <div class="card" id="maintLockCard" style="display:none;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🔒</div>
+        <h3 data-i18n="lockedTitle">This feature is locked</h3>
+        <p style="font-size:13px;color:var(--muted);margin:8px 0 14px" id="maintLockMsg" data-i18n="lockedMsgPending">Your account is awaiting admin approval to use this feature.</p>
+        <button class="btn btn-accent" id="requestActivationBtnMaint" data-i18n="requestActivation">Request activation</button>
+      </div>
+      <div id="maintUnlockedArea">
       <div class="card">
         <h3 data-i18n="newMaintRequest">New maintenance request</h3>
         <div class="field">
@@ -107,6 +123,7 @@
       <div class="card">
         <h3 data-i18n="myRequests">My requests</h3>
         <div id="maintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
+      </div>
       </div>
     </section>
 

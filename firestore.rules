@@ -12,17 +12,25 @@ service cloud.firestore {
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
     }
+    function isActiveResident() {
+      return isSignedIn() &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.accountStatus == 'active';
+    }
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      // A resident may only touch their own activation-request fields — not role, accountStatus, or points.
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['activationRequestStatus', 'activationRequestedAt']));
       allow delete: if isAdmin();
     }
 
     match /invitations/{inviteId} {
       allow read: if isSignedIn(); // security/admin need to read any invite to validate a scan
-      allow create: if isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId);
+      allow create: if isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident();
       allow update: if isAdmin(); // only admin/security marks an invite as used
       allow delete: if isAdmin();
     }
@@ -34,7 +42,7 @@ service cloud.firestore {
 
     match /maintenanceRequests/{reqId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.residentId);
+      allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

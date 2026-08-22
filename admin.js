@@ -38,6 +38,48 @@ onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), 
   document.getElementById("statOverdue").textContent = snap.size;
 });
 
+// ---------- Residents & activation requests ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
+  const el = document.getElementById("residentsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  // Show pending activation requests first, then the rest
+  rows.sort((a, b) => {
+    const aPending = a.activationRequestStatus === "pending" ? 0 : 1;
+    const bPending = b.activationRequestStatus === "pending" ? 0 : 1;
+    return aPending - bPending;
+  });
+  rows.forEach(r => {
+    const status = r.accountStatus || "active";
+    const hasRequest = r.activationRequestStatus === "pending";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.name || r.email} ${hasRequest ? "🔔" : ""}</div>
+          <div class="sub">${t("unitLabel")} ${r.unit || "—"} · ${r.email || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          ${status === "active"
+            ? `<button class="btn btn-sm btn-danger" data-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
+            : `<button class="btn btn-sm btn-primary" data-action="approve" data-id="${r.id}">${t("approve")}</button>`
+          }
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const uid = btn.dataset.id;
+      const action = btn.dataset.action;
+      await updateDoc(doc(db, "users", uid), {
+        accountStatus: action === "approve" ? "active" : "suspended",
+        activationRequestStatus: "none"
+      });
+    });
+  });
+});
+
 // ---------- Announcements ----------
 document.getElementById("postAnnBtn").addEventListener("click", async () => {
   const title = document.getElementById("annTitle").value.trim();

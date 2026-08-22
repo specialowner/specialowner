@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import {
-  collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc
+  collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("resident");
@@ -17,10 +17,60 @@ function renderGreeting() {
 }
 renderGreeting();
 window.addEventListener("so-lang-changed", renderGreeting);
+window.addEventListener("so-lang-changed", renderAccountStatus);
 
 document.getElementById("pointsNum").textContent = profile.points ?? 0;
 document.getElementById("shopsPoints").textContent = profile.points ?? 0;
 document.getElementById("logoutBtn").addEventListener("click", logout);
+
+// ---------- Account status (pending / active / suspended) ----------
+// Missing field = legacy account created before this feature = treated as active.
+let currentAccountStatus = "active";
+let activationRequestPending = false;
+
+const userDocRef = doc(db, "users", user.uid);
+onSnapshot(userDocRef, (snap) => {
+  const data = snap.data() || {};
+  currentAccountStatus = data.accountStatus || "active";
+  activationRequestPending = data.activationRequestStatus === "pending";
+  renderAccountStatus();
+});
+
+function renderAccountStatus() {
+  const isLocked = currentAccountStatus !== "active";
+  const banner = document.getElementById("statusBanner");
+  if (isLocked) {
+    banner.style.display = "block";
+    banner.textContent = currentAccountStatus === "suspended" ? t("statusSuspendedBanner") : t("statusPendingBanner");
+  } else {
+    banner.style.display = "none";
+  }
+
+  ["invites", "maint"].forEach(tab => {
+    const lockCard = document.getElementById(tab === "invites" ? "invitesLockCard" : "maintLockCard");
+    const lockMsg = document.getElementById(tab === "invites" ? "invitesLockMsg" : "maintLockMsg");
+    const unlockedArea = document.getElementById(tab === "invites" ? "invitesUnlockedArea" : "maintUnlockedArea");
+    lockCard.style.display = isLocked ? "block" : "none";
+    unlockedArea.style.display = isLocked ? "none" : "block";
+    if (isLocked) lockMsg.textContent = currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending");
+  });
+}
+
+async function requestActivation() {
+  if (activationRequestPending) { alert(t("requestAlreadySent")); return; }
+  try {
+    await updateDoc(userDocRef, {
+      activationRequestStatus: "pending",
+      activationRequestedAt: serverTimestamp()
+    });
+    alert(t("requestSent"));
+  } catch (err) {
+    console.error("Activation request failed:", err);
+    alert(err.message || err);
+  }
+}
+document.getElementById("requestActivationBtnInvites").addEventListener("click", requestActivation);
+document.getElementById("requestActivationBtnMaint").addEventListener("click", requestActivation);
 
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab-btn");
@@ -74,6 +124,7 @@ onSnapshot(annQ, (snap) => {
 
 // ---------- Invitations ----------
 document.getElementById("createInviteBtn").addEventListener("click", async () => {
+  if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
   const guestName = document.getElementById("guestName").value.trim();
   const guestPhone = document.getElementById("guestPhone").value.trim();
   const guestDate = document.getElementById("guestDate").value;
@@ -139,6 +190,7 @@ onSnapshot(invitesQ, (snap) => {
 
 // ---------- Maintenance ----------
 document.getElementById("createMaintBtn").addEventListener("click", async () => {
+  if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
   const category = document.getElementById("maintCategory").value;
   const description = document.getElementById("maintDesc").value.trim();
   if (!description) { alert("Please describe the issue."); return; }

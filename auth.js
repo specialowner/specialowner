@@ -58,6 +58,7 @@ authForm.addEventListener("submit", async (e) => {
         email,
         unit,
         role: "resident",        // default role — admins are promoted manually in Firestore
+        accountStatus: "pending", // locked until admin approves (resident can request activation)
         points: 0,
         createdAt: serverTimestamp()
       });
