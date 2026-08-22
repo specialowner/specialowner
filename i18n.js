@@ -80,6 +80,8 @@ const translations = {
     tabMaintShort: "Maint.",
 
     scanQr: "Scan guest / worker QR",
+    cameraLoading: "Loading camera…",
+    cameraUnavailable: "Camera unavailable — check browser permissions, or open this page on a phone/tablet with a camera.",
     recentAccessLog: "Recent access log",
     noEntries: "No entries yet.",
 
@@ -181,6 +183,8 @@ const translations = {
     tabMaintShort: "الصيانة",
 
     scanQr: "مسح رمز QR للضيف / العامل",
+    cameraLoading: "جاري تحميل الكاميرا…",
+    cameraUnavailable: "الكاميرا مش متاحة — تأكد من إذن الوصول للكاميرا، أو افتح الصفحة دي من موبايل/تابلت فيه كاميرا.",
     recentAccessLog: "سجل الدخول الأخير",
     noEntries: "لا توجد سجلات بعد.",
 

@@ -8,6 +8,11 @@ import {
 const { user, profile } = await requireAuth("admin");
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
+function t(key) {
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
+}
+
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab-btn");
 tabs.forEach(btn => btn.addEventListener("click", () => {
@@ -62,7 +67,7 @@ document.getElementById("addWorkerBtn").addEventListener("click", async () => {
 
 onSnapshot(query(collection(db, "workers"), orderBy("createdAt", "desc")), (snap) => {
   const el = document.getElementById("workersList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No workers added yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noWorkers")}</p>`; return; }
   el.innerHTML = "";
   snap.forEach(d => {
     const w = d.data();
@@ -103,7 +108,7 @@ document.getElementById("addPayBtn").addEventListener("click", async () => {
 
 onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (snap) => {
   const el = document.getElementById("financeList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No payment records yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPaymentRecords")}</p>`; return; }
   el.innerHTML = "";
   snap.forEach(d => {
     const p = d.data();
@@ -121,7 +126,7 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
 // ---------- Maintenance (admin view + status update) ----------
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   const el = document.getElementById("adminMaintList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No requests yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
   el.innerHTML = "";
   snap.forEach(d => {
     const m = d.data();
@@ -148,7 +153,7 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
 // ---------- Access log ----------
 onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (snap) => {
   const el = document.getElementById("accessList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No entries yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
   el.innerHTML = "";
   let count = 0;
   snap.forEach(d => {
@@ -203,7 +208,7 @@ function startScanner() {
     },
     () => {} // ignore per-frame scan failures
   ).catch(() => {
-    document.getElementById("scanResult").textContent = "Camera unavailable — check browser permissions.";
+    document.getElementById("scanResult").textContent = "❌ " + t("cameraUnavailable");
   });
 }
 

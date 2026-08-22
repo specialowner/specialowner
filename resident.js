@@ -36,7 +36,7 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
   const el = document.getElementById("paymentsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No payment records yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
   let totalDue = 0;
   el.innerHTML = "";
   const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
@@ -58,7 +58,7 @@ onSnapshot(paymentsQ, (snap) => {
 const annQ = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
 onSnapshot(annQ, (snap) => {
   const el = document.getElementById("announcementsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No announcements yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noAnnouncements")}</p>`; return; }
   el.innerHTML = "";
   snap.forEach(d => {
     const a = d.data();
@@ -122,7 +122,7 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
 const invitesQ = query(collection(db, "invitations"), where("residentId", "==", user.uid));
 onSnapshot(invitesQ, (snap) => {
   const el = document.getElementById("invitesList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No invitations yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noInvitations")}</p>`; return; }
   el.innerHTML = "";
   const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   rows.forEach(i => {
@@ -156,7 +156,7 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
 const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid));
 onSnapshot(maintQ, (snap) => {
   const el = document.getElementById("maintList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No requests yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
   el.innerHTML = "";
   const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
   rows.forEach(m => {
@@ -175,7 +175,7 @@ onSnapshot(maintQ, (snap) => {
 const shopsQ = query(collection(db, "shops"), orderBy("name", "asc"));
 onSnapshot(shopsQ, (snap) => {
   const el = document.getElementById("shopsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">No partner shops yet.</p>`; return; }
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noShops")}</p>`; return; }
   el.innerHTML = "";
   snap.forEach(d => {
     const s = d.data();
