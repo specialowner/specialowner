@@ -123,6 +123,8 @@ onSnapshot(annQ, (snap) => {
 });
 
 // ---------- Invitations ----------
+let lastInviteInfo = null;
+
 document.getElementById("createInviteBtn").addEventListener("click", async () => {
   if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
   const guestName = document.getElementById("guestName").value.trim();
@@ -158,6 +160,10 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
     ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe any previously drawn QR first
     await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0f6e5f" } });
     document.getElementById("qrResultCard").style.display = "block";
+
+    // Keep the message/guest details available for the WhatsApp share button below.
+    lastInviteInfo = { guestName, visitDate: guestDate, residentUnit: profile.unit || "" };
+
     document.getElementById("guestName").value = "";
     document.getElementById("guestPhone").value = "";
     document.getElementById("guestDate").value = "";
@@ -186,6 +192,37 @@ onSnapshot(invitesQ, (snap) => {
         <span class="badge ${i.status}">${i.status}</span>
       </div>`;
   });
+});
+
+// ---------- WhatsApp share ----------
+document.getElementById("shareWhatsappBtn").addEventListener("click", async () => {
+  if (!lastInviteInfo) return;
+  const message =
+    `دعوة دخول - ${lastInviteInfo.guestName}\n` +
+    `${t("unitLabel")}: ${lastInviteInfo.residentUnit || "—"}\n` +
+    `${t("visitDate")}: ${fmtVisitDateTime(lastInviteInfo.visitDate)}\n` +
+    `يرجى إظهار رمز QR المرفق عند البوابة.`;
+
+  const canvas = document.getElementById("qrCanvas");
+
+  // Try the native share sheet first (works on most mobile browsers) so the
+  // QR image and the message go together in one share action.
+  try {
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
+    const file = new File([blob], "invitation-qr.png", { type: "image/png" });
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], text: message });
+      return;
+    }
+  } catch (err) {
+    // If the user just cancels the native share sheet, don't fall through to the wa.me link too.
+    if (err && err.name === "AbortError") return;
+    console.warn("Native share unavailable, falling back to wa.me link:", err);
+  }
+
+  // Fallback: open WhatsApp with the text pre-filled; the image has to be attached manually.
+  alert(t("whatsappShareUnsupported"));
+  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
 });
 
 // ---------- Maintenance ----------

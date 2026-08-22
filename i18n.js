@@ -45,6 +45,8 @@ const translations = {
     visitDate: "Visit date",
     generateQr: "Generate QR invitation",
     shareQr: "Share this QR with your guest",
+    shareWhatsapp: "Send via WhatsApp",
+    whatsappShareUnsupported: "Your browser can't attach the image automatically. WhatsApp will open with the message ready — please attach the QR image (long-press it above and save, or use the download) before sending.",
     myInvitations: "My invitations",
     noInvitations: "No invitations yet.",
 
@@ -161,6 +163,8 @@ const translations = {
     visitDate: "تاريخ الزيارة",
     generateQr: "توليد رمز QR للدعوة",
     shareQr: "شارك رمز QR ده مع ضيفك",
+    shareWhatsapp: "إرسال عبر واتساب",
+    whatsappShareUnsupported: "المتصفح مش بيدعم إرفاق الصورة تلقائيًا. هافتحلك واتساب بالرسالة جاهزة — محتاج بس ترفق صورة الـ QR بنفسك (اضغط مطولًا عليها فوق واحفظها، أو نزّلها) قبل ما تبعت.",
     myInvitations: "دعواتي",
     noInvitations: "لا توجد دعوات بعد.",
 
