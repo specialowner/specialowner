@@ -181,7 +181,7 @@ onSnapshot(invitesQ, (snap) => {
       <div class="list-item">
         <div class="meta">
           <div class="title">${i.guestName}</div>
-          <div class="sub">Visit: ${i.visitDate}</div>
+          <div class="sub">${t("visitDate")}: ${fmtVisitDateTime(i.visitDate)}</div>
         </div>
         <span class="badge ${i.status}">${i.status}</span>
       </div>`;
@@ -246,6 +246,15 @@ function fmtDate(v) {
   if (!v) return "—";
   if (v.toDate) return v.toDate().toLocaleDateString();
   return v;
+}
+function fmtVisitDateTime(v) {
+  if (!v) return "—";
+  const d = new Date(v); // v is a "datetime-local" string, e.g. 2026-08-23T14:30
+  if (isNaN(d.getTime())) return v;
+  return d.toLocaleString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
 }
 function cryptoToken() {
   return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
