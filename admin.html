@@ -54,6 +54,14 @@
             <option value="workers" data-i18n="audienceWorkers">Staff only</option>
           </select>
         </div>
+        <div class="field" id="annTargetField" style="display:none">
+          <label data-i18n="chooseRecipients">Choose recipients</label>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <input type="checkbox" id="annSelectAll" checked>
+            <label for="annSelectAll" style="font-size:12px" data-i18n="selectAll">Select all</label>
+          </div>
+          <div id="annTargetList" style="max-height:220px;overflow-y:auto;border:1px solid #dfe6e3;border-radius:8px;padding:8px"></div>
+        </div>
         <button class="btn btn-primary" id="postAnnBtn" data-i18n="publish">Publish</button>
       </div>
     </section>
@@ -118,6 +126,15 @@
       <div class="card">
         <h3 data-i18n="leaveRequestsReview">Leave requests</h3>
         <div id="leaveRequestsList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="advanceRequestsReview">Advance requests</h3>
+        <div id="advanceRequestsList"><p class="empty-state" data-i18n="noAdvanceRequests">No advance requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="salaryAndLeaveManage">Salary & leave balance</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="salaryManageNote">Set each worker's monthly salary breakdown and leave balance, then archive the month once it's final.</p>
+        <div id="salaryManageList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
       </div>
       <div class="card">
         <h3 data-i18n="addWorker">Add worker</h3>

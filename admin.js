@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import {
-  collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
+  collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
   onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
@@ -41,9 +41,11 @@ onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), 
 // ---------- Residents & activation requests ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   const el = document.getElementById("residentsList");
+  residentsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (document.getElementById("annAudience").value === "residents") renderAnnTargetList();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`; return; }
   el.innerHTML = "";
-  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const rows = residentsCache.slice();
   // Show pending activation requests first, then the rest
   rows.sort((a, b) => {
     const aPending = a.activationRequestStatus === "pending" ? 0 : 1;
@@ -81,25 +83,85 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
 });
 
 // ---------- Announcements ----------
+let residentsCache = [];
+let workersCache = [];
+
+function renderAnnTargetList() {
+  const audience = document.getElementById("annAudience").value;
+  const field = document.getElementById("annTargetField");
+  const list = document.getElementById("annTargetList");
+  if (audience === "all") { field.style.display = "none"; return; }
+  field.style.display = "block";
+
+  if (audience === "residents") {
+    if (residentsCache.length === 0) {
+      list.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`;
+      return;
+    }
+    list.innerHTML = residentsCache.map(r => `
+      <label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px">
+        <input type="checkbox" class="annTargetCheck" value="${r.id}" checked>
+        <span>${r.name || r.email || r.id} · ${t("unitLabel")} ${r.unit || "—"}</span>
+      </label>`).join("");
+  } else if (audience === "workers") {
+    if (workersCache.length === 0) {
+      list.innerHTML = `<p class="empty-state">${t("noStaffYet")}</p>`;
+      return;
+    }
+    // Quick filter chips per worker craft/type (e.g. select all electricians / security).
+    const types = [...new Set(workersCache.map(w => w.workerType).filter(Boolean))];
+    const chips = types.map(wt => `<button type="button" class="btn btn-sm btn-outline ann-craft-chip" data-craft="${wt}" style="margin:0 4px 8px 0">${t(wt) || wt}</button>`).join("");
+    list.innerHTML = (chips ? `<div style="margin-bottom:6px">${chips}</div>` : "") + workersCache.map(w => `
+      <label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px" data-craft="${w.workerType || ""}">
+        <input type="checkbox" class="annTargetCheck" value="${w.id}" checked>
+        <span>${w.name || w.email || w.id} · ${t(w.workerType) || w.workerType || ""}</span>
+      </label>`).join("");
+    list.querySelectorAll(".ann-craft-chip").forEach(chip => {
+      chip.addEventListener("click", () => {
+        const craft = chip.dataset.craft;
+        list.querySelectorAll(`label[data-craft="${craft}"] .annTargetCheck`).forEach(cb => cb.checked = true);
+        list.querySelectorAll(".annTargetCheck").forEach(cb => {
+          if (cb.closest("label").dataset.craft !== craft) cb.checked = false;
+        });
+        document.getElementById("annSelectAll").checked = false;
+      });
+    });
+  }
+}
+
+document.getElementById("annAudience").addEventListener("change", renderAnnTargetList);
+document.getElementById("annSelectAll").addEventListener("change", (e) => {
+  document.querySelectorAll(".annTargetCheck").forEach(cb => cb.checked = e.target.checked);
+});
+
 document.getElementById("postAnnBtn").addEventListener("click", async () => {
   const title = document.getElementById("annTitle").value.trim();
   const body = document.getElementById("annBody").value.trim();
   const audience = document.getElementById("annAudience").value; // all | residents | workers
-  if (!title) { alert("Please enter a title."); return; }
-  await addDoc(collection(db, "announcements"), {
-    title, body, audience, createdBy: user.uid, createdAt: serverTimestamp()
-  });
+  if (!title) { alert(t("enterTitleAlert") || "Please enter a title."); return; }
+
+  const payload = { title, body, audience, createdBy: user.uid, createdAt: serverTimestamp() };
+
+  if (audience !== "all") {
+    const targetIds = [...document.querySelectorAll(".annTargetCheck:checked")].map(cb => cb.value);
+    if (targetIds.length === 0) { alert(t("chooseAtLeastOne") || "Please choose at least one recipient."); return; }
+    payload.targetIds = targetIds;
+  }
+
+  await addDoc(collection(db, "announcements"), payload);
   document.getElementById("annTitle").value = "";
   document.getElementById("annBody").value = "";
-  alert("Announcement published.");
+  alert(t("announcementPublished") || "Announcement published.");
 });
 
 // ---------- Staff accounts & activation requests ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   const el = document.getElementById("staffAccountsList");
+  workersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  if (document.getElementById("annAudience").value === "workers") renderAnnTargetList();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noStaffYet")}</p>`; return; }
   el.innerHTML = "";
-  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const rows = workersCache.slice();
   rows.sort((a, b) => {
     const aPending = a.activationRequestStatus === "pending" ? 0 : 1;
     const bPending = b.activationRequestStatus === "pending" ? 0 : 1;
@@ -113,10 +175,6 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
         <div class="meta">
           <div class="title">${r.name || r.email} ${hasRequest ? "🔔" : ""}</div>
           <div class="sub">${t(r.workerType) || r.workerType} · ${r.email || ""}</div>
-          <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
-            <input type="number" class="salary-input" data-id="${r.id}" placeholder="${t("salaryPlaceholder")}" value="${r.salary || ""}" style="width:100px;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px">
-            <button class="btn btn-sm btn-outline" data-save-salary="${r.id}">${t("save")}</button>
-          </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
@@ -135,11 +193,102 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
       });
     });
   });
-  el.querySelectorAll("button[data-save-salary]").forEach(btn => {
+  renderSalaryManageList();
+});
+
+// ---------- Salary breakdown & leave balance management ----------
+function renderSalaryManageList() {
+  const el = document.getElementById("salaryManageList");
+  if (!el) return;
+  if (workersCache.length === 0) { el.innerHTML = `<p class="empty-state">${t("noWorkers")}</p>`; return; }
+  const monthNow = new Date().toISOString().slice(0, 7); // YYYY-MM
+  el.innerHTML = workersCache.map(w => `
+    <div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px">
+      <div class="meta">
+        <div class="title">${w.name || w.email}</div>
+        <div class="sub">${t(w.workerType) || w.workerType || ""}</div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryBasic">Basic</label>
+          <input type="number" class="wm-basic" data-id="${w.id}" value="${w.salaryBasic || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryAllowances">Allowances</label>
+          <input type="number" class="wm-allowances" data-id="${w.id}" value="${w.salaryAllowances || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryIncentives">Incentives</label>
+          <input type="number" class="wm-incentives" data-id="${w.id}" value="${w.salaryIncentives || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryDeductions">Deductions</label>
+          <input type="number" class="wm-deductions" data-id="${w.id}" value="${w.salaryDeductions || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="leaveBalance">Leave balance</label>
+          <input type="number" class="wm-leave" data-id="${w.id}" value="${w.leaveBalance ?? 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn btn-sm btn-outline" data-save-worker="${w.id}">${t("save")}</button>
+        <button class="btn btn-sm btn-primary" data-archive-worker="${w.id}">${t("archiveMonth") || "Archive this month"}</button>
+      </div>
+    </div>`).join("");
+
+  el.querySelectorAll("button[data-save-worker]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      const input = el.querySelector(`.salary-input[data-id="${btn.dataset.saveSalary}"]`);
-      const val = Number(input.value) || 0;
-      await updateDoc(doc(db, "users", btn.dataset.saveSalary), { salary: val });
+      const id = btn.dataset.saveWorker;
+      await updateDoc(doc(db, "users", id), {
+        salaryBasic: Number(el.querySelector(`.wm-basic[data-id="${id}"]`).value) || 0,
+        salaryAllowances: Number(el.querySelector(`.wm-allowances[data-id="${id}"]`).value) || 0,
+        salaryIncentives: Number(el.querySelector(`.wm-incentives[data-id="${id}"]`).value) || 0,
+        salaryDeductions: Number(el.querySelector(`.wm-deductions[data-id="${id}"]`).value) || 0,
+        leaveBalance: Number(el.querySelector(`.wm-leave[data-id="${id}"]`).value) || 0
+      });
+      alert(t("saved") || "Saved.");
+    });
+  });
+
+  el.querySelectorAll("button[data-archive-worker]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const id = btn.dataset.archiveWorker;
+      const worker = workersCache.find(w => w.id === id) || {};
+      const basic = Number(el.querySelector(`.wm-basic[data-id="${id}"]`).value) || 0;
+      const allowances = Number(el.querySelector(`.wm-allowances[data-id="${id}"]`).value) || 0;
+      const incentives = Number(el.querySelector(`.wm-incentives[data-id="${id}"]`).value) || 0;
+      const deductions = Number(el.querySelector(`.wm-deductions[data-id="${id}"]`).value) || 0;
+      const net = basic + allowances + incentives - deductions;
+      // One record per worker per calendar month — re-archiving the same month overwrites it.
+      await setDoc(doc(db, "salaryRecords", `${id}_${monthNow}`), {
+        workerId: id,
+        workerName: worker.name || "",
+        month: monthNow,
+        basic, allowances, incentives, deductions, net,
+        createdAt: serverTimestamp()
+      });
+      await updateDoc(doc(db, "users", id), {
+        salaryBasic: basic, salaryAllowances: allowances, salaryIncentives: incentives, salaryDeductions: deductions
+      });
+      alert(t("monthArchived") || "Month archived to salary history.");
+    });
+  });
+}
+
+// ---------- Advance requests review ----------
+onSnapshot(query(collection(db, "advanceRequests"), orderBy("createdAt", "desc")), (snap) => {
+  const el = document.getElementById("advanceRequestsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noAdvanceRequests")}</p>`; return; }
+  el.innerHTML = "";
+  snap.forEach(d => {
+    const r = d.data();
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.workerName || ""} · EGP ${r.amount}</div>
+          <div class="sub">${r.months} ${t("monthsShort") || "mo"} · EGP ${r.installment}/${t("monthShort") || "mo"} · ${r.reason || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${r.status}">${t(r.status)}</span>
+          ${r.status === "pending" ? `
+            <button class="btn btn-sm btn-primary" data-adv-action="approved" data-id="${d.id}">${t("approve")}</button>
+            <button class="btn btn-sm btn-danger" data-adv-action="rejected" data-id="${d.id}">${t("reject")}</button>` : ""}
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-adv-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "advanceRequests", btn.dataset.id), { status: btn.dataset.advAction });
     });
   });
 });

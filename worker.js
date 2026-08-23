@@ -28,22 +28,32 @@ if (isSecurity) {
   document.getElementById("scannerTabBtn").style.display = "flex";
 } else {
   document.getElementById("ordersTabBtn").style.display = "flex";
+  // Orders is the actual reason non-security staff are hired, so it comes first
+  // and opens by default instead of Home.
+  const tabbar = document.getElementById("tabbar");
+  const homeBtn = document.querySelector('.tab-btn[data-tab="home"]');
+  const ordersBtn = document.getElementById("ordersTabBtn");
+  tabbar.insertBefore(ordersBtn, homeBtn);
 }
 
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab-btn");
 let scannerStarted = false;
-tabs.forEach(btn => btn.addEventListener("click", () => {
-  tabs.forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
+function activateTab(tabName) {
+  tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
   ["home", "scanner", "orders"].forEach(tab => {
     const section = document.getElementById(`tab-${tab}`);
-    if (section) section.style.display = (tab === btn.dataset.tab) ? "block" : "none";
+    if (section) section.style.display = (tab === tabName) ? "block" : "none";
   });
-  if (btn.dataset.tab === "scanner" && isSecurity) startScanner();
-}));
+  if (tabName === "scanner" && isSecurity) startScanner();
+}
+tabs.forEach(btn => btn.addEventListener("click", () => activateTab(btn.dataset.tab)));
+activateTab(isSecurity ? "home" : "orders");
 
-// ---------- Account status (pending / active / suspended) ----------
+// ---------- Today's date + leave balance ----------
+document.getElementById("todayDate").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+// ---------- Account status (pending / active / suspended) + salary ----------
 let currentAccountStatus = "active";
 let activationRequestPending = false;
 const userDocRef = doc(db, "users", user.uid);
@@ -51,7 +61,26 @@ onSnapshot(userDocRef, (snap) => {
   const data = snap.data() || {};
   currentAccountStatus = data.accountStatus || "active";
   activationRequestPending = data.activationRequestStatus === "pending";
-  document.getElementById("salaryAmount").textContent = data.salary ? `EGP ${data.salary}` : "—";
+
+  document.getElementById("leaveBalanceAmount").textContent =
+    (data.leaveBalance || data.leaveBalance === 0) ? `${data.leaveBalance} ${t("daysShort") || ""}` : "—";
+
+  const basic = data.salaryBasic || 0;
+  const allowances = data.salaryAllowances || 0;
+  const incentives = data.salaryIncentives || 0;
+  const deductions = data.salaryDeductions || 0;
+  const net = basic + allowances + incentives - deductions;
+  const hasBreakdown = data.salaryBasic || data.salaryAllowances || data.salaryIncentives || data.salaryDeductions;
+
+  document.getElementById("salaryBasicVal").textContent = `EGP ${basic}`;
+  document.getElementById("salaryAllowancesVal").textContent = `EGP ${allowances}`;
+  document.getElementById("salaryIncentivesVal").textContent = `EGP ${incentives}`;
+  document.getElementById("salaryDeductionsVal").textContent = `EGP ${deductions}`;
+  // Fall back to the old flat "salary" field for accounts that haven't been switched to the new breakdown yet.
+  document.getElementById("salaryAmount").textContent = hasBreakdown
+    ? `EGP ${net}`
+    : (data.salary ? `EGP ${data.salary}` : "—");
+
   renderAccountStatus();
 });
 
@@ -95,6 +124,7 @@ function renderAccountStatus() {
   document.getElementById("startBreakBtn").disabled = isLocked;
   document.getElementById("endBreakBtn").disabled = isLocked;
   document.getElementById("submitLeaveBtn").disabled = isLocked;
+  document.getElementById("submitAdvanceBtn").disabled = isLocked;
 }
 
 // ---------- Attendance (clock in / out / break) ----------
@@ -213,11 +243,71 @@ onSnapshot(leaveQ, (snap) => {
   });
 });
 
+// ---------- Salary history (past months, archived by admin) ----------
+const salaryHistoryQ = query(collection(db, "salaryRecords"), where("workerId", "==", user.uid));
+onSnapshot(salaryHistoryQ, (snap) => {
+  const el = document.getElementById("salaryHistoryList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noSalaryHistory")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.month || "").localeCompare(a.month || ""));
+  rows.forEach(r => {
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.month || ""}</div>
+          <div class="sub">${t("netSalary")}: EGP ${r.net ?? 0}</div>
+        </div>
+      </div>`;
+  });
+});
+
+// ---------- Advance (سلفة) requests ----------
+document.getElementById("submitAdvanceBtn").addEventListener("click", async () => {
+  if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
+  const amount = Number(document.getElementById("advanceAmount").value) || 0;
+  const months = Number(document.getElementById("advanceMonths").value) || 0;
+  const reason = document.getElementById("advanceReason").value.trim();
+  if (amount <= 0 || months <= 0) { alert(t("fillAdvanceFields") || "Please enter an amount and number of months."); return; }
+
+  await addDoc(collection(db, "advanceRequests"), {
+    workerId: user.uid,
+    workerName: profile.name || "",
+    amount, months,
+    installment: Math.round((amount / months) * 100) / 100,
+    reason,
+    status: "pending",
+    createdAt: serverTimestamp()
+  });
+  document.getElementById("advanceAmount").value = "";
+  document.getElementById("advanceMonths").value = "";
+  document.getElementById("advanceReason").value = "";
+});
+
+const advanceQ = query(collection(db, "advanceRequests"), where("workerId", "==", user.uid));
+onSnapshot(advanceQ, (snap) => {
+  const el = document.getElementById("advanceList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noAdvanceRequests")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  rows.forEach(r => {
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">EGP ${r.amount} · ${r.months} ${t("monthsShort") || ""}</div>
+          <div class="sub">${t("installmentLabel") || "Installment"}: EGP ${r.installment}/${t("monthShort") || "mo"} · ${r.reason || ""}</div>
+        </div>
+        <span class="badge ${r.status}">${t(r.status)}</span>
+      </div>`;
+  });
+});
+
 // ---------- Staff announcements (audience: all | workers) ----------
 const annQ = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
 onSnapshot(annQ, (snap) => {
   const el = document.getElementById("announcementsList");
-  const rows = snap.docs.map(d => d.data()).filter(a => !a.audience || a.audience === "all" || a.audience === "workers");
+  const rows = snap.docs.map(d => d.data())
+    .filter(a => !a.audience || a.audience === "all" || a.audience === "workers")
+    .filter(a => !a.targetIds || a.targetIds.length === 0 || a.targetIds.includes(user.uid));
   if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noAnnouncements")}</p>`; return; }
   el.innerHTML = "";
   rows.forEach(a => {

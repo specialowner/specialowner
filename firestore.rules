@@ -101,5 +101,17 @@ service cloud.firestore {
       allow update: if isAdmin(); // only admin approves/rejects
       allow delete: if isAdmin();
     }
+
+    match /advanceRequests/{advId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
+      allow update: if isAdmin(); // only admin approves/rejects
+      allow delete: if isAdmin();
+    }
+
+    match /salaryRecords/{recordId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow write: if isAdmin(); // admin builds and archives the monthly breakdown
+    }
   }
 }

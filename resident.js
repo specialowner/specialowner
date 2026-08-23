@@ -108,7 +108,9 @@ onSnapshot(paymentsQ, (snap) => {
 const annQ = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
 onSnapshot(annQ, (snap) => {
   const el = document.getElementById("announcementsList");
-  const rows = snap.docs.map(d => d.data()).filter(a => !a.audience || a.audience === "all" || a.audience === "residents");
+  const rows = snap.docs.map(d => d.data())
+    .filter(a => !a.audience || a.audience === "all" || a.audience === "residents")
+    .filter(a => !a.targetIds || a.targetIds.length === 0 || a.targetIds.includes(user.uid));
   if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noAnnouncements")}</p>`; return; }
   el.innerHTML = "";
   rows.forEach(a => {
