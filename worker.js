@@ -45,13 +45,31 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 
 // ---------- Account status (pending / active / suspended) ----------
 let currentAccountStatus = "active";
+let activationRequestPending = false;
 const userDocRef = doc(db, "users", user.uid);
 onSnapshot(userDocRef, (snap) => {
   const data = snap.data() || {};
   currentAccountStatus = data.accountStatus || "active";
+  activationRequestPending = data.activationRequestStatus === "pending";
   document.getElementById("salaryAmount").textContent = data.salary ? `EGP ${data.salary}` : "—";
   renderAccountStatus();
 });
+
+async function requestActivation() {
+  if (activationRequestPending) { alert(t("requestAlreadySent")); return; }
+  try {
+    await updateDoc(userDocRef, {
+      activationRequestStatus: "pending",
+      activationRequestedAt: serverTimestamp()
+    });
+    alert(t("requestSent"));
+  } catch (err) {
+    console.error("Activation request failed:", err);
+    alert(err.message || err);
+  }
+}
+document.getElementById("requestActivationBtnScanner").addEventListener("click", requestActivation);
+document.getElementById("requestActivationBtnOrders").addEventListener("click", requestActivation);
 
 function renderAccountStatus() {
   const isLocked = currentAccountStatus !== "active";
