@@ -92,26 +92,47 @@ function renderAccountStatus() {
   document.getElementById("ordersLockMsg").textContent = lockMsg;
 
   document.getElementById("clockInBtn").disabled = isLocked;
+  document.getElementById("startBreakBtn").disabled = isLocked;
+  document.getElementById("endBreakBtn").disabled = isLocked;
   document.getElementById("submitLeaveBtn").disabled = isLocked;
 }
 
-// ---------- Attendance (clock in / out) ----------
+// ---------- Attendance (clock in / out / break) ----------
 let openShiftId = null;
+let onBreak = false;
+let breakStart = null; // Firestore Timestamp of the currently running break, if any
 const attendanceQ = query(collection(db, "attendance"), where("workerId", "==", user.uid), where("status", "==", "open"));
 onSnapshot(attendanceQ, (snap) => {
   if (snap.empty) {
     openShiftId = null;
+    onBreak = false;
+    breakStart = null;
     document.getElementById("shiftStatusText").textContent = t("shiftClosed");
     document.getElementById("clockInBtn").style.display = "block";
     document.getElementById("clockOutBtn").style.display = "none";
+    document.getElementById("startBreakBtn").style.display = "none";
+    document.getElementById("endBreakBtn").style.display = "none";
   } else {
     const d = snap.docs[0];
     openShiftId = d.id;
-    const clockIn = d.data().clockIn;
+    const data = d.data();
+    onBreak = !!data.onBreak;
+    breakStart = data.breakStart || null;
+    const clockIn = data.clockIn;
     const timeStr = clockIn?.toDate ? clockIn.toDate().toLocaleString() : "";
-    document.getElementById("shiftStatusText").textContent = `${t("shiftOpenSince")} ${timeStr}`;
+
+    if (onBreak) {
+      const bStr = breakStart?.toDate ? breakStart.toDate().toLocaleTimeString() : "";
+      document.getElementById("shiftStatusText").textContent = `${t("onBreakSince")} ${bStr}`;
+    } else {
+      document.getElementById("shiftStatusText").textContent = `${t("shiftOpenSince")} ${timeStr}`;
+    }
+
     document.getElementById("clockInBtn").style.display = "none";
-    document.getElementById("clockOutBtn").style.display = "block";
+    // Must end the break before clocking out, so the shift's total time stays accurate.
+    document.getElementById("clockOutBtn").style.display = onBreak ? "none" : "block";
+    document.getElementById("startBreakBtn").style.display = onBreak ? "none" : "block";
+    document.getElementById("endBreakBtn").style.display = onBreak ? "block" : "none";
   }
 });
 
@@ -123,6 +144,9 @@ document.getElementById("clockInBtn").addEventListener("click", async () => {
     clockIn: serverTimestamp(),
     clockOut: null,
     status: "open",
+    onBreak: false,
+    breakStart: null,
+    totalBreakSeconds: 0,
     date: new Date().toISOString().slice(0, 10)
   });
 });
@@ -130,6 +154,25 @@ document.getElementById("clockInBtn").addEventListener("click", async () => {
 document.getElementById("clockOutBtn").addEventListener("click", async () => {
   if (!openShiftId) return;
   await updateDoc(doc(db, "attendance", openShiftId), { clockOut: serverTimestamp(), status: "closed" });
+});
+
+document.getElementById("startBreakBtn").addEventListener("click", async () => {
+  if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
+  if (!openShiftId) return;
+  await updateDoc(doc(db, "attendance", openShiftId), { onBreak: true, breakStart: serverTimestamp() });
+});
+
+document.getElementById("endBreakBtn").addEventListener("click", async () => {
+  if (!openShiftId || !breakStart) return;
+  const startMs = breakStart.toDate ? breakStart.toDate().getTime() : Date.now();
+  const elapsedSeconds = Math.max(0, Math.round((Date.now() - startMs) / 1000));
+  const shiftSnap = await getDoc(doc(db, "attendance", openShiftId));
+  const prevTotal = shiftSnap.exists() ? (shiftSnap.data().totalBreakSeconds || 0) : 0;
+  await updateDoc(doc(db, "attendance", openShiftId), {
+    onBreak: false,
+    breakStart: null,
+    totalBreakSeconds: prevTotal + elapsedSeconds
+  });
 });
 
 // ---------- Leave requests ----------

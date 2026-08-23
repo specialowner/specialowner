@@ -153,13 +153,18 @@ onSnapshot(query(collection(db, "attendance"), orderBy("clockIn", "desc")), (sna
     const s = d.data();
     const inTime = s.clockIn?.toDate ? s.clockIn.toDate().toLocaleString() : "—";
     const outTime = s.clockOut?.toDate ? s.clockOut.toDate().toLocaleTimeString() : t("shiftOngoing");
+    const totalBreakMin = s.totalBreakSeconds ? Math.round(s.totalBreakSeconds / 60) : 0;
+    const breakInfo = totalBreakMin > 0 ? ` · ${t("totalBreak")}: ${totalBreakMin} ${t("minutesShort")}` : "";
+    const badge = s.status === "open"
+      ? (s.onBreak ? `<span class="badge pending">${t("onBreakBadge")}</span>` : `<span class="badge pending">${t("shiftOngoing")}</span>`)
+      : "";
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
           <div class="title">${s.workerName || ""}</div>
-          <div class="sub">${inTime} → ${outTime}</div>
+          <div class="sub">${inTime} → ${outTime}${breakInfo}</div>
         </div>
-        ${s.status === "open" ? `<span class="badge pending">${t("shiftOngoing")}</span>` : ""}
+        ${badge}
       </div>`;
   });
 });

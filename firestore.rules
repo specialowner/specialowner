@@ -88,10 +88,10 @@ service cloud.firestore {
     match /attendance/{attId} {
       allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
       allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
-      // Worker may only close their own shift (clockOut/status); admin can do anything.
+      // Worker may only close their own shift or toggle their own break (clockOut/status/onBreak/breakStart/totalBreakSeconds); admin can do anything.
       allow update: if isAdmin() ||
         (isActiveWorker() && resource.data.workerId == request.auth.uid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clockOut', 'status']));
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clockOut', 'status', 'onBreak', 'breakStart', 'totalBreakSeconds']));
       allow delete: if isAdmin();
     }
 
