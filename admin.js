@@ -144,6 +144,26 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
   });
 });
 
+// ---------- Worker shifts (attendance) ----------
+onSnapshot(query(collection(db, "attendance"), orderBy("clockIn", "desc")), (snap) => {
+  const el = document.getElementById("shiftsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noShiftsYet")}</p>`; return; }
+  el.innerHTML = "";
+  snap.docs.slice(0, 50).forEach(d => {
+    const s = d.data();
+    const inTime = s.clockIn?.toDate ? s.clockIn.toDate().toLocaleString() : "—";
+    const outTime = s.clockOut?.toDate ? s.clockOut.toDate().toLocaleTimeString() : t("shiftOngoing");
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${s.workerName || ""}</div>
+          <div class="sub">${inTime} → ${outTime}</div>
+        </div>
+        ${s.status === "open" ? `<span class="badge pending">${t("shiftOngoing")}</span>` : ""}
+      </div>`;
+  });
+});
+
 // ---------- Leave requests review ----------
 onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")), (snap) => {
   const el = document.getElementById("leaveRequestsList");
