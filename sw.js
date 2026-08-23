@@ -1,8 +1,9 @@
-const CACHE_NAME = "special-owner-v4";
+const CACHE_NAME = "special-owner-v5";
 const APP_SHELL = [
   "index.html",
   "resident.html",
   "admin.html",
+  "worker.html",
   "style.css",
   "i18n.js",
   "qrcode.min.js",

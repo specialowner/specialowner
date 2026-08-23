@@ -46,6 +46,14 @@
         <h3 data-i18n="postAnnouncement">Post an announcement</h3>
         <div class="field"><label data-i18n="title">Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday" data-i18n-placeholder="titlePh"></div>
         <div class="field"><label data-i18n="details">Details</label><textarea id="annBody" placeholder="Details for residents" data-i18n-placeholder="detailsPh"></textarea></div>
+        <div class="field">
+          <label data-i18n="audience">Audience</label>
+          <select id="annAudience">
+            <option value="all" data-i18n="audienceAll">Everyone</option>
+            <option value="residents" data-i18n="audienceResidents">Residents only</option>
+            <option value="workers" data-i18n="audienceWorkers">Staff only</option>
+          </select>
+        </div>
         <button class="btn btn-primary" id="postAnnBtn" data-i18n="publish">Publish</button>
       </div>
     </section>
@@ -100,7 +108,16 @@
     <!-- WORKERS -->
     <section id="tab-workers" style="display:none">
       <div class="card">
+        <h3 data-i18n="staffAccountsAndRequests">Staff accounts & activation requests</h3>
+        <div id="staffAccountsList"><p class="empty-state" data-i18n="noStaffYet">No staff accounts yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="leaveRequestsReview">Leave requests</h3>
+        <div id="leaveRequestsList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+      <div class="card">
         <h3 data-i18n="addWorker">Add worker</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="rosterNote">Roster entry only — for staff who need app access, ask them to sign up as "Staff / Worker" from the login screen instead.</p>
         <div class="field"><label data-i18n="workerName">Name</label><input type="text" id="workerName" placeholder="Worker full name" data-i18n-placeholder="workerNamePh"></div>
         <div class="field"><label data-i18n="workerRole">Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician" data-i18n-placeholder="workerRolePh"></div>
         <div class="field"><label data-i18n="workerPhone">Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="workerPhonePh"></div>

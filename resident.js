@@ -108,10 +108,10 @@ onSnapshot(paymentsQ, (snap) => {
 const annQ = query(collection(db, "announcements"), orderBy("createdAt", "desc"));
 onSnapshot(annQ, (snap) => {
   const el = document.getElementById("announcementsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noAnnouncements")}</p>`; return; }
+  const rows = snap.docs.map(d => d.data()).filter(a => !a.audience || a.audience === "all" || a.audience === "residents");
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noAnnouncements")}</p>`; return; }
   el.innerHTML = "";
-  snap.forEach(d => {
-    const a = d.data();
+  rows.forEach(a => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">

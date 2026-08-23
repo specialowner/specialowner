@@ -84,13 +84,98 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
 document.getElementById("postAnnBtn").addEventListener("click", async () => {
   const title = document.getElementById("annTitle").value.trim();
   const body = document.getElementById("annBody").value.trim();
+  const audience = document.getElementById("annAudience").value; // all | residents | workers
   if (!title) { alert("Please enter a title."); return; }
   await addDoc(collection(db, "announcements"), {
-    title, body, createdBy: user.uid, createdAt: serverTimestamp()
+    title, body, audience, createdBy: user.uid, createdAt: serverTimestamp()
   });
   document.getElementById("annTitle").value = "";
   document.getElementById("annBody").value = "";
   alert("Announcement published.");
+});
+
+// ---------- Staff accounts & activation requests ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
+  const el = document.getElementById("staffAccountsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noStaffYet")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  rows.sort((a, b) => {
+    const aPending = a.activationRequestStatus === "pending" ? 0 : 1;
+    const bPending = b.activationRequestStatus === "pending" ? 0 : 1;
+    return aPending - bPending;
+  });
+  rows.forEach(r => {
+    const status = r.accountStatus || "active";
+    const hasRequest = r.activationRequestStatus === "pending";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.name || r.email} ${hasRequest ? "🔔" : ""}</div>
+          <div class="sub">${t(r.workerType) || r.workerType} · ${r.email || ""}</div>
+          <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+            <input type="number" class="salary-input" data-id="${r.id}" placeholder="${t("salaryPlaceholder")}" value="${r.salary || ""}" style="width:100px;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px">
+            <button class="btn btn-sm btn-outline" data-save-salary="${r.id}">${t("save")}</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          ${status === "active"
+            ? `<button class="btn btn-sm btn-danger" data-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
+            : `<button class="btn btn-sm btn-primary" data-action="approve" data-id="${r.id}">${t("approve")}</button>`
+          }
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "users", btn.dataset.id), {
+        accountStatus: btn.dataset.action === "approve" ? "active" : "suspended",
+        activationRequestStatus: "none"
+      });
+    });
+  });
+  el.querySelectorAll("button[data-save-salary]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const input = el.querySelector(`.salary-input[data-id="${btn.dataset.saveSalary}"]`);
+      const val = Number(input.value) || 0;
+      await updateDoc(doc(db, "users", btn.dataset.saveSalary), { salary: val });
+    });
+  });
+});
+
+// ---------- Leave requests review ----------
+onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")), (snap) => {
+  const el = document.getElementById("leaveRequestsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noLeaveRequests")}</p>`; return; }
+  el.innerHTML = "";
+  snap.forEach(d => {
+    const r = d.data();
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.workerName} · ${r.fromDate} → ${r.toDate}</div>
+          <div class="sub">${r.reason || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${r.status}">${r.status}</span>
+          ${r.status === "pending" ? `
+            <button class="btn btn-sm btn-primary" data-leave-approve="${d.id}">${t("approve")}</button>
+            <button class="btn btn-sm btn-danger" data-leave-reject="${d.id}">${t("reject")}</button>
+          ` : ""}
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-leave-approve]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveApprove), { status: "approved" });
+    });
+  });
+  el.querySelectorAll("button[data-leave-reject]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveReject), { status: "rejected" });
+    });
+  });
 });
 
 // ---------- Workers ----------
@@ -165,23 +250,30 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   });
 });
 
-// ---------- Maintenance (admin view + status update) ----------
-onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
+// ---------- Maintenance (admin view + status update + assign worker) ----------
+let workerOptionsCache = [];
+let lastMaintDocs = [];
+
+function renderMaintList() {
   const el = document.getElementById("adminMaintList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
+  if (lastMaintDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
+  const assignableWorkers = workerOptionsCache.filter(w => w.workerType !== "security");
   el.innerHTML = "";
-  snap.forEach(d => {
-    const m = d.data();
+  lastMaintDocs.forEach(m => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
           <div class="title">${m.unit || "—"} · ${m.category}</div>
           <div class="sub">${m.description}</div>
+          <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
+            <option value="">${t("unassigned")}</option>
+            ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${t(w.workerType)})</option>`).join("")}
+          </select>
         </div>
-        <select data-id="${d.id}" class="maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
-          <option value="pending" ${m.status === "pending" ? "selected" : ""}>Pending</option>
-          <option value="in_progress" ${m.status === "in_progress" ? "selected" : ""}>In progress</option>
-          <option value="completed" ${m.status === "completed" ? "selected" : ""}>Completed</option>
+        <select data-id="${m.id}" class="maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
+          <option value="pending" ${m.status === "pending" ? "selected" : ""}>${t("pending")}</option>
+          <option value="in_progress" ${m.status === "in_progress" ? "selected" : ""}>${t("in_progress")}</option>
+          <option value="completed" ${m.status === "completed" ? "selected" : ""}>${t("completed")}</option>
         </select>
       </div>`;
   });
@@ -190,6 +282,21 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
       await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), { status: sel.value });
     });
   });
+  el.querySelectorAll(".maint-assign").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), { assignedWorkerId: sel.value || null });
+    });
+  });
+}
+
+onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
+  workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderMaintList();
+});
+
+onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
+  lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderMaintList();
 });
 
 // ---------- Access log ----------

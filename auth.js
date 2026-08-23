@@ -15,7 +15,12 @@ function t(key) {
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
+const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html" };
+
 const modeToggle = document.getElementById("modeToggle");
+const accountTypeField = document.getElementById("accountTypeField");
+const accountTypeSelect = document.getElementById("accountType");
+const workerTypeField = document.getElementById("workerTypeField");
 const nameField = document.getElementById("nameField");
 const unitField = document.getElementById("unitField");
 const submitBtn = document.getElementById("submitBtn");
@@ -28,6 +33,14 @@ function syncSubmitLabel() {
 syncSubmitLabel();
 window.addEventListener("so-lang-changed", syncSubmitLabel);
 
+function syncAccountTypeFields() {
+  const isRegister = mode === "register";
+  const isWorker = isRegister && accountTypeSelect.value === "worker";
+  accountTypeField.style.display = isRegister ? "block" : "none";
+  unitField.style.display = isRegister && !isWorker ? "block" : "none";
+  workerTypeField.style.display = isWorker ? "block" : "none";
+}
+
 modeToggle.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
@@ -35,9 +48,11 @@ modeToggle.addEventListener("click", (e) => {
   [...modeToggle.children].forEach(b => b.classList.toggle("active", b === btn));
   const isRegister = mode === "register";
   nameField.style.display = isRegister ? "block" : "none";
-  unitField.style.display = isRegister ? "block" : "none";
+  syncAccountTypeFields();
   syncSubmitLabel();
 });
+
+accountTypeSelect.addEventListener("change", syncAccountTypeFields);
 
 authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -49,25 +64,43 @@ authForm.addEventListener("submit", async (e) => {
     submitBtn.disabled = true;
     if (mode === "register") {
       const fullName = document.getElementById("fullName").value.trim();
-      const unit = document.getElementById("unitNumber").value.trim();
-      if (!fullName || !unit) throw { message: "Please fill in your name and unit number." };
+      const accountType = accountTypeSelect.value; // 'resident' | 'worker'
 
-      const cred = await createUserWithEmailAndPassword(auth, email, password);
-      await setDoc(doc(db, "users", cred.user.uid), {
-        name: fullName,
-        email,
-        unit,
-        role: "resident",        // default role — admins are promoted manually in Firestore
-        accountStatus: "pending", // locked until admin approves (resident can request activation)
-        points: 0,
-        createdAt: serverTimestamp()
-      });
-      window.location.href = "resident.html";
+      if (accountType === "worker") {
+        if (!fullName) throw { message: "Please fill in your name." };
+        const workerType = document.getElementById("workerType").value;
+
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name: fullName,
+          email,
+          role: "worker",
+          workerType,               // security | maintenance | cleaning | porter | garden
+          accountStatus: "pending", // locked until admin approves
+          createdAt: serverTimestamp()
+        });
+        window.location.href = "worker.html";
+      } else {
+        const unit = document.getElementById("unitNumber").value.trim();
+        if (!fullName || !unit) throw { message: "Please fill in your name and unit number." };
+
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name: fullName,
+          email,
+          unit,
+          role: "resident",
+          accountStatus: "pending", // locked until admin approves (resident can request activation)
+          points: 0,
+          createdAt: serverTimestamp()
+        });
+        window.location.href = "resident.html";
+      }
     } else {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const snap = await getDoc(doc(db, "users", cred.user.uid));
       const role = snap.exists() ? snap.data().role : "resident";
-      window.location.href = role === "admin" ? "admin.html" : "resident.html";
+      window.location.href = HOME_PAGE[role] || "resident.html";
     }
   } catch (err) {
     authError.textContent = friendlyError(err);
@@ -83,9 +116,8 @@ onAuthStateChanged(auth, async (user) => {
   if (user) {
     const snap = await getDoc(doc(db, "users", user.uid));
     const role = snap.exists() ? snap.data().role : "resident";
-    // Only auto-redirect from the login page itself
     if (window.location.pathname === "/" || window.location.pathname.endsWith("index.html")) {
-      window.location.href = role === "admin" ? "admin.html" : "resident.html";
+      window.location.href = HOME_PAGE[role] || "resident.html";
     }
   }
 });

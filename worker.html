@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Staff</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+<script src="html5-qrcode.min.js"></script>
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 id="greetName">Hi 👋</h1>
+        <div class="sub" id="greetRole">—</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+
+    <!-- HOME -->
+    <section id="tab-home">
+      <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
+
+      <div class="card">
+        <h3 data-i18n="myShift">My shift</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px" id="shiftStatusText" data-i18n="shiftClosed">You have no open shift.</p>
+        <button class="btn btn-primary" id="clockInBtn" data-i18n="clockIn">Clock in</button>
+        <button class="btn btn-danger" id="clockOutBtn" style="display:none" data-i18n="clockOut">Clock out</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="mySalary">My salary</h3>
+        <div style="font-size:22px;font-weight:800;color:var(--primary)" id="salaryAmount">—</div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="requestLeave">Request leave</h3>
+        <div class="field">
+          <label data-i18n="fromDate">From</label>
+          <input type="date" id="leaveFrom">
+        </div>
+        <div class="field">
+          <label data-i18n="toDate">To</label>
+          <input type="date" id="leaveTo">
+        </div>
+        <div class="field">
+          <label data-i18n="reason">Reason</label>
+          <textarea id="leaveReason" data-i18n-placeholder="reasonPh" placeholder="Reason for leave"></textarea>
+        </div>
+        <button class="btn btn-accent" id="submitLeaveBtn" data-i18n="submitRequest">Submit request</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="myLeaveRequests">My leave requests</h3>
+        <div id="leaveList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="staffAnnouncements">Staff announcements</h3>
+        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+      </div>
+    </section>
+
+    <!-- SECURITY: QR SCANNER -->
+    <section id="tab-scanner" style="display:none">
+      <div class="card" id="scannerLockCard" style="display:none;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🔒</div>
+        <h3 data-i18n="lockedTitle">This feature is locked</h3>
+        <p style="font-size:13px;color:var(--muted);margin:8px 0" id="scannerLockMsg" data-i18n="lockedMsgPending">Your account is awaiting admin approval.</p>
+      </div>
+      <div id="scannerUnlockedArea">
+        <div class="card">
+          <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
+          <div id="qrReader" style="border-radius:10px;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px" data-i18n="cameraLoading">Loading camera…</div>
+          <p id="scanResult" style="margin-top:10px;font-size:13px"></p>
+        </div>
+        <div class="card">
+          <h3 data-i18n="recentAccessLog">Recent access log</h3>
+          <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE / CLEANING / PORTER / GARDEN: WORK ORDERS -->
+    <section id="tab-orders" style="display:none">
+      <div class="card" id="ordersLockCard" style="display:none;text-align:center">
+        <div style="font-size:32px;margin-bottom:8px">🔒</div>
+        <h3 data-i18n="lockedTitle">This feature is locked</h3>
+        <p style="font-size:13px;color:var(--muted);margin:8px 0" id="ordersLockMsg" data-i18n="lockedMsgPending">Your account is awaiting admin approval.</p>
+      </div>
+      <div id="ordersUnlockedArea">
+        <div class="card">
+          <h3 data-i18n="myWorkOrders">My work orders</h3>
+          <div id="ordersList"><p class="empty-state" data-i18n="noWorkOrders">No work orders assigned yet.</p></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tabbar" id="tabbar">
+    <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabHome">Home</span></button>
+    <button class="tab-btn" data-tab="scanner" id="scannerTabBtn" style="display:none"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
+    <button class="tab-btn" data-tab="orders" id="ordersTabBtn" style="display:none"><span class="tab-icon">🛠️</span><span data-i18n="tabOrders">Orders</span></button>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script type="module" src="worker.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
+</body>
+</html>
