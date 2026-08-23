@@ -36,7 +36,7 @@ input,select,textarea{font-family:inherit}
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
 .badge.pending{background:#fbe9c9;color:var(--warning)}
 .badge.paid,.badge.completed,.badge.active{background:#d7f0e2;color:var(--success)}
-.badge.overdue,.badge.expired{background:#f7d7d2;color:var(--danger)}
+.badge.overdue,.badge.expired,.badge.revoked{background:#f7d7d2;color:var(--danger)}
 .badge.in_progress{background:#dbe7fb;color:#2a5db0}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;width:100%}

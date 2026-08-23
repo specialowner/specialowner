@@ -30,7 +30,8 @@ service cloud.firestore {
 
     match /invitations/{inviteId} {
       allow read: if isSignedIn(); // security/admin need to read any invite to validate a scan
-      allow create: if isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident();
+      allow create: if isAdmin() ||
+        (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
       allow update: if isAdmin(); // only admin/security marks an invite as used
       allow delete: if isAdmin();
     }

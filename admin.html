@@ -8,6 +8,7 @@
 <meta name="theme-color" content="#0a4f45">
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="icon-192.png">
+<script src="qrcode.min.js"></script>
 <script src="html5-qrcode.min.js"></script>
 </head>
 <body>
@@ -51,6 +52,40 @@
 
     <!-- ACCESS -->
     <section id="tab-access" style="display:none">
+      <div class="card">
+        <h3 data-i18n="generateMasterQr">Generate master access QR</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px" data-i18n="masterQrDesc">Opens all gates, elevators, intercoms and garages. Use for maintenance crews or emergencies.</p>
+        <div class="field">
+          <label data-i18n="label">Label</label>
+          <input type="text" id="masterLabel" placeholder="e.g. Elevator maintenance crew" data-i18n-placeholder="masterLabelPh">
+        </div>
+        <div class="field">
+          <label data-i18n="expiresOptional">Expires at (optional)</label>
+          <input type="datetime-local" id="masterExpiry">
+        </div>
+        <div class="field">
+          <label data-i18n="accessZones">Access zones</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="gate" checked><span data-i18n="gate">Gate</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="elevator" checked><span data-i18n="elevator">Elevator</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="intercom" checked><span data-i18n="intercom">Intercom</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="garage" checked><span data-i18n="garage">Garage</span></label>
+          </div>
+        </div>
+        <button class="btn btn-accent" id="generateMasterBtn" data-i18n="generateMasterBtn">Generate master QR</button>
+      </div>
+
+      <div class="card" id="masterQrResultCard" style="display:none;text-align:center">
+        <h3 data-i18n="masterQrReady">Master QR ready</h3>
+        <div class="qr-box"><canvas id="masterQrCanvas"></canvas></div>
+        <button class="btn btn-danger" id="revokeMasterBtn" style="margin-top:12px" data-i18n="revoke">Revoke this code</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="activeMasterCodes">Active master codes</h3>
+        <div id="masterCodesList"><p class="empty-state" data-i18n="noMasterCodes">No master codes yet.</p></div>
+      </div>
+
       <div class="card">
         <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
         <div id="qrReader" style="border-radius:10px;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px" data-i18n="cameraLoading">Loading camera…</div>

@@ -212,6 +212,84 @@ onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (s
 });
 
 // ---------- QR scanner ----------
+// ---------- Master access QR ----------
+function cryptoToken() {
+  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
+}
+
+document.getElementById("generateMasterBtn").addEventListener("click", async () => {
+  const label = document.getElementById("masterLabel").value.trim();
+  const expiryVal = document.getElementById("masterExpiry").value;
+  const zones = [...document.querySelectorAll(".zoneCheck:checked")].map(cb => cb.value);
+  if (!label) { alert("Please enter a label for this code."); return; }
+  if (zones.length === 0) { alert("Select at least one access zone."); return; }
+  if (typeof QRCode === "undefined") { alert("QR library did not load. Reload the page and try again."); return; }
+
+  const btn = document.getElementById("generateMasterBtn");
+  btn.disabled = true;
+  try {
+    const token = cryptoToken();
+    const ref = await addDoc(collection(db, "invitations"), {
+      type: "master",
+      label,
+      accessZones: zones,
+      token,
+      status: "active",
+      createdBy: user.uid,
+      createdAt: serverTimestamp(),
+      expiresAt: expiryVal ? new Date(expiryVal) : null
+    });
+
+    const qrPayload = JSON.stringify({ inviteId: ref.id, token, ts: Date.now() });
+    const canvas = document.getElementById("masterQrCanvas");
+    const ctx = canvas.getContext("2d");
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0a4f45" } });
+    document.getElementById("masterQrResultCard").style.display = "block";
+    document.getElementById("revokeMasterBtn").dataset.id = ref.id;
+    document.getElementById("masterLabel").value = "";
+    document.getElementById("masterExpiry").value = "";
+  } catch (err) {
+    console.error("Master QR generation failed:", err);
+    alert(err.message || err);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById("revokeMasterBtn").addEventListener("click", async () => {
+  const id = document.getElementById("revokeMasterBtn").dataset.id;
+  if (!id) return;
+  await updateDoc(doc(db, "invitations", id), { status: "revoked" });
+  document.getElementById("masterQrResultCard").style.display = "none";
+});
+
+onSnapshot(query(collection(db, "invitations"), where("type", "==", "master")), (snap) => {
+  const el = document.getElementById("masterCodesList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noMasterCodes")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  rows.forEach(m => {
+    const expired = m.expiresAt && m.expiresAt.toDate() < new Date();
+    const status = m.status === "revoked" ? "revoked" : expired ? "expired" : "active";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${m.label}</div>
+          <div class="sub">${(m.accessZones || []).map(z => t(z)).join("، ")}</div>
+        </div>
+        <span class="badge ${status}">${status}</span>
+        ${status === "active" ? `<button class="btn btn-sm btn-danger" data-revoke-id="${m.id}" style="margin-inline-start:6px">${t("revoke")}</button>` : ""}
+      </div>`;
+  });
+  el.querySelectorAll("button[data-revoke-id]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "invitations", btn.dataset.revokeId), { status: "revoked" });
+    });
+  });
+});
+
 let scannerStarted = false;
 function startScanner() {
   if (scannerStarted) return;
@@ -231,19 +309,36 @@ function startScanner() {
           return;
         }
         const invite = inviteSnap.data();
-        if (invite.status === "used") {
-          resultEl.textContent = `⚠️ This invitation was already used (${invite.guestName}).`;
+        const isMaster = invite.type === "master";
+        const displayName = isMaster ? (invite.label || "Master access") : invite.guestName;
+
+        if (invite.expiresAt && invite.expiresAt.toDate() < new Date()) {
+          resultEl.textContent = `⛔ ${t("expired")}: ${displayName}`;
           return;
         }
-        await updateDoc(inviteRef, { status: "used" });
+        if (invite.status === "revoked") {
+          resultEl.textContent = `⛔ ${t("revoked")}: ${displayName}`;
+          return;
+        }
+        // Guest invitations are single-use; master access codes stay valid until expiry/revocation.
+        if (!isMaster) {
+          if (invite.status === "used") {
+            resultEl.textContent = `⚠️ This invitation was already used (${invite.guestName}).`;
+            return;
+          }
+          await updateDoc(inviteRef, { status: "used" });
+        }
         await addDoc(collection(db, "accessLogs"), {
           type: "entry",
           personType: invite.type || "guest",
-          personName: invite.guestName,
+          personName: displayName,
           invitationId: payload.inviteId,
+          zones: invite.accessZones || null,
           timestamp: serverTimestamp()
         });
-        resultEl.textContent = `✅ Access granted: ${invite.guestName} (unit ${invite.residentUnit || "—"})`;
+        resultEl.textContent = isMaster
+          ? `✅ ${t("masterAccessGranted")}: ${displayName} — ${(invite.accessZones || []).map(z => t(z)).join("، ")}`
+          : `✅ Access granted: ${invite.guestName} (unit ${invite.residentUnit || "—"})`;
       } catch (e) {
         document.getElementById("scanResult").textContent = "❌ Could not read this QR code.";
       }
