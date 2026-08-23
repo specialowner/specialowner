@@ -178,7 +178,7 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
           <div class="sub">${r.reason || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${r.status}">${r.status}</span>
+          <span class="badge ${r.status}">${t(r.status)}</span>
           ${r.status === "pending" ? `
             <button class="btn btn-sm btn-primary" data-leave-approve="${d.id}">${t("approve")}</button>
             <button class="btn btn-sm btn-danger" data-leave-reject="${d.id}">${t("reject")}</button>

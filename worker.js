@@ -165,7 +165,7 @@ onSnapshot(leaveQ, (snap) => {
           <div class="title">${r.fromDate} → ${r.toDate}</div>
           <div class="sub">${r.reason || ""}</div>
         </div>
-        <span class="badge ${r.status}">${r.status}</span>
+        <span class="badge ${r.status}">${t(r.status)}</span>
       </div>`;
   });
 });
