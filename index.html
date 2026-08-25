@@ -1,53 +1,83 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Special Owner</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#0f6e5f">
-<link rel="stylesheet" href="css/style.css">
-<link rel="icon" href="icons/icon-192.png">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
 </head>
 <body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
 <div class="app-shell">
   <div class="center-screen" id="authScreen">
-    <img src="icons/icon-512.png" alt="Special Owner" class="logo-mark-img">
-    <h2 style="margin-bottom:4px">Special Owner</h2>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:24px">Your residential compound, in one app</p>
+    <img src="icon-512.png" alt="Special Owner" class="logo-mark-img">
+    <h2 style="margin-bottom:4px" data-i18n="appName">Special Owner</h2>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:24px" data-i18n="tagline">Your residential compound, in one app</p>
 
     <div class="role-toggle" id="modeToggle">
-      <button class="active" data-mode="login">Log in</button>
-      <button data-mode="register">Sign up</button>
+      <button class="active" data-mode="login" data-i18n="login">Log in</button>
+      <button data-mode="register" data-i18n="signup">Sign up</button>
     </div>
 
     <form id="authForm" style="width:100%;text-align:left">
+      <div class="field" id="accountTypeField" style="display:none">
+        <label data-i18n="accountType">Account type</label>
+        <select id="accountType">
+          <option value="resident" data-i18n="accountTypeResident">Resident</option>
+          <option value="worker" data-i18n="accountTypeWorker">Staff / Worker</option>
+        </select>
+      </div>
+      <div class="field" id="workerTypeField" style="display:none">
+        <label data-i18n="workerCategory">Staff category</label>
+        <select id="workerType">
+          <option value="security" data-i18n="security">Security</option>
+          <option value="maintenance" data-i18n="maintenanceStaff">Maintenance</option>
+          <option value="cleaning" data-i18n="cleaningStaff">Cleaning</option>
+          <option value="porter" data-i18n="porterStaff">Porter</option>
+          <option value="garden" data-i18n="gardenStaff">Gardening</option>
+        </select>
+      </div>
       <div class="field" id="nameField" style="display:none">
-        <label>Full name</label>
-        <input type="text" id="fullName" placeholder="e.g. Ahmed Salama">
+        <label data-i18n="fullName">Full name</label>
+        <input type="text" id="fullName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh">
       </div>
       <div class="field" id="unitField" style="display:none">
-        <label>Unit / Villa number</label>
-        <input type="text" id="unitNumber" placeholder="e.g. B-204">
+        <label data-i18n="unitNumber">Unit / Villa number</label>
+        <input type="text" id="unitNumber" placeholder="e.g. B-204" data-i18n-placeholder="unitNumberPh">
       </div>
       <div class="field">
-        <label>Email</label>
-        <input type="email" id="email" placeholder="you@example.com" required>
+        <label data-i18n="email">Email</label>
+        <input type="email" id="email" placeholder="you@example.com" data-i18n-placeholder="emailPh" required>
       </div>
       <div class="field">
-        <label>Password</label>
-        <input type="password" id="password" placeholder="••••••••" required>
+        <label data-i18n="password">Password</label>
+        <input type="password" id="password" placeholder="••••••••" data-i18n-placeholder="passwordPh" required>
       </div>
       <p class="error-text" id="authError" style="display:none"></p>
       <button type="submit" class="btn btn-primary" id="submitBtn">Log in</button>
     </form>
 
     <p style="font-size:11px;color:var(--muted);margin-top:22px">
-      By continuing you agree to the <a href="privacy-policy.html" style="text-decoration:underline">Privacy Policy</a>
+      <span data-i18n="agreePrefix">By continuing you agree to the</span>
+      <a href="privacy-policy.html" style="text-decoration:underline" data-i18n="privacyPolicy">Privacy Policy</a>
     </p>
   </div>
 </div>
 
-<script type="module" src="js/auth.js"></script>
+<script src="i18n.js"></script>
+<script type="module" src="auth.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
 </body>
 </html>

@@ -5,25 +5,44 @@ service cloud.firestore {
     function isSignedIn() {
       return request.auth != null;
     }
+    function myData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
     function isAdmin() {
-      return isSignedIn() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isSignedIn() && myData().role == 'admin';
     }
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
+    }
+    function isActiveResident() {
+      return isSignedIn() && myData().role == 'resident' && myData().accountStatus == 'active';
+    }
+    function isWorker() {
+      return isSignedIn() && myData().role == 'worker';
+    }
+    function isActiveWorker() {
+      return isWorker() && myData().accountStatus == 'active';
+    }
+    function isActiveSecurityWorker() {
+      return isActiveWorker() && myData().workerType == 'security';
     }
 
     match /users/{userId} {
       allow read: if isOwner(userId) || isAdmin();
       allow create: if isOwner(userId);
-      allow update: if isOwner(userId) || isAdmin();
+      // A resident/worker may only touch their own activation-request fields — not role, accountStatus, salary, or points.
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['activationRequestStatus', 'activationRequestedAt']));
       allow delete: if isAdmin();
     }
 
     match /invitations/{inviteId} {
       allow read: if isSignedIn(); // security/admin need to read any invite to validate a scan
-      allow create: if isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId);
-      allow update: if isAdmin(); // only admin/security marks an invite as used
+      allow create: if isAdmin() ||
+        (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
+      allow update: if isAdmin() || isActiveSecurityWorker(); // admin or security staff mark an invite as used
       allow delete: if isAdmin();
     }
 
@@ -33,9 +52,12 @@ service cloud.firestore {
     }
 
     match /maintenanceRequests/{reqId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.residentId);
-      allow update: if isAdmin();
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid);
+      allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
+      // Admin can change anything; an assigned active worker may only update the status field of their own order.
+      allow update: if isAdmin() ||
+        (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
       allow delete: if isAdmin();
     }
 
@@ -54,13 +76,42 @@ service cloud.firestore {
     }
 
     match /accessLogs/{logId} {
-      allow read: if isAdmin();
-      allow create: if isAdmin();
+      allow read: if isAdmin() || isActiveSecurityWorker();
+      allow create: if isAdmin() || isActiveSecurityWorker();
     }
 
     match /pointsTransactions/{txId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
       allow write: if isAdmin();
+    }
+
+    match /attendance/{attId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
+      // Worker may only close their own shift or toggle their own break (clockOut/status/onBreak/breakStart/totalBreakSeconds); admin can do anything.
+      allow update: if isAdmin() ||
+        (isActiveWorker() && resource.data.workerId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clockOut', 'status', 'onBreak', 'breakStart', 'totalBreakSeconds']));
+      allow delete: if isAdmin();
+    }
+
+    match /leaveRequests/{leaveId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
+      allow update: if isAdmin(); // only admin approves/rejects
+      allow delete: if isAdmin();
+    }
+
+    match /advanceRequests/{advId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
+      allow update: if isAdmin(); // only admin approves/rejects
+      allow delete: if isAdmin();
+    }
+
+    match /salaryRecords/{recordId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow write: if isAdmin(); // admin builds and archives the monthly breakdown
     }
   }
 }

@@ -1,10 +1,14 @@
-const CACHE_NAME = "special-owner-v1";
+const CACHE_NAME = "special-owner-v5";
 const APP_SHELL = [
-  "/index.html",
-  "/resident.html",
-  "/admin.html",
-  "/css/style.css",
-  "/manifest.json"
+  "index.html",
+  "resident.html",
+  "admin.html",
+  "worker.html",
+  "style.css",
+  "i18n.js",
+  "qrcode.min.js",
+  "html5-qrcode.min.js",
+  "manifest.json"
 ];
 
 self.addEventListener("install", (event) => {
@@ -23,9 +27,19 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
+// Network-first: always try to fetch the latest version from the server first.
+// Only fall back to the cached copy if the network request fails (offline).
+// This prevents the app from getting stuck showing an old cached version
+// after new files are deployed.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request))
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
