@@ -40,7 +40,15 @@ service cloud.firestore {
       // A manager may read worker profiles (needed for the Workers/Security/Leaves views), on top of their own doc.
       allow read: if isOwner(userId) || isAdmin() ||
         (isActiveManager() && resource.data.role == 'worker');
-      allow create: if isOwner(userId);
+      // Self-registration is residents-only (public sign-up). The admin can create
+      // any account (site managers, workers, or promote/adjust anyone). An active
+      // site manager can create worker accounts only — never manager or admin
+      // accounts. This is the real gate: the app UI no longer offers worker/manager
+      // sign-up, but that alone wouldn't stop a crafted request without this rule.
+      allow create: if
+        (isOwner(userId) && request.resource.data.role == 'resident') ||
+        isAdmin() ||
+        (isActiveManager() && request.resource.data.role == 'worker');
       // A resident/worker/manager may only touch their own activation-request fields — not role, accountStatus, salary, or points.
       allow update: if isAdmin() ||
         (isOwner(userId) &&

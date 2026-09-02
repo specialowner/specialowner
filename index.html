@@ -26,24 +26,9 @@
     </div>
 
     <form id="authForm" style="width:100%;text-align:left">
-      <div class="field" id="accountTypeField" style="display:none">
-        <label data-i18n="accountType">Account type</label>
-        <select id="accountType">
-          <option value="resident" data-i18n="accountTypeResident">Resident</option>
-          <option value="worker" data-i18n="accountTypeWorker">Staff / Worker</option>
-          <option value="manager" data-i18n="accountTypeManager">Site Manager</option>
-        </select>
-      </div>
-      <div class="field" id="workerTypeField" style="display:none">
-        <label data-i18n="workerCategory">Staff category</label>
-        <select id="workerType">
-          <option value="security" data-i18n="security">Security</option>
-          <option value="maintenance" data-i18n="maintenanceStaff">Maintenance</option>
-          <option value="cleaning" data-i18n="cleaningStaff">Cleaning</option>
-          <option value="porter" data-i18n="porterStaff">Porter</option>
-          <option value="garden" data-i18n="gardenStaff">Gardening</option>
-        </select>
-      </div>
+      <!-- Public sign-up is residents only. Site managers and workers are created
+           directly by the admin (or, for workers, by the site manager) from their
+           dashboards — they never self-register from this screen. -->
       <div class="field" id="nameField" style="display:none">
         <label data-i18n="fullName">Full name</label>
         <input type="text" id="fullName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh">

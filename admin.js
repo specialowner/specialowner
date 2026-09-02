@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
   onSnapshot, serverTimestamp
@@ -418,7 +419,64 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
   });
 });
 
-// ---------- Workers ----------
+// ---------- Add site manager account (admin only) ----------
+document.getElementById("addManagerAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("addManagerAccBtn");
+  const errEl = document.getElementById("mgrAccError");
+  errEl.style.display = "none";
+  const name = document.getElementById("mgrAccName").value.trim();
+  const email = document.getElementById("mgrAccEmail").value.trim();
+  const password = document.getElementById("mgrAccPassword").value;
+  if (!name || !email || !password) {
+    errEl.textContent = "Please fill in the name, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "manager", createdBy: user.uid });
+    document.getElementById("mgrAccName").value = "";
+    document.getElementById("mgrAccEmail").value = "";
+    document.getElementById("mgrAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Add worker account (admin) ----------
+document.getElementById("addWorkerAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("addWorkerAccBtn");
+  const errEl = document.getElementById("workerAccError");
+  errEl.style.display = "none";
+  const name = document.getElementById("workerAccName").value.trim();
+  const workerType = document.getElementById("workerAccType").value;
+  const email = document.getElementById("workerAccEmail").value.trim();
+  const password = document.getElementById("workerAccPassword").value;
+  if (!name || !email || !password) {
+    errEl.textContent = "Please fill in the name, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "worker", createdBy: user.uid, extra: { workerType } });
+    document.getElementById("workerAccName").value = "";
+    document.getElementById("workerAccEmail").value = "";
+    document.getElementById("workerAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Workers (legacy roster entry, no login) ----------
 document.getElementById("addWorkerBtn").addEventListener("click", async () => {
   const name = document.getElementById("workerName").value.trim();
   const role = document.getElementById("workerRole").value.trim();

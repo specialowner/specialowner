@@ -124,6 +124,33 @@
         <div id="managerAccountsList"><p class="empty-state" data-i18n="noManagersYet">No site manager accounts yet.</p></div>
       </div>
       <div class="card">
+        <h3 data-i18n="addManagerAccount">Add site manager</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addManagerNote">Only the admin can create a site manager account. Give them the email and password you set here to log in.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="mgrAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="mgrAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="mgrAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="mgrAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addManagerAccBtn" data-i18n="addManagerAccount">Add site manager</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addWorkerAccount">Add worker account</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addWorkerAccountNote">Creates a login for the worker. Give them the email and password you set here.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="workerAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="workerCategory">Staff category</label>
+          <select id="workerAccType">
+            <option value="security" data-i18n="security">Security</option>
+            <option value="maintenance" data-i18n="maintenanceStaff">Maintenance</option>
+            <option value="cleaning" data-i18n="cleaningStaff">Cleaning</option>
+            <option value="porter" data-i18n="porterStaff">Porter</option>
+            <option value="garden" data-i18n="gardenStaff">Gardening</option>
+          </select>
+        </div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="workerAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="workerAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="workerAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addWorkerAccBtn" data-i18n="addWorkerAccount">Add worker account</button>
+      </div>
+      <div class="card">
         <h3 data-i18n="workerShifts">Worker shifts</h3>
         <div id="shiftsList"><p class="empty-state" data-i18n="noShiftsYet">No shifts recorded yet.</p></div>
       </div>
@@ -141,8 +168,8 @@
         <div id="salaryManageList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
       </div>
       <div class="card">
-        <h3 data-i18n="addWorker">Add worker</h3>
-        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="rosterNote">Roster entry only — for staff who need app access, ask them to sign up as "Staff / Worker" from the login screen instead.</p>
+        <h3 data-i18n="addWorker">Add worker (roster only)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="rosterNote">Roster entry only, no app login. For staff who need to log in, use "Add worker account" above instead.</p>
         <div class="field"><label data-i18n="workerName">Name</label><input type="text" id="workerName" placeholder="Worker full name" data-i18n-placeholder="workerNamePh"></div>
         <div class="field"><label data-i18n="workerRole">Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician" data-i18n-placeholder="workerRolePh"></div>
         <div class="field"><label data-i18n="workerPhone">Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="workerPhonePh"></div>

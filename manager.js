@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp
@@ -161,6 +162,40 @@ onSnapshot(salaryHistoryQ, (snap) => {
         </div>
       </div>`;
   });
+});
+
+// ---------- Add worker account (site manager — workers only, never managers) ----------
+document.getElementById("mgrAddWorkerAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("mgrAddWorkerAccBtn");
+  const errEl = document.getElementById("mgrWorkerAccError");
+  errEl.style.display = "none";
+  if (currentAccountStatus !== "active") {
+    errEl.textContent = currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending");
+    errEl.style.display = "block";
+    return;
+  }
+  const name = document.getElementById("mgrWorkerAccName").value.trim();
+  const workerType = document.getElementById("mgrWorkerAccType").value;
+  const email = document.getElementById("mgrWorkerAccEmail").value.trim();
+  const password = document.getElementById("mgrWorkerAccPassword").value;
+  if (!name || !email || !password) {
+    errEl.textContent = "Please fill in the name, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "worker", createdBy: user.uid, extra: { workerType } });
+    document.getElementById("mgrWorkerAccName").value = "";
+    document.getElementById("mgrWorkerAccEmail").value = "";
+    document.getElementById("mgrWorkerAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 // ---------- Workers roster (read-only) ----------

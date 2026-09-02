@@ -18,9 +18,6 @@ function t(key) {
 const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html", manager: "manager.html" };
 
 const modeToggle = document.getElementById("modeToggle");
-const accountTypeField = document.getElementById("accountTypeField");
-const accountTypeSelect = document.getElementById("accountType");
-const workerTypeField = document.getElementById("workerTypeField");
 const nameField = document.getElementById("nameField");
 const unitField = document.getElementById("unitField");
 const submitBtn = document.getElementById("submitBtn");
@@ -33,16 +30,6 @@ function syncSubmitLabel() {
 syncSubmitLabel();
 window.addEventListener("so-lang-changed", syncSubmitLabel);
 
-function syncAccountTypeFields() {
-  const isRegister = mode === "register";
-  const isWorker = isRegister && accountTypeSelect.value === "worker";
-  const isManager = isRegister && accountTypeSelect.value === "manager";
-  accountTypeField.style.display = isRegister ? "block" : "none";
-  // Managers have no unit (they're staff, not residents) and no worker craft (they're not on the roster).
-  unitField.style.display = isRegister && !isWorker && !isManager ? "block" : "none";
-  workerTypeField.style.display = isWorker ? "block" : "none";
-}
-
 modeToggle.addEventListener("click", (e) => {
   const btn = e.target.closest("button");
   if (!btn) return;
@@ -50,11 +37,9 @@ modeToggle.addEventListener("click", (e) => {
   [...modeToggle.children].forEach(b => b.classList.toggle("active", b === btn));
   const isRegister = mode === "register";
   nameField.style.display = isRegister ? "block" : "none";
-  syncAccountTypeFields();
+  unitField.style.display = isRegister ? "block" : "none";
   syncSubmitLabel();
 });
-
-accountTypeSelect.addEventListener("change", syncAccountTypeFields);
 
 authForm.addEventListener("submit", async (e) => {
   e.preventDefault();
@@ -65,51 +50,24 @@ authForm.addEventListener("submit", async (e) => {
   try {
     submitBtn.disabled = true;
     if (mode === "register") {
+      // Public sign-up only ever creates a resident account. Site manager and
+      // worker accounts are created by the admin (or, for workers, by the site
+      // manager) from their dashboards — never through this form.
       const fullName = document.getElementById("fullName").value.trim();
-      const accountType = accountTypeSelect.value; // 'resident' | 'worker' | 'manager'
+      const unit = document.getElementById("unitNumber").value.trim();
+      if (!fullName || !unit) throw { message: "Please fill in your name and unit number." };
 
-      if (accountType === "worker") {
-        if (!fullName) throw { message: "Please fill in your name." };
-        const workerType = document.getElementById("workerType").value;
-
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          name: fullName,
-          email,
-          role: "worker",
-          workerType,               // security | maintenance | cleaning | porter | garden
-          accountStatus: "pending", // locked until admin approves
-          createdAt: serverTimestamp()
-        });
-        window.location.href = "worker.html";
-      } else if (accountType === "manager") {
-        if (!fullName) throw { message: "Please fill in your name." };
-
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          name: fullName,
-          email,
-          role: "manager",
-          accountStatus: "pending", // locked until admin approves — same flow as staff
-          createdAt: serverTimestamp()
-        });
-        window.location.href = "manager.html";
-      } else {
-        const unit = document.getElementById("unitNumber").value.trim();
-        if (!fullName || !unit) throw { message: "Please fill in your name and unit number." };
-
-        const cred = await createUserWithEmailAndPassword(auth, email, password);
-        await setDoc(doc(db, "users", cred.user.uid), {
-          name: fullName,
-          email,
-          unit,
-          role: "resident",
-          accountStatus: "pending", // locked until admin approves (resident can request activation)
-          points: 0,
-          createdAt: serverTimestamp()
-        });
-        window.location.href = "resident.html";
-      }
+      const cred = await createUserWithEmailAndPassword(auth, email, password);
+      await setDoc(doc(db, "users", cred.user.uid), {
+        name: fullName,
+        email,
+        unit,
+        role: "resident",
+        accountStatus: "pending", // locked until admin approves (resident can request activation)
+        points: 0,
+        createdAt: serverTimestamp()
+      });
+      window.location.href = "resident.html";
     } else {
       const cred = await signInWithEmailAndPassword(auth, email, password);
       const snap = await getDoc(doc(db, "users", cred.user.uid));
