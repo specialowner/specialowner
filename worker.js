@@ -12,12 +12,20 @@ function t(key) {
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
+const WORKER_TYPE_I18N_KEY = {
+  security: "security",
+  maintenance: "maintenanceStaff",
+  cleaning: "cleaningStaff",
+  porter: "porterStaff",
+  garden: "gardenStaff"
+};
+
 const workerType = profile.workerType || "maintenance"; // security | maintenance | cleaning | porter | garden
 const isSecurity = workerType === "security";
 
 function renderGreeting() {
   document.getElementById("greetName").textContent = `${t("hiThere")}, ${profile.name?.split(" ")[0] || ""} 👋`;
-  document.getElementById("greetRole").textContent = t(workerType) || workerType;
+  document.getElementById("greetRole").textContent = t(WORKER_TYPE_I18N_KEY[workerType] || workerType) || workerType;
 }
 renderGreeting();
 window.addEventListener("so-lang-changed", renderGreeting);
@@ -51,7 +59,13 @@ tabs.forEach(btn => btn.addEventListener("click", () => activateTab(btn.dataset.
 activateTab(isSecurity ? "home" : "orders");
 
 // ---------- Today's date + leave balance ----------
-document.getElementById("todayDate").textContent = new Date().toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+function renderTodayDate() {
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  const locale = lang === "ar" ? "ar-EG" : "en-US";
+  document.getElementById("todayDate").textContent = new Date().toLocaleDateString(locale, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+}
+renderTodayDate();
+window.addEventListener("so-lang-changed", renderTodayDate);
 
 // ---------- Account status (pending / active / suspended) + salary ----------
 let currentAccountStatus = "active";
