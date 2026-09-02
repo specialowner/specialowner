@@ -133,6 +133,13 @@ document.getElementById("annAudience").addEventListener("change", renderAnnTarge
 document.getElementById("annSelectAll").addEventListener("change", (e) => {
   document.querySelectorAll(".annTargetCheck").forEach(cb => cb.checked = e.target.checked);
 });
+// Keep "Select all" in sync when the admin manually checks/unchecks individual recipients
+document.getElementById("annTargetList").addEventListener("change", (e) => {
+  if (!e.target.classList.contains("annTargetCheck")) return;
+  const all = document.querySelectorAll(".annTargetCheck");
+  const checked = document.querySelectorAll(".annTargetCheck:checked");
+  document.getElementById("annSelectAll").checked = all.length > 0 && all.length === checked.length;
+});
 
 document.getElementById("postAnnBtn").addEventListener("click", async () => {
   const title = document.getElementById("annTitle").value.trim();
