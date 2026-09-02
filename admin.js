@@ -419,6 +419,36 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
   });
 });
 
+// ---------- Add resident account (admin can create directly, on top of self-signup) ----------
+document.getElementById("addResidentAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("addResidentAccBtn");
+  const errEl = document.getElementById("residentAccError");
+  errEl.style.display = "none";
+  const name = document.getElementById("residentAccName").value.trim();
+  const unit = document.getElementById("residentAccUnit").value.trim();
+  const email = document.getElementById("residentAccEmail").value.trim();
+  const password = document.getElementById("residentAccPassword").value;
+  if (!name || !unit || !email || !password) {
+    errEl.textContent = "Please fill in the name, unit, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "resident", createdBy: user.uid, extra: { unit, points: 0 } });
+    document.getElementById("residentAccName").value = "";
+    document.getElementById("residentAccUnit").value = "";
+    document.getElementById("residentAccEmail").value = "";
+    document.getElementById("residentAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ---------- Add site manager account (admin only) ----------
 document.getElementById("addManagerAccBtn").addEventListener("click", async () => {
   const btn = document.getElementById("addManagerAccBtn");
