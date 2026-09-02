@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Site Manager</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 id="greetName">Hi 👋</h1>
+        <div class="sub" id="greetRole" data-i18n="siteManager">Site Manager</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+
+    <!-- HOME: personal salary + leave -->
+    <section id="tab-home">
+      <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410">
+        <p id="statusBannerText" style="margin-bottom:10px"></p>
+        <button class="btn btn-accent" id="requestActivationBtn" data-i18n="requestActivation">Request activation</button>
+      </div>
+
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div style="font-size:12px;color:var(--muted)" data-i18n="today">Today</div>
+            <div style="font-size:15px;font-weight:700" id="todayDate">—</div>
+          </div>
+          <div style="text-align:end">
+            <div style="font-size:12px;color:var(--muted)" data-i18n="leaveBalance">Leave balance</div>
+            <div style="font-size:15px;font-weight:700;color:var(--primary)" id="leaveBalanceAmount">—</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="mySalary">My salary</h3>
+        <div class="sub-row"><span data-i18n="salaryBasic">Basic</span><span id="salaryBasicVal">—</span></div>
+        <div class="sub-row"><span data-i18n="salaryAllowances">Allowances</span><span id="salaryAllowancesVal">—</span></div>
+        <div class="sub-row"><span data-i18n="salaryIncentives">Incentives</span><span id="salaryIncentivesVal">—</span></div>
+        <div class="sub-row"><span data-i18n="salaryDeductions">Deductions</span><span id="salaryDeductionsVal">—</span></div>
+        <div class="sub-row" style="border-top:1px solid #dfe6e3;margin-top:8px;padding-top:8px">
+          <span style="font-weight:700" data-i18n="netSalary">Net total</span>
+          <span style="font-size:20px;font-weight:800;color:var(--primary)" id="salaryAmount">—</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="salaryHistory">Salary history</h3>
+        <div id="salaryHistoryList"><p class="empty-state" data-i18n="noSalaryHistory">No past months recorded yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="requestLeave">Request leave</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="managerLeaveNote">Your own leave requests go to the compound owner for approval.</p>
+        <div class="field">
+          <label data-i18n="fromDate">From</label>
+          <input type="date" id="leaveFrom">
+        </div>
+        <div class="field">
+          <label data-i18n="toDate">To</label>
+          <input type="date" id="leaveTo">
+        </div>
+        <div class="field">
+          <label data-i18n="reason">Reason</label>
+          <textarea id="leaveReason" data-i18n-placeholder="reasonPh" placeholder="Reason for leave"></textarea>
+        </div>
+        <button class="btn btn-accent" id="submitLeaveBtn" data-i18n="submitRequest">Submit request</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="myLeaveRequests">My leave requests</h3>
+        <div id="leaveList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+    </section>
+
+    <!-- WORKERS: roster + movements -->
+    <section id="tab-workers" style="display:none">
+      <div class="card">
+        <h3 data-i18n="allWorkers">All workers</h3>
+        <div id="mgrWorkersList"><p class="empty-state" data-i18n="noWorkers2">No workers yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="workersMovements">Workers' movements</h3>
+        <div id="mgrShiftsList"><p class="empty-state" data-i18n="noMovements">No movements recorded yet.</p></div>
+      </div>
+    </section>
+
+    <!-- SECURITY -->
+    <section id="tab-security" style="display:none">
+      <div class="card">
+        <h3 data-i18n="securityLog">Security log</h3>
+        <div id="mgrAccessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+      </div>
+    </section>
+
+    <!-- VISITS -->
+    <section id="tab-visits" style="display:none">
+      <div class="card">
+        <h3 data-i18n="guestVisits">Guest visits</h3>
+        <div id="mgrVisitsList"><p class="empty-state" data-i18n="noVisits">No visits recorded yet.</p></div>
+      </div>
+    </section>
+
+    <!-- LEAVES: approve workers' leave -->
+    <section id="tab-leaves" style="display:none">
+      <div class="card">
+        <h3 data-i18n="workersLeaveRequests">Workers' leave requests</h3>
+        <div id="mgrLeaveRequestsList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+    </section>
+
+    <!-- ANNOUNCEMENTS: post to residents -->
+    <section id="tab-announcements" style="display:none">
+      <div class="card">
+        <h3 data-i18n="postAnnouncementToResidents">Post announcement to residents</h3>
+        <div class="field"><label data-i18n="title">Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday" data-i18n-placeholder="titlePh"></div>
+        <div class="field"><label data-i18n="details">Details</label><textarea id="annBody" placeholder="Details for residents" data-i18n-placeholder="detailsPh"></textarea></div>
+        <div class="field">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <input type="checkbox" id="annSelectAll" checked>
+            <label for="annSelectAll" style="font-size:12px" data-i18n="selectAll">Select all</label>
+          </div>
+          <div id="annTargetList" style="max-height:220px;overflow-y:auto;border:1px solid #dfe6e3;border-radius:8px;padding:8px"></div>
+        </div>
+        <button class="btn btn-primary" id="postAnnBtn" data-i18n="publish">Publish</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="postAnnouncement">Post an announcement</h3>
+        <div id="mgrAnnList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabManagerHome">Home</span></button>
+    <button class="tab-btn" data-tab="workers"><span class="tab-icon">👷</span><span data-i18n="tabManagerWorkers">Workers</span></button>
+    <button class="tab-btn" data-tab="security"><span class="tab-icon">🔑</span><span data-i18n="tabManagerSecurity">Security</span></button>
+    <button class="tab-btn" data-tab="visits"><span class="tab-icon">🚪</span><span data-i18n="tabManagerVisits">Visits</span></button>
+    <button class="tab-btn" data-tab="leaves"><span class="tab-icon">🗓️</span><span data-i18n="tabManagerLeaves">Leaves</span></button>
+    <button class="tab-btn" data-tab="announcements"><span class="tab-icon">📣</span><span data-i18n="tabManagerAnnouncements">Announcements</span></button>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script type="module" src="manager.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
+</body>
+</html>

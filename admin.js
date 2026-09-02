@@ -100,6 +100,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
 // ---------- Announcements ----------
 let residentsCache = [];
 let workersCache = [];
+let managersCache = [];
 
 function renderAnnTargetList() {
   const audience = document.getElementById("annAudience").value;
@@ -218,17 +219,60 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
   renderSalaryManageList();
 });
 
+// ---------- Site manager accounts & activation requests ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap) => {
+  const el = document.getElementById("managerAccountsList");
+  managersCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderSalaryManageList();
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noManagersYet")}</p>`; return; }
+  el.innerHTML = "";
+  const rows = managersCache.slice();
+  rows.sort((a, b) => {
+    const aPending = a.activationRequestStatus === "pending" ? 0 : 1;
+    const bPending = b.activationRequestStatus === "pending" ? 0 : 1;
+    return aPending - bPending;
+  });
+  rows.forEach(r => {
+    const status = r.accountStatus || "active";
+    const hasRequest = r.activationRequestStatus === "pending";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.name || r.email} ${hasRequest ? "🔔" : ""}</div>
+          <div class="sub">${r.email || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          ${status === "active"
+            ? `<button class="btn btn-sm btn-danger" data-mgr-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
+            : `<button class="btn btn-sm btn-primary" data-mgr-action="approve" data-id="${r.id}">${t("approve")}</button>`
+          }
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-mgr-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "users", btn.dataset.id), {
+        accountStatus: btn.dataset.mgrAction === "approve" ? "active" : "suspended",
+        activationRequestStatus: "none"
+      });
+    });
+  });
+});
+
 // ---------- Salary breakdown & leave balance management ----------
 function renderSalaryManageList() {
   const el = document.getElementById("salaryManageList");
   if (!el) return;
-  if (workersCache.length === 0) { el.innerHTML = `<p class="empty-state">${t("noWorkers")}</p>`; return; }
+  // Site managers are on the payroll too — same breakdown fields, so they share this list with workers.
+  const payrollCache = [...workersCache, ...managersCache];
+  if (payrollCache.length === 0) { el.innerHTML = `<p class="empty-state">${t("noWorkers")}</p>`; return; }
   const monthNow = new Date().toISOString().slice(0, 7); // YYYY-MM
-  el.innerHTML = workersCache.map(w => `
+  el.innerHTML = payrollCache.map(w => `
     <div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px">
       <div class="meta">
         <div class="title">${w.name || w.email}</div>
-        <div class="sub">${workerTypeLabel(w.workerType)}</div>
+        <div class="sub">${w.workerType ? workerTypeLabel(w.workerType) : t("siteManager")}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
         <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryBasic">Basic</label>
@@ -265,7 +309,7 @@ function renderSalaryManageList() {
   el.querySelectorAll("button[data-archive-worker]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.archiveWorker;
-      const worker = workersCache.find(w => w.id === id) || {};
+      const worker = [...workersCache, ...managersCache].find(w => w.id === id) || {};
       const basic = Number(el.querySelector(`.wm-basic[data-id="${id}"]`).value) || 0;
       const allowances = Number(el.querySelector(`.wm-allowances[data-id="${id}"]`).value) || 0;
       const incentives = Number(el.querySelector(`.wm-incentives[data-id="${id}"]`).value) || 0;

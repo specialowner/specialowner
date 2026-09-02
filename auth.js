@@ -15,7 +15,7 @@ function t(key) {
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
-const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html" };
+const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html", manager: "manager.html" };
 
 const modeToggle = document.getElementById("modeToggle");
 const accountTypeField = document.getElementById("accountTypeField");
@@ -36,8 +36,10 @@ window.addEventListener("so-lang-changed", syncSubmitLabel);
 function syncAccountTypeFields() {
   const isRegister = mode === "register";
   const isWorker = isRegister && accountTypeSelect.value === "worker";
+  const isManager = isRegister && accountTypeSelect.value === "manager";
   accountTypeField.style.display = isRegister ? "block" : "none";
-  unitField.style.display = isRegister && !isWorker ? "block" : "none";
+  // Managers have no unit (they're staff, not residents) and no worker craft (they're not on the roster).
+  unitField.style.display = isRegister && !isWorker && !isManager ? "block" : "none";
   workerTypeField.style.display = isWorker ? "block" : "none";
 }
 
@@ -64,7 +66,7 @@ authForm.addEventListener("submit", async (e) => {
     submitBtn.disabled = true;
     if (mode === "register") {
       const fullName = document.getElementById("fullName").value.trim();
-      const accountType = accountTypeSelect.value; // 'resident' | 'worker'
+      const accountType = accountTypeSelect.value; // 'resident' | 'worker' | 'manager'
 
       if (accountType === "worker") {
         if (!fullName) throw { message: "Please fill in your name." };
@@ -80,6 +82,18 @@ authForm.addEventListener("submit", async (e) => {
           createdAt: serverTimestamp()
         });
         window.location.href = "worker.html";
+      } else if (accountType === "manager") {
+        if (!fullName) throw { message: "Please fill in your name." };
+
+        const cred = await createUserWithEmailAndPassword(auth, email, password);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          name: fullName,
+          email,
+          role: "manager",
+          accountStatus: "pending", // locked until admin approves — same flow as staff
+          createdAt: serverTimestamp()
+        });
+        window.location.href = "manager.html";
       } else {
         const unit = document.getElementById("unitNumber").value.trim();
         if (!fullName || !unit) throw { message: "Please fill in your name and unit number." };

@@ -118,6 +118,7 @@ const translations = {
     accountType: "Account type",
     accountTypeResident: "Resident",
     accountTypeWorker: "Staff / Worker",
+    accountTypeManager: "Site Manager",
     workerCategory: "Staff category",
     security: "Security",
     maintenanceStaff: "Maintenance",
@@ -230,7 +231,31 @@ const translations = {
     allPayments: "All payments",
     noPaymentRecords: "No payment records yet.",
 
-    maintenanceRequests: "Maintenance requests"
+    maintenanceRequests: "Maintenance requests",
+
+    // Site manager portal
+    tabManagerHome: "Home",
+    tabManagerWorkers: "Workers",
+    tabManagerSecurity: "Security",
+    tabManagerVisits: "Visits",
+    tabManagerLeaves: "Leaves",
+    tabManagerAnnouncements: "Announcements",
+    siteManager: "Site Manager",
+    allWorkers: "All workers",
+    noWorkers2: "No workers yet.",
+    workersMovements: "Workers' movements",
+    noMovements: "No movements recorded yet.",
+    securityLog: "Security log",
+    guestVisits: "Guest visits",
+    noVisits: "No visits recorded yet.",
+    visitDate: "Visit date",
+    workersLeaveRequests: "Workers' leave requests",
+    postAnnouncementToResidents: "Post announcement to residents",
+    myAccountManager: "My account",
+    managerLeaveNote: "Your own leave requests go to the compound owner for approval.",
+    filterAll: "All",
+    siteManagerAccounts: "Site manager accounts",
+    noManagersYet: "No site manager accounts yet."
   },
   ar: {
     appName: "Special Owner",
@@ -344,6 +369,7 @@ const translations = {
     accountType: "نوع الحساب",
     accountTypeResident: "ساكن",
     accountTypeWorker: "طاقم عمل",
+    accountTypeManager: "مدير الموقع",
     workerCategory: "فئة الطاقم",
     security: "أمن",
     maintenanceStaff: "صيانة",
@@ -456,7 +482,31 @@ const translations = {
     allPayments: "كل المدفوعات",
     noPaymentRecords: "لا توجد سجلات مدفوعات بعد.",
 
-    maintenanceRequests: "طلبات الصيانة"
+    maintenanceRequests: "طلبات الصيانة",
+
+    // بوابة مدير الموقع
+    tabManagerHome: "الرئيسية",
+    tabManagerWorkers: "العمال",
+    tabManagerSecurity: "الأمن",
+    tabManagerVisits: "الزيارات",
+    tabManagerLeaves: "الإجازات",
+    tabManagerAnnouncements: "الإعلانات",
+    siteManager: "مدير الموقع",
+    allWorkers: "كل العمال",
+    noWorkers2: "لا يوجد عمال بعد.",
+    workersMovements: "حركات العمال",
+    noMovements: "لا توجد حركات مسجلة بعد.",
+    securityLog: "سجل الأمن",
+    guestVisits: "زيارات الضيوف",
+    noVisits: "لا توجد زيارات مسجلة بعد.",
+    visitDate: "تاريخ الزيارة",
+    workersLeaveRequests: "طلبات إجازات العمال",
+    postAnnouncementToResidents: "نشر إعلان للسكان",
+    myAccountManager: "حسابي",
+    managerLeaveNote: "طلبات إجازتك بتروح لمالك الكومباوند للموافقة عليها.",
+    filterAll: "الكل",
+    siteManagerAccounts: "حسابات مديري الموقع",
+    noManagersYet: "لا يوجد حسابات مديري موقع بعد."
   }
 };
 

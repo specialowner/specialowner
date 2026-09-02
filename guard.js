@@ -5,11 +5,12 @@ import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase
 const HOME_PAGE = {
   admin: "admin.html",
   worker: "worker.html",
-  resident: "resident.html"
+  resident: "resident.html",
+  manager: "manager.html"
 };
 
 // Resolves with { user, profile } once auth state is known and role matches.
-// requiredRole: 'resident' | 'admin' | 'worker' | null (null = any logged-in user)
+// requiredRole: 'resident' | 'admin' | 'worker' | 'manager' | null (null = any logged-in user)
 export function requireAuth(requiredRole) {
   return new Promise((resolve) => {
     onAuthStateChanged(auth, async (user) => {

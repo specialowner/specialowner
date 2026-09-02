@@ -26,11 +26,22 @@ service cloud.firestore {
     function isActiveSecurityWorker() {
       return isActiveWorker() && myData().workerType == 'security';
     }
+    // Site manager: reports to the compound owner (admin). Can see workers, their
+    // movements/attendance, security logs and guest visits, approve workers' leave
+    // requests, and post announcements to residents — but has no access to finance.
+    function isManager() {
+      return isSignedIn() && myData().role == 'manager';
+    }
+    function isActiveManager() {
+      return isManager() && myData().accountStatus == 'active';
+    }
 
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
+      // A manager may read worker profiles (needed for the Workers/Security/Leaves views), on top of their own doc.
+      allow read: if isOwner(userId) || isAdmin() ||
+        (isActiveManager() && resource.data.role == 'worker');
       allow create: if isOwner(userId);
-      // A resident/worker may only touch their own activation-request fields — not role, accountStatus, salary, or points.
+      // A resident/worker/manager may only touch their own activation-request fields — not role, accountStatus, salary, or points.
       allow update: if isAdmin() ||
         (isOwner(userId) &&
          request.resource.data.diff(resource.data).affectedKeys()
@@ -39,7 +50,7 @@ service cloud.firestore {
     }
 
     match /invitations/{inviteId} {
-      allow read: if isSignedIn(); // security/admin need to read any invite to validate a scan
+      allow read: if isSignedIn(); // security/admin/manager need to read any invite to validate a scan or view visits
       allow create: if isAdmin() ||
         (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
       allow update: if isAdmin() || isActiveSecurityWorker(); // admin or security staff mark an invite as used
@@ -63,7 +74,10 @@ service cloud.firestore {
 
     match /announcements/{annId} {
       allow read: if isSignedIn();
-      allow write: if isAdmin();
+      // Manager may post announcements too, but only ones aimed at residents (not staff-wide, not finance-related).
+      allow write: if isAdmin() ||
+        (isActiveManager() &&
+         (request.resource == null || request.resource.data.audience == 'residents'));
     }
 
     match /shops/{shopId} {
@@ -76,7 +90,7 @@ service cloud.firestore {
     }
 
     match /accessLogs/{logId} {
-      allow read: if isAdmin() || isActiveSecurityWorker();
+      allow read: if isAdmin() || isActiveSecurityWorker() || isActiveManager();
       allow create: if isAdmin() || isActiveSecurityWorker();
     }
 
@@ -86,19 +100,25 @@ service cloud.firestore {
     }
 
     match /attendance/{attId} {
-      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
-      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
-      // Worker may only close their own shift or toggle their own break (clockOut/status/onBreak/breakStart/totalBreakSeconds); admin can do anything.
+      // Manager can see everyone's movements; a worker/manager only ever writes their own shift.
+      allow read: if isAdmin() || isActiveManager() ||
+        ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
+      allow create: if (isActiveWorker() || isActiveManager()) && request.resource.data.workerId == request.auth.uid;
+      // Worker/manager may only close their own shift or toggle their own break; admin can do anything.
       allow update: if isAdmin() ||
-        (isActiveWorker() && resource.data.workerId == request.auth.uid &&
+        ((isActiveWorker() || isActiveManager()) && resource.data.workerId == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clockOut', 'status', 'onBreak', 'breakStart', 'totalBreakSeconds']));
       allow delete: if isAdmin();
     }
 
     match /leaveRequests/{leaveId} {
-      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
-      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
-      allow update: if isAdmin(); // only admin approves/rejects
+      // Manager can see every leave request (to review workers') plus create/read their own.
+      allow read: if isAdmin() || isActiveManager() ||
+        ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
+      allow create: if (isActiveWorker() || isActiveManager()) && request.resource.data.workerId == request.auth.uid;
+      // Admin approves anyone; an active manager may approve/reject a worker's request, but never their own.
+      allow update: if isAdmin() ||
+        (isActiveManager() && resource.data.workerId != request.auth.uid);
       allow delete: if isAdmin();
     }
 
@@ -110,7 +130,7 @@ service cloud.firestore {
     }
 
     match /salaryRecords/{recordId} {
-      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow read: if isAdmin() || ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
       allow write: if isAdmin(); // admin builds and archives the monthly breakdown
     }
   }
