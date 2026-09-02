@@ -13,6 +13,21 @@ function t(key) {
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
+// workerType values stored in Firestore (security | maintenance | cleaning | porter | garden)
+// don't match the i18n keys (security | maintenanceStaff | cleaningStaff | porterStaff | gardenStaff).
+// This maps a raw workerType to its translated label in the current language.
+const WORKER_TYPE_I18N_KEY = {
+  security: "security",
+  maintenance: "maintenanceStaff",
+  cleaning: "cleaningStaff",
+  porter: "porterStaff",
+  garden: "gardenStaff"
+};
+function workerTypeLabel(wt) {
+  if (!wt) return "";
+  return t(WORKER_TYPE_I18N_KEY[wt] || wt) || wt;
+}
+
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab-btn");
 tabs.forEach(btn => btn.addEventListener("click", () => {
@@ -110,11 +125,11 @@ function renderAnnTargetList() {
     }
     // Quick filter chips per worker craft/type (e.g. select all electricians / security).
     const types = [...new Set(workersCache.map(w => w.workerType).filter(Boolean))];
-    const chips = types.map(wt => `<button type="button" class="btn btn-sm btn-outline ann-craft-chip" data-craft="${wt}" style="margin:0 4px 8px 0">${t(wt) || wt}</button>`).join("");
+    const chips = types.map(wt => `<button type="button" class="btn btn-sm btn-outline ann-craft-chip" data-craft="${wt}" style="margin:0 4px 8px 0">${workerTypeLabel(wt)}</button>`).join("");
     list.innerHTML = (chips ? `<div style="margin-bottom:6px">${chips}</div>` : "") + workersCache.map(w => `
       <label style="display:flex;align-items:center;gap:6px;padding:4px 0;font-size:12px" data-craft="${w.workerType || ""}">
         <input type="checkbox" class="annTargetCheck" value="${w.id}" checked>
-        <span>${w.name || w.email || w.id} · ${t(w.workerType) || w.workerType || ""}</span>
+        <span>${w.name || w.email || w.id} · ${workerTypeLabel(w.workerType)}</span>
       </label>`).join("");
     list.querySelectorAll(".ann-craft-chip").forEach(chip => {
       chip.addEventListener("click", () => {
@@ -181,7 +196,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
       <div class="list-item">
         <div class="meta">
           <div class="title">${r.name || r.email} ${hasRequest ? "🔔" : ""}</div>
-          <div class="sub">${t(r.workerType) || r.workerType} · ${r.email || ""}</div>
+          <div class="sub">${workerTypeLabel(r.workerType)} · ${r.email || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
           <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
@@ -213,7 +228,7 @@ function renderSalaryManageList() {
     <div class="list-item" style="flex-direction:column;align-items:stretch;gap:8px">
       <div class="meta">
         <div class="title">${w.name || w.email}</div>
-        <div class="sub">${t(w.workerType) || w.workerType || ""}</div>
+        <div class="sub">${workerTypeLabel(w.workerType)}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
         <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryBasic">Basic</label>
@@ -448,7 +463,7 @@ function renderMaintList() {
           <div class="sub">${m.description}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
-            ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${t(w.workerType)})</option>`).join("")}
+            ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("")}
           </select>
         </div>
         <select data-id="${m.id}" class="maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
