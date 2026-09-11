@@ -29,18 +29,54 @@ function workerTypeLabel(wt) {
   return t(WORKER_TYPE_I18N_KEY[wt] || wt) || wt;
 }
 
-// ---------- Tabs ----------
+// ---------- Dashboards (Residents / Operations) & tabs ----------
+// The admin panel is split into two dashboards: "res" (residents, finance, announcements)
+// and "ops" (access, personnel, maintenance). Each tab-btn/section carries a data-dashboard
+// attribute; switching dashboards just filters which tab buttons are visible and jumps to
+// a tab inside that dashboard (remembering the last one visited per dashboard).
+const ALL_TABS = ["residents", "announcements", "access", "workers", "finance", "maint"];
+const DASHBOARD_TABS = {
+  res: ["residents", "finance", "announcements"],
+  ops: ["access", "workers", "maint"]
+};
+const DASH_STORAGE_KEY = "so_admin_dashboard";
+const tabStorageKey = (dash) => `so_admin_tab_${dash}`;
+
 const tabs = document.querySelectorAll(".tab-btn");
-tabs.forEach(btn => btn.addEventListener("click", () => {
-  tabs.forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  ["overview", "access", "workers", "finance", "maint"].forEach(t => {
-    document.getElementById(`tab-${t}`).style.display = (t === btn.dataset.tab) ? "block" : "none";
+const dashButtons = document.querySelectorAll(".dash-switch [data-dash]");
+
+function showTab(tabName) {
+  tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
+  ALL_TABS.forEach(t => {
+    document.getElementById(`tab-${t}`).style.display = (t === tabName) ? "block" : "none";
   });
-  if (btn.dataset.tab === "access") startScanner();
+  if (tabName === "access") startScanner();
+}
+
+function activateDashboard(dash) {
+  if (!DASHBOARD_TABS[dash]) dash = "res";
+  dashButtons.forEach(b => b.classList.toggle("active", b.dataset.dash === dash));
+  tabs.forEach(b => {
+    b.style.display = DASHBOARD_TABS[dash].includes(b.dataset.tab) ? "" : "none";
+  });
+  localStorage.setItem(DASH_STORAGE_KEY, dash);
+  const remembered = localStorage.getItem(tabStorageKey(dash));
+  const targetTab = DASHBOARD_TABS[dash].includes(remembered) ? remembered : DASHBOARD_TABS[dash][0];
+  showTab(targetTab);
+}
+
+dashButtons.forEach(btn => btn.addEventListener("click", () => activateDashboard(btn.dataset.dash)));
+
+tabs.forEach(btn => btn.addEventListener("click", () => {
+  showTab(btn.dataset.tab);
+  if (btn.dataset.dashboard) localStorage.setItem(tabStorageKey(btn.dataset.dashboard), btn.dataset.tab);
 }));
 
-// ---------- Overview stats ----------
+// Restore whichever dashboard the admin was last on (defaults to "res", matching the
+// panel's previous single-dashboard behavior for anyone who hasn't used the switch yet).
+activateDashboard(localStorage.getItem(DASH_STORAGE_KEY) || "res");
+
+// ---------- Stats (shown at the top of the Residents tab) ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   document.getElementById("statResidents").textContent = snap.size;
 });

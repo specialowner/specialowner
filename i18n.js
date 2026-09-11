@@ -89,10 +89,15 @@ const translations = {
     publish: "Publish",
 
     tabOverview: "Overview",
+    tabResidents: "Residents",
+    tabAnnouncements: "Announce",
     tabAccess: "Access",
     tabWorkers: "Workers",
     tabFinance: "Finance",
     tabMaintShort: "Maint.",
+
+    dashResidents: "Residents",
+    dashOps: "Operations",
 
     scanQr: "Scan guest / worker QR",
     generateMasterQr: "Generate master access QR",
@@ -347,10 +352,15 @@ const translations = {
     publish: "نشر",
 
     tabOverview: "نظرة عامة",
+    tabResidents: "السكان",
+    tabAnnouncements: "الإعلانات",
     tabAccess: "الدخول",
     tabWorkers: "العمال",
     tabFinance: "المالية",
     tabMaintShort: "الصيانة",
+
+    dashResidents: "السكان",
+    dashOps: "التشغيل",
 
     scanQr: "مسح رمز QR للضيف / العامل",
     generateMasterQr: "توليد رمز QR رئيسي (ماستر)",
