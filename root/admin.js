@@ -619,7 +619,7 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
           <div class="title">${p.unit || "—"} · EGP ${p.amount}</div>
           <div class="sub">${p.description} · due ${p.dueDate}</div>
         </div>
-        <span class="badge ${p.status}">${p.status}</span>
+        <span class="badge ${p.status}">${t(p.status) || p.status}</span>
         ${canMarkPaid ? `<button class="btn btn-sm btn-outline pay-mark-paid" data-id="${d.id}">${t("markAsPaid") || "Mark as paid"}</button>` : ""}
       </div>`;
   });
@@ -641,6 +641,18 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
 });
 
 // ---------- Maintenance (admin view + status update + assign worker) ----------
+const CATEGORY_I18N_KEY = {
+  "Plumbing": "catPlumbing",
+  "Electrical": "catElectrical",
+  "AC / Cooling": "catAC",
+  "Carpentry": "catCarpentry",
+  "Cleaning": "catCleaning",
+  "Other": "catOther"
+};
+function categoryLabel(cat) {
+  const key = CATEGORY_I18N_KEY[cat];
+  return key ? t(key) : cat; // fallback for any legacy/custom value
+}
 let workerOptionsCache = [];
 let lastMaintDocs = [];
 
@@ -653,7 +665,7 @@ function renderMaintList() {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${m.unit || "—"} · ${m.category}</div>
+          <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -719,7 +731,7 @@ function renderMaintStats() {
     return `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${cat}</div>
+          <div class="title">${categoryLabel(cat)}</div>
           <div class="sub">${arr.length} ${t("resolved") || "resolved"}</div>
         </div>
         <span class="badge completed">${t("avgTime") || "avg"} ${avgLabel}</span>

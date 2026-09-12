@@ -336,6 +336,18 @@ onSnapshot(annQ, (snap) => {
 });
 
 // ---------- Work orders (maintenance / cleaning / porter / garden) ----------
+const CATEGORY_I18N_KEY = {
+  "Plumbing": "catPlumbing",
+  "Electrical": "catElectrical",
+  "AC / Cooling": "catAC",
+  "Carpentry": "catCarpentry",
+  "Cleaning": "catCleaning",
+  "Other": "catOther"
+};
+function categoryLabel(cat) {
+  const key = CATEGORY_I18N_KEY[cat];
+  return key ? t(key) : cat; // fallback for any legacy/custom value
+}
 if (!isSecurity) {
   const ordersQ = query(collection(db, "maintenanceRequests"), where("assignedWorkerId", "==", user.uid));
   onSnapshot(ordersQ, (snap) => {
@@ -348,7 +360,7 @@ if (!isSecurity) {
       el.innerHTML += `
         <div class="list-item">
           <div class="meta">
-            <div class="title">${o.category} · ${o.unit || "—"}</div>
+            <div class="title">${categoryLabel(o.category)} · ${o.unit || "—"}</div>
             <div class="sub">${o.description}</div>
           </div>
           <select data-id="${o.id}" class="order-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
