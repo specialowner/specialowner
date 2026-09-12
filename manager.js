@@ -305,7 +305,12 @@ function renderMaintList() {
       const payload = { assignedWorkerId: sel.value || null };
       if (sel.value && m?.status === "pending") payload.status = "accepted";
       if (!sel.value && m?.status === "accepted") payload.status = "pending";
-      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
+      try {
+        await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
+      } catch (err) {
+        console.error("Failed to assign worker:", err);
+        alert(err.message || String(err));
+      }
     });
   });
   el.querySelectorAll(".mgr-maint-auto").forEach(btn => {
@@ -313,7 +318,12 @@ function renderMaintList() {
       const m = lastMaintDocs.find(x => x.id === btn.dataset.id);
       const worker = pickWorkerForCategory(m.category);
       if (!worker) { alert(t("noAssignableWorkers")); return; }
-      await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
+      try {
+        await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
+      } catch (err) {
+        console.error("Failed to auto-assign worker:", err);
+        alert(err.message || String(err));
+      }
     });
   });
 }

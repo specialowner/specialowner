@@ -375,13 +375,22 @@ if (!isSecurity) {
     el.querySelectorAll(".order-action").forEach(btn => {
       btn.addEventListener("click", async () => {
         if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
+        btn.disabled = true;
         const payload = {
           status: btn.dataset.next,
           statusSeenByResident: false,
           statusChangedAt: serverTimestamp()
         };
         if (btn.dataset.next === "completed") payload.completedAt = serverTimestamp();
-        await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), payload);
+        try {
+          await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), payload);
+        } catch (err) {
+          console.error("Failed to update work order status:", err);
+          btn.disabled = false;
+          alert(err.code === "permission-denied"
+            ? "Permission denied — ask the admin to publish the latest Firestore rules."
+            : (err.message || String(err)));
+        }
       });
     });
   });
