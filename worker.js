@@ -361,7 +361,11 @@ if (!isSecurity) {
     el.querySelectorAll(".order-status").forEach(sel => {
       sel.addEventListener("change", async () => {
         if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
-        await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), { status: sel.value });
+        await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
+          status: sel.value,
+          statusSeenByResident: false,
+          statusChangedAt: serverTimestamp()
+        });
       });
     });
   });

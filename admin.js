@@ -603,6 +603,7 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   el.innerHTML = "";
   snap.forEach(d => {
     const p = d.data();
+    const canMarkPaid = p.status !== "paid";
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
@@ -610,7 +611,23 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
           <div class="sub">${p.description} · due ${p.dueDate}</div>
         </div>
         <span class="badge ${p.status}">${p.status}</span>
+        ${canMarkPaid ? `<button class="btn btn-sm btn-outline pay-mark-paid" data-id="${d.id}">${t("markAsPaid") || "Mark as paid"}</button>` : ""}
       </div>`;
+  });
+  el.querySelectorAll(".pay-mark-paid").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "payments", btn.dataset.id), {
+          status: "paid",
+          paidAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error(err);
+        alert("Could not update payment. Please try again.");
+        btn.disabled = false;
+      }
+    });
   });
 });
 
@@ -643,7 +660,11 @@ function renderMaintList() {
   });
   el.querySelectorAll(".maint-status").forEach(sel => {
     sel.addEventListener("change", async () => {
-      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), { status: sel.value });
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
+        status: sel.value,
+        statusSeenByResident: false,
+        statusChangedAt: serverTimestamp()
+      });
     });
   });
   el.querySelectorAll(".maint-assign").forEach(sel => {

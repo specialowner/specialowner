@@ -239,18 +239,23 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
     unit: profile.unit || "",
     category, description,
     status: "pending",
+    statusSeenByResident: true,
     createdAt: serverTimestamp()
   });
   document.getElementById("maintDesc").value = "";
 });
 
 const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid));
+let lastMaintRows = [];
 onSnapshot(maintQ, (snap) => {
   const el = document.getElementById("maintList");
+  lastMaintRows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  renderMaintNotifDot();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
   el.innerHTML = "";
-  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  rows.forEach(m => {
+  lastMaintRows.forEach(m => {
+    const isUnseen = m.statusSeenByResident === false;
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
@@ -258,9 +263,32 @@ onSnapshot(maintQ, (snap) => {
           <div class="sub">${m.description}</div>
         </div>
         <span class="badge ${m.status}">${m.status.replace("_", " ")}</span>
+        ${isUnseen ? `<span class="badge" style="background:#fdeaea;color:#a63b3b;border:1px solid #f2c6c6;margin-left:4px">${t("newUpdate") || "New update"}</span>` : ""}
       </div>`;
   });
 });
+
+function renderMaintNotifDot() {
+  const hasUnseen = lastMaintRows.some(m => m.statusSeenByResident === false);
+  const tabBtn = document.querySelector('.tab-btn[data-tab="maint"]');
+  if (!tabBtn) return;
+  let dot = tabBtn.querySelector(".maint-notif-dot");
+  if (hasUnseen && !dot) {
+    dot = document.createElement("span");
+    dot.className = "maint-notif-dot";
+    dot.style.cssText = "display:inline-block;width:8px;height:8px;border-radius:50%;background:#d64545;margin-left:4px;vertical-align:top";
+    tabBtn.appendChild(dot);
+  } else if (!hasUnseen && dot) {
+    dot.remove();
+  }
+}
+
+async function markMaintSeen() {
+  const unseen = lastMaintRows.filter(m => m.statusSeenByResident === false);
+  if (unseen.length === 0) return;
+  await Promise.all(unseen.map(m => updateDoc(doc(db, "maintenanceRequests", m.id), { statusSeenByResident: true })));
+}
+document.querySelector('.tab-btn[data-tab="maint"]')?.addEventListener("click", markMaintSeen);
 
 // ---------- Shops ----------
 const shopsQ = query(collection(db, "shops"), orderBy("name", "asc"));

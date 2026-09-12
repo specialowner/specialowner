@@ -57,6 +57,7 @@ const translations = {
     submitRequest: "Submit request",
     myRequests: "My requests",
     noRequests: "No requests yet.",
+    newUpdate: "New update",
 
     yourPointsBalance: "Your points balance",
     noShops: "No partner shops yet.",
@@ -242,6 +243,7 @@ const translations = {
     addRecord: "Add record",
     allPayments: "All payments",
     noPaymentRecords: "No payment records yet.",
+    markAsPaid: "Mark as paid",
 
     maintenanceRequests: "Maintenance requests",
 
@@ -320,6 +322,7 @@ const translations = {
     submitRequest: "إرسال الطلب",
     myRequests: "طلباتي",
     noRequests: "لا توجد طلبات بعد.",
+    newUpdate: "تحديث جديد",
 
     yourPointsBalance: "رصيد نقاطك",
     noShops: "لا توجد متاجر شريكة بعد.",
@@ -505,6 +508,7 @@ const translations = {
     addRecord: "إضافة السجل",
     allPayments: "كل المدفوعات",
     noPaymentRecords: "لا توجد سجلات مدفوعات بعد.",
+    markAsPaid: "تحديد كمدفوع",
 
     maintenanceRequests: "طلبات الصيانة",
 
