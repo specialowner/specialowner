@@ -601,8 +601,17 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   const el = document.getElementById("financeList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPaymentRecords")}</p>`; return; }
   el.innerHTML = "";
+  const todayISO = new Date().toISOString().slice(0, 10);
   snap.forEach(d => {
     const p = d.data();
+    // Best-effort auto-overdue: no scheduled Cloud Function yet, so whichever admin
+    // has this panel open is the one that flips stale "pending" rows to "overdue".
+    // This only runs while an admin is actively viewing Finanza — see roadmap backlog.
+    if (p.status === "pending" && p.dueDate && p.dueDate < todayISO) {
+      updateDoc(doc(db, "payments", d.id), { status: "overdue" })
+        .catch(err => console.error("Auto-overdue update failed for", d.id, err));
+      p.status = "overdue"; // reflect immediately in this render pass, don't wait for the round-trip
+    }
     const canMarkPaid = p.status !== "paid";
     el.innerHTML += `
       <div class="list-item">
@@ -610,7 +619,7 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
           <div class="title">${p.unit || "—"} · EGP ${p.amount}</div>
           <div class="sub">${p.description} · due ${p.dueDate}</div>
         </div>
-        <span class="badge ${p.status}">${p.status}</span>
+        <span class="badge ${p.status}">${t(p.status) || p.status}</span>
         ${canMarkPaid ? `<button class="btn btn-sm btn-outline pay-mark-paid" data-id="${d.id}">${t("markAsPaid") || "Mark as paid"}</button>` : ""}
       </div>`;
   });
@@ -632,6 +641,18 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
 });
 
 // ---------- Maintenance (admin view + status update + assign worker) ----------
+const CATEGORY_I18N_KEY = {
+  "Plumbing": "catPlumbing",
+  "Electrical": "catElectrical",
+  "AC / Cooling": "catAC",
+  "Carpentry": "catCarpentry",
+  "Cleaning": "catCleaning",
+  "Other": "catOther"
+};
+function categoryLabel(cat) {
+  const key = CATEGORY_I18N_KEY[cat];
+  return key ? t(key) : cat; // fallback for any legacy/custom value
+}
 let workerOptionsCache = [];
 let lastMaintDocs = [];
 
@@ -644,7 +665,7 @@ function renderMaintList() {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${m.unit || "—"} · ${m.category}</div>
+          <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -660,11 +681,13 @@ function renderMaintList() {
   });
   el.querySelectorAll(".maint-status").forEach(sel => {
     sel.addEventListener("change", async () => {
-      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
+      const payload = {
         status: sel.value,
         statusSeenByResident: false,
         statusChangedAt: serverTimestamp()
-      });
+      };
+      if (sel.value === "completed") payload.completedAt = serverTimestamp();
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
     });
   });
   el.querySelectorAll(".maint-assign").forEach(sel => {
@@ -682,7 +705,39 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderMaintStats();
 });
+
+// ---------- Maintenance stats: average resolution time per category ----------
+function renderMaintStats() {
+  const el = document.getElementById("maintStats");
+  if (!el) return; // markup not added to this admin.html copy yet
+  const byCategory = {};
+  lastMaintDocs.forEach(m => {
+    if (m.status !== "completed" || !m.createdAt?.seconds || !m.completedAt?.seconds) return;
+    const hours = (m.completedAt.seconds - m.createdAt.seconds) / 3600;
+    if (hours < 0) return;
+    (byCategory[m.category] ||= []).push(hours);
+  });
+  const cats = Object.keys(byCategory);
+  if (cats.length === 0) {
+    el.innerHTML = `<p class="empty-state">${t("noMaintStats") || "No resolved requests with timing yet."}</p>`;
+    return;
+  }
+  el.innerHTML = cats.map(cat => {
+    const arr = byCategory[cat];
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const avgLabel = avg < 1 ? `${Math.round(avg * 60)} min` : `${avg.toFixed(1)} h`;
+    return `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${categoryLabel(cat)}</div>
+          <div class="sub">${arr.length} ${t("resolved") || "resolved"}</div>
+        </div>
+        <span class="badge completed">${t("avgTime") || "avg"} ${avgLabel}</span>
+      </div>`;
+  }).join("");
+}
 
 // ---------- Access log ----------
 onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (snap) => {

@@ -98,7 +98,7 @@ onSnapshot(paymentsQ, (snap) => {
           <div class="title">${p.description || "Monthly fee"}</div>
           <div class="sub">EGP ${p.amount} · due ${fmtDate(p.dueDate)}</div>
         </div>
-        <span class="badge ${p.status}">${p.status}</span>
+        <span class="badge ${p.status}">${t(p.status) || p.status}</span>
       </div>`;
   });
   document.getElementById("dueNum").textContent = `EGP ${totalDue}`;
@@ -245,6 +245,19 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
   document.getElementById("maintDesc").value = "";
 });
 
+const CATEGORY_I18N_KEY = {
+  "Plumbing": "catPlumbing",
+  "Electrical": "catElectrical",
+  "AC / Cooling": "catAC",
+  "Carpentry": "catCarpentry",
+  "Cleaning": "catCleaning",
+  "Other": "catOther"
+};
+function categoryLabel(cat) {
+  const key = CATEGORY_I18N_KEY[cat];
+  return key ? t(key) : cat; // fallback for any legacy/custom value
+}
+
 const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid));
 let lastMaintRows = [];
 onSnapshot(maintQ, (snap) => {
@@ -259,10 +272,10 @@ onSnapshot(maintQ, (snap) => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${m.category}</div>
+          <div class="title">${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
         </div>
-        <span class="badge ${m.status}">${m.status.replace("_", " ")}</span>
+        <span class="badge ${m.status}">${t(m.status) || m.status.replace("_", " ")}</span>
         ${isUnseen ? `<span class="badge" style="background:#fdeaea;color:#a63b3b;border:1px solid #f2c6c6;margin-left:4px">${t("newUpdate") || "New update"}</span>` : ""}
       </div>`;
   });
