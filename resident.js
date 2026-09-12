@@ -269,11 +269,18 @@ onSnapshot(maintQ, (snap) => {
   el.innerHTML = "";
   lastMaintRows.forEach(m => {
     const isUnseen = m.statusSeenByResident === false;
+    // Queue position is written onto the doc by the admin/manager clients (residents
+    // can't read other residents' requests to count it themselves).
+    const showQueue = (m.status === "pending" || m.status === "accepted") && typeof m.queueAhead === "number";
+    const queueLine = !showQueue ? "" : (m.queueAhead === 0
+      ? `<div class="sub" style="color:#3a7d5c">${t("yourTurnNow")}</div>`
+      : `<div class="sub">${m.queueAhead === 1 ? t("requestsAheadSingular") : `${m.queueAhead} ${t("requestsAheadPlural")}`}</div>`);
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
           <div class="title">${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
+          ${queueLine}
         </div>
         <span class="badge ${m.status}">${t(m.status) || m.status.replace("_", " ")}</span>
         ${isUnseen ? `<span class="badge" style="background:#fdeaea;color:#a63b3b;border:1px solid #f2c6c6;margin-left:4px">${t("newUpdate") || "New update"}</span>` : ""}

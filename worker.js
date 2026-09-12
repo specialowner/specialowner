@@ -357,27 +357,31 @@ if (!isSecurity) {
     const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
       .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
     rows.forEach(o => {
+      // A worker only ever moves their own order forward one step at a time —
+      // accepted → in progress → completed — never sideways or backwards.
+      let actionBtn = "";
+      if (o.status === "accepted") actionBtn = `<button type="button" class="btn btn-sm btn-primary order-action" data-id="${o.id}" data-next="in_progress">${t("startWork")}</button>`;
+      else if (o.status === "in_progress") actionBtn = `<button type="button" class="btn btn-sm btn-primary order-action" data-id="${o.id}" data-next="completed">${t("markComplete")}</button>`;
       el.innerHTML += `
         <div class="list-item">
           <div class="meta">
             <div class="title">${categoryLabel(o.category)} · ${o.unit || "—"}</div>
             <div class="sub">${o.description}</div>
           </div>
-          <select data-id="${o.id}" class="order-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
-            <option value="pending" ${o.status === "pending" ? "selected" : ""}>${t("pending")}</option>
-            <option value="in_progress" ${o.status === "in_progress" ? "selected" : ""}>${t("in_progress")}</option>
-            <option value="completed" ${o.status === "completed" ? "selected" : ""}>${t("completed")}</option>
-          </select>
+          <span class="badge ${o.status}">${t(o.status) || o.status}</span>
+          ${actionBtn}
         </div>`;
     });
-    el.querySelectorAll(".order-status").forEach(sel => {
-      sel.addEventListener("change", async () => {
+    el.querySelectorAll(".order-action").forEach(btn => {
+      btn.addEventListener("click", async () => {
         if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
-        await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
-          status: sel.value,
+        const payload = {
+          status: btn.dataset.next,
           statusSeenByResident: false,
           statusChangedAt: serverTimestamp()
-        });
+        };
+        if (btn.dataset.next === "completed") payload.completedAt = serverTimestamp();
+        await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), payload);
       });
     });
   });

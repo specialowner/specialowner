@@ -38,7 +38,7 @@ const tabs = document.querySelectorAll(".tab-btn");
 tabs.forEach(btn => btn.addEventListener("click", () => {
   tabs.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  ["home", "workers", "security", "visits", "leaves", "announcements"].forEach(tab => {
+  ["home", "workers", "security", "visits", "leaves", "maint", "announcements"].forEach(tab => {
     document.getElementById(`tab-${tab}`).style.display = (tab === btn.dataset.tab) ? "block" : "none";
   });
 }));
@@ -217,6 +217,111 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
       </div>`;
   });
   renderAnnTargetList();
+  renderMaintList();
+});
+
+// ---------- Maintenance requests: distribute work between workers of the same craft ----------
+const CATEGORY_I18N_KEY = {
+  "Plumbing": "catPlumbing",
+  "Electrical": "catElectrical",
+  "AC / Cooling": "catAC",
+  "Carpentry": "catCarpentry",
+  "Cleaning": "catCleaning",
+  "Other": "catOther"
+};
+function categoryLabel(cat) {
+  const key = CATEGORY_I18N_KEY[cat];
+  return key ? t(key) : cat;
+}
+const CATEGORY_TO_CRAFT = {
+  "Cleaning": "cleaning",
+  "Plumbing": "maintenance",
+  "Electrical": "maintenance",
+  "AC / Cooling": "maintenance",
+  "Carpentry": "maintenance",
+  "Other": "maintenance"
+};
+const ACTIVE_STATUSES = ["accepted", "in_progress"];
+let lastMaintDocs = [];
+
+function pickWorkerForCategory(category) {
+  const craft = CATEGORY_TO_CRAFT[category] || "maintenance";
+  const candidates = workersCache.filter(w => w.workerType === craft && (w.accountStatus || "active") === "active");
+  if (candidates.length === 0) return null;
+  const load = {};
+  candidates.forEach(w => { load[w.id] = 0; });
+  lastMaintDocs.forEach(m => {
+    if (ACTIVE_STATUSES.includes(m.status) && m.assignedWorkerId && load[m.assignedWorkerId] !== undefined) {
+      load[m.assignedWorkerId]++;
+    }
+  });
+  return candidates.sort((a, b) => load[a.id] - load[b.id])[0];
+}
+
+// Same "N requests ahead" bookkeeping the admin dashboard maintains — kept here too so
+// queue positions stay fresh even when it's the site manager (not the admin) online.
+async function recomputeQueuePositions() {
+  const byCraft = {};
+  lastMaintDocs.forEach(m => {
+    if (m.status === "completed") return;
+    const craft = CATEGORY_TO_CRAFT[m.category] || "maintenance";
+    (byCraft[craft] ||= []).push(m);
+  });
+  const writes = [];
+  Object.values(byCraft).forEach(list => {
+    list.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    list.forEach((m, idx) => {
+      if (m.queueAhead !== idx) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), { queueAhead: idx }));
+    });
+  });
+  if (writes.length) await Promise.all(writes).catch(() => {});
+}
+
+function renderMaintList() {
+  const el = document.getElementById("mgrMaintList");
+  if (!el) return;
+  if (lastMaintDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
+  el.innerHTML = "";
+  lastMaintDocs.forEach(m => {
+    const craft = CATEGORY_TO_CRAFT[m.category] || "maintenance";
+    const assignableWorkers = workersCache.filter(w => w.workerType === craft);
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
+          <div class="sub">${m.description}</div>
+          <select data-id="${m.id}" class="mgr-maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
+            <option value="">${t("unassigned")}</option>
+            ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("")}
+          </select>
+          ${!m.assignedWorkerId ? `<button type="button" class="btn btn-sm btn-outline mgr-maint-auto" data-id="${m.id}" style="margin-top:6px">${t("autoAssign")}</button>` : ""}
+        </div>
+        <span class="badge ${m.status}">${t(m.status) || m.status}</span>
+      </div>`;
+  });
+  el.querySelectorAll(".mgr-maint-assign").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const m = lastMaintDocs.find(x => x.id === sel.dataset.id);
+      const payload = { assignedWorkerId: sel.value || null };
+      if (sel.value && m?.status === "pending") payload.status = "accepted";
+      if (!sel.value && m?.status === "accepted") payload.status = "pending";
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
+    });
+  });
+  el.querySelectorAll(".mgr-maint-auto").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const m = lastMaintDocs.find(x => x.id === btn.dataset.id);
+      const worker = pickWorkerForCategory(m.category);
+      if (!worker) { alert(t("noAssignableWorkers")); return; }
+      await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
+    });
+  });
+}
+
+onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
+  lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderMaintList();
+  recomputeQueuePositions();
 });
 
 // ---------- Workers' movements (attendance, everyone) ----------

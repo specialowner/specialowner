@@ -143,6 +143,14 @@
       </div>
     </section>
 
+    <!-- MAINTENANCE: distribute requests between workers of the same craft -->
+    <section id="tab-maint" style="display:none">
+      <div class="card">
+        <h3 data-i18n="maintenanceRequests">Maintenance requests</h3>
+        <div id="mgrMaintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
+      </div>
+    </section>
+
     <!-- ANNOUNCEMENTS: post to residents -->
     <section id="tab-announcements" style="display:none">
       <div class="card">
@@ -172,6 +180,7 @@
     <button class="tab-btn" data-tab="security"><span class="tab-icon">🔑</span><span data-i18n="tabManagerSecurity">Security</span></button>
     <button class="tab-btn" data-tab="visits"><span class="tab-icon">🚪</span><span data-i18n="tabManagerVisits">Visits</span></button>
     <button class="tab-btn" data-tab="leaves"><span class="tab-icon">🗓️</span><span data-i18n="tabManagerLeaves">Leaves</span></button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabManagerMaint">Maintenance</span></button>
     <button class="tab-btn" data-tab="announcements"><span class="tab-icon">📣</span><span data-i18n="tabManagerAnnouncements">Announcements</span></button>
   </div>
 </div>

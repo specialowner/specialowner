@@ -38,6 +38,7 @@ input,select,textarea{font-family:inherit}
 .badge.paid,.badge.completed,.badge.active{background:#d7f0e2;color:var(--success)}
 .badge.overdue,.badge.expired,.badge.revoked{background:#f7d7d2;color:var(--danger)}
 .badge.in_progress{background:#dbe7fb;color:#2a5db0}
+.badge.accepted{background:#e6ddf7;color:#5b3fa0}
 
 .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:12px 16px;border-radius:10px;font-weight:700;font-size:14px;width:100%}
 .btn-primary{background:var(--primary);color:#fff}

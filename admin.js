@@ -653,15 +653,67 @@ function categoryLabel(cat) {
   const key = CATEGORY_I18N_KEY[cat];
   return key ? t(key) : cat; // fallback for any legacy/custom value
 }
+// Which craft (workerType) can take which request category. "Cleaning" goes to cleaning
+// staff; everything else (plumbing/electrical/AC/carpentry/other) goes to the general
+// maintenance craft — the data model doesn't split those into separate worker types yet.
+const CATEGORY_TO_CRAFT = {
+  "Cleaning": "cleaning",
+  "Plumbing": "maintenance",
+  "Electrical": "maintenance",
+  "AC / Cooling": "maintenance",
+  "Carpentry": "maintenance",
+  "Other": "maintenance"
+};
+// A request is "active" for load-balancing purposes once a worker has it and hasn't
+// finished — i.e. assigned-but-not-started or in progress.
+const ACTIVE_STATUSES = ["accepted", "in_progress"];
+
 let workerOptionsCache = [];
 let lastMaintDocs = [];
+
+// Picks the least-busy active worker of the matching craft (equal distribution across
+// workers doing the same kind of job), per the site's request.
+function pickWorkerForCategory(category) {
+  const craft = CATEGORY_TO_CRAFT[category] || "maintenance";
+  const candidates = workerOptionsCache.filter(w => w.workerType === craft && (w.accountStatus || "active") === "active");
+  if (candidates.length === 0) return null;
+  const load = {};
+  candidates.forEach(w => { load[w.id] = 0; });
+  lastMaintDocs.forEach(m => {
+    if (ACTIVE_STATUSES.includes(m.status) && m.assignedWorkerId && load[m.assignedWorkerId] !== undefined) {
+      load[m.assignedWorkerId]++;
+    }
+  });
+  return candidates.sort((a, b) => load[a.id] - load[b.id])[0];
+}
+
+// Queue position: how many other non-completed requests of the same craft were created
+// earlier than this one. Written back onto each doc so the resident view (which can't
+// read other residents' requests) can show "N requests ahead of yours" from its own doc.
+async function recomputeQueuePositions() {
+  const byCraft = {};
+  lastMaintDocs.forEach(m => {
+    if (m.status === "completed") return;
+    const craft = CATEGORY_TO_CRAFT[m.category] || "maintenance";
+    (byCraft[craft] ||= []).push(m);
+  });
+  const writes = [];
+  Object.values(byCraft).forEach(list => {
+    list.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    list.forEach((m, idx) => {
+      if (m.queueAhead !== idx) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), { queueAhead: idx }));
+    });
+  });
+  if (writes.length) await Promise.all(writes).catch(() => {});
+}
 
 function renderMaintList() {
   const el = document.getElementById("adminMaintList");
   if (lastMaintDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noRequests")}</p>`; return; }
-  const assignableWorkers = workerOptionsCache.filter(w => w.workerType !== "security");
   el.innerHTML = "";
   lastMaintDocs.forEach(m => {
+    const craft = CATEGORY_TO_CRAFT[m.category] || "maintenance";
+    const assignableWorkers = workerOptionsCache.filter(w => w.workerType === craft);
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
@@ -671,9 +723,11 @@ function renderMaintList() {
             <option value="">${t("unassigned")}</option>
             ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("")}
           </select>
+          ${!m.assignedWorkerId ? `<button type="button" class="btn btn-sm btn-outline maint-auto" data-id="${m.id}" style="margin-top:6px">${t("autoAssign")}</button>` : ""}
         </div>
         <select data-id="${m.id}" class="maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
-          <option value="pending" ${m.status === "pending" ? "selected" : ""}>${t("pending")}</option>
+          <option value="pending" ${m.status === "pending" ? "selected" : ""} disabled>${t("pending")}</option>
+          <option value="accepted" ${m.status === "accepted" ? "selected" : ""} disabled>${t("accepted")}</option>
           <option value="in_progress" ${m.status === "in_progress" ? "selected" : ""}>${t("in_progress")}</option>
           <option value="completed" ${m.status === "completed" ? "selected" : ""}>${t("completed")}</option>
         </select>
@@ -692,7 +746,22 @@ function renderMaintList() {
   });
   el.querySelectorAll(".maint-assign").forEach(sel => {
     sel.addEventListener("change", async () => {
-      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), { assignedWorkerId: sel.value || null });
+      const m = lastMaintDocs.find(x => x.id === sel.dataset.id);
+      const payload = { assignedWorkerId: sel.value || null };
+      // Assigning someone bumps a still-pending request straight to "accepted" so it
+      // shows up in that worker's queue; clearing the assignment on an accepted-but-
+      // not-started request drops it back to pending.
+      if (sel.value && m?.status === "pending") payload.status = "accepted";
+      if (!sel.value && m?.status === "accepted") payload.status = "pending";
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
+    });
+  });
+  el.querySelectorAll(".maint-auto").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const m = lastMaintDocs.find(x => x.id === btn.dataset.id);
+      const worker = pickWorkerForCategory(m.category);
+      if (!worker) { alert(t("noAssignableWorkers")); return; }
+      await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
     });
   });
 }
@@ -706,6 +775,7 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
   renderMaintStats();
+  recomputeQueuePositions();
 });
 
 // ---------- Maintenance stats: average resolution time per category ----------

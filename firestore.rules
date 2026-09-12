@@ -71,12 +71,18 @@ service cloud.firestore {
     }
 
     match /maintenanceRequests/{reqId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid);
+      // Admin and the (active) site manager both need the full list to distribute work
+      // between workers and to show call-center-style totals.
+      allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
+        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid);
       allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
-      // Admin can change anything; an assigned active worker may only update the status field of their own order.
-      allow update: if isAdmin() ||
+      // Admin/manager can assign workers, change status, and recompute queue positions on
+      // every request. An assigned active worker may only move their own order forward
+      // (status + the bookkeeping fields written alongside a status change).
+      allow update: if isAdmin() || isActiveManager() ||
         (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']));
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt']));
       allow delete: if isAdmin();
     }
 
