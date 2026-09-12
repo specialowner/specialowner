@@ -669,11 +669,13 @@ function renderMaintList() {
   });
   el.querySelectorAll(".maint-status").forEach(sel => {
     sel.addEventListener("change", async () => {
-      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
+      const payload = {
         status: sel.value,
         statusSeenByResident: false,
         statusChangedAt: serverTimestamp()
-      });
+      };
+      if (sel.value === "completed") payload.completedAt = serverTimestamp();
+      await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
     });
   });
   el.querySelectorAll(".maint-assign").forEach(sel => {
@@ -691,7 +693,39 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderMaintStats();
 });
+
+// ---------- Maintenance stats: average resolution time per category ----------
+function renderMaintStats() {
+  const el = document.getElementById("maintStats");
+  if (!el) return; // markup not added to this admin.html copy yet
+  const byCategory = {};
+  lastMaintDocs.forEach(m => {
+    if (m.status !== "completed" || !m.createdAt?.seconds || !m.completedAt?.seconds) return;
+    const hours = (m.completedAt.seconds - m.createdAt.seconds) / 3600;
+    if (hours < 0) return;
+    (byCategory[m.category] ||= []).push(hours);
+  });
+  const cats = Object.keys(byCategory);
+  if (cats.length === 0) {
+    el.innerHTML = `<p class="empty-state">${t("noMaintStats") || "No resolved requests with timing yet."}</p>`;
+    return;
+  }
+  el.innerHTML = cats.map(cat => {
+    const arr = byCategory[cat];
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const avgLabel = avg < 1 ? `${Math.round(avg * 60)} min` : `${avg.toFixed(1)} h`;
+    return `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${cat}</div>
+          <div class="sub">${arr.length} ${t("resolved") || "resolved"}</div>
+        </div>
+        <span class="badge completed">${t("avgTime") || "avg"} ${avgLabel}</span>
+      </div>`;
+  }).join("");
+}
 
 // ---------- Access log ----------
 onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (snap) => {

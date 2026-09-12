@@ -58,6 +58,10 @@ const translations = {
     myRequests: "My requests",
     noRequests: "No requests yet.",
     newUpdate: "New update",
+    maintStatsTitle: "Average resolution time by category",
+    noMaintStats: "No resolved requests with timing yet.",
+    resolved: "resolved",
+    avgTime: "avg",
 
     yourPointsBalance: "Your points balance",
     noShops: "No partner shops yet.",
@@ -323,6 +327,10 @@ const translations = {
     myRequests: "طلباتي",
     noRequests: "لا توجد طلبات بعد.",
     newUpdate: "تحديث جديد",
+    maintStatsTitle: "متوسط وقت الحل حسب النوع",
+    noMaintStats: "لا توجد طلبات مكتملة بها توقيت بعد.",
+    resolved: "تم حلها",
+    avgTime: "المتوسط",
 
     yourPointsBalance: "رصيد نقاطك",
     noShops: "لا توجد متاجر شريكة بعد.",
