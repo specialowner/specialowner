@@ -667,6 +667,8 @@ const CATEGORY_TO_CRAFT = {
 // A request is "active" for load-balancing purposes once a worker has it and hasn't
 // finished — i.e. assigned-but-not-started or in progress.
 const ACTIVE_STATUSES = ["accepted", "in_progress"];
+// Fallback length for a request no worker has estimated yet (hours).
+const DEFAULT_TASK_HOURS = 1;
 
 let workerOptionsCache = [];
 let lastMaintDocs = [];
@@ -700,8 +702,17 @@ async function recomputeQueuePositions() {
   const writes = [];
   Object.values(byCraft).forEach(list => {
     list.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    let hoursSoFar = 0;
     list.forEach((m, idx) => {
-      if (m.queueAhead !== idx) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), { queueAhead: idx }));
+      // Waiting time = the durations the workers estimated for everything queued before
+      // this request. Items nobody has estimated yet count as DEFAULT_TASK_HOURS so the
+      // number never silently under-reports; it's shown to the resident as approximate.
+      const eta = Math.round(hoursSoFar * 2) / 2;
+      const patch = {};
+      if (m.queueAhead !== idx) patch.queueAhead = idx;
+      if (m.queueEtaHours !== eta) patch.queueEtaHours = eta;
+      if (Object.keys(patch).length) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), patch));
+      hoursSoFar += Number(m.estimatedHours) > 0 ? Number(m.estimatedHours) : DEFAULT_TASK_HOURS;
     });
   });
   if (writes.length) await Promise.all(writes).catch(() => {});
@@ -719,6 +730,7 @@ function renderMaintList() {
         <div class="meta">
           <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
+          <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
             ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("")}

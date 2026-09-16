@@ -78,11 +78,12 @@ service cloud.firestore {
       allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
       // Admin/manager can assign workers, change status, and recompute queue positions on
       // every request. An assigned active worker may only move their own order forward
-      // (status + the bookkeeping fields written alongside a status change).
+      // (status + the bookkeeping fields written alongside a status change), or set the
+      // duration estimate that feeds the residents' waiting time.
       allow update: if isAdmin() || isActiveManager() ||
         (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt']));
+           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours']));
       allow delete: if isAdmin();
     }
 

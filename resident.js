@@ -272,9 +272,15 @@ onSnapshot(maintQ, (snap) => {
     // Queue position is written onto the doc by the admin/manager clients (residents
     // can't read other residents' requests to count it themselves).
     const showQueue = (m.status === "pending" || m.status === "accepted") && typeof m.queueAhead === "number";
+    // Waiting time is maintained on the doc alongside queueAhead: the sum of the
+    // durations the workers estimated for the requests queued before this one.
+    const eta = Number(m.queueEtaHours);
+    const etaText = showQueue && m.queueAhead > 0 && eta > 0
+      ? ` · ≈ ${eta === 0.5 ? t("estHalfHour") : `${eta} ${eta === 1 ? t("estHour") : t("estHours")}`} ${t("estWait")}`
+      : "";
     const queueLine = !showQueue ? "" : (m.queueAhead === 0
       ? `<div class="sub" style="color:#3a7d5c">${t("yourTurnNow")}</div>`
-      : `<div class="sub">${m.queueAhead === 1 ? t("requestsAheadSingular") : `${m.queueAhead} ${t("requestsAheadPlural")}`}</div>`);
+      : `<div class="sub">${m.queueAhead === 1 ? t("requestsAheadSingular") : `${m.queueAhead} ${t("requestsAheadPlural")}`}${etaText}</div>`);
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
