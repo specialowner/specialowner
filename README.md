@@ -57,24 +57,8 @@ I can't compile a signed Android package directly in this chat (that needs the A
 6. Before uploading to Play Console, add the Digital Asset Links file PWABuilder gives you (`assetlinks.json`) to `/.well-known/assetlinks.json` on your hosted site — this is what fixed the address-bar issue on Nour, same fix applies here.
 7. Upload the AAB to a new Play Console app ("Special Owner"), fill Data Safety (this app collects: email, name, unit number → Account info; QR/invite data → App activity; stored via Firebase) and category (likely "House & Home").
 
-## 5. Deploy the maintenance-queue Cloud Function
-
-`functions/recomputeMaintenanceQueue` keeps each resident's queue position and estimated
-wait time (`queueAhead`, `queueEtaHours`) correct server-side, so it stays accurate even
-with no admin or site manager browser open — it fires on every write to
-`maintenanceRequests`, not on someone's screen refreshing.
-
-1. `npm install -g firebase-tools` if you don't have the CLI, then `firebase login`.
-2. From the project root (this folder): `firebase use specialowner-f3dce` (or `firebase use --add` the first time).
-3. `cd functions && npm install && cd ..`
-4. Deploy it: `firebase deploy --only functions:recomputeMaintenanceQueue`
-   (or `firebase deploy --only functions,firestore:rules` to push rules at the same time).
-5. Requires the Firebase project to be on the **Blaze (pay-as-you-go)** plan — Cloud
-   Functions don't run on the free Spark plan. Firestore trigger volume here is tiny
-   (one invocation per maintenance-request write), so cost is negligible in practice.
-
-## 6. Suggested next steps for the "advanced" version later
-- Cloud Function to auto-flag payments `pending → overdue` past due date (the maintenance-queue function above follows the same trigger-on-write pattern, so this can reuse most of the setup)
+## 4. Suggested next steps for the "advanced" version later
+- Cloud Function to auto-flag payments `pending → overdue` past due date
 - Points ledger: write to `pointsTransactions` and increment `users/{uid}.points` in a transaction whenever a shop purchase happens
 - Worker time/attendance stats (clock-in QR similar to guest QR, tied to `workers/{id}`)
 - Payroll + bank account linking module (flagged as future work in your outline)
