@@ -173,7 +173,86 @@
   </div>
 
   <div class="card">
-    <h2>Fatto in questa sessione — Stima in ore dell'operaio e tempo di attesa per il residente</h2>
+    <h2>Fatto in questa sessione — Pannello Call Center con ruolo dedicato</h2>
+    <div class="desc">Prima voce "vera" del backlog Call Center: un account staff separato che registra le chiamate telefoniche dei residenti. Nuovi file: <code>call-center.html</code>, <code>call-center.js</code>. Modificati: <code>admin.html</code>, <code>admin.js</code>, <code>guard.js</code>, <code>auth.js</code>, <code>i18n.js</code>, <code>firestore.rules</code>, <code>create-staff-account.js</code>, <code>README.md</code>.</div>
+
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">Nuovo ruolo <code>callcenter</code> <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">Ruolo a sé, non admin e non manager. Aggiunto alle mappe di routing in <code>guard.js</code> e <code>auth.js</code>, così al login l'agente finisce direttamente sulla sua pagina. Come manager e operai, l'account lo crea solo l'admin — nessuna auto-registrazione.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">Gestione account dal pannello admin <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">Nel tab Operai dell'admin: form "Aggiungi account call center" (nome, email, password) + elenco degli account esistenti con stato e pulsante sospendi/riattiva. Riusa <code>createStaffAccount()</code>, lo stesso meccanismo già collaudato per manager e operai, quindi l'admin non viene sloggato mentre crea l'account.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">Pannello agente: ricerca residente + registrazione chiamata <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">L'agente cerca il residente digitando il numero di unità (ricerca parziale, case-insensitive), lo seleziona, sceglie la categoria e descrive il problema. Viene creata una normale richiesta di manutenzione a nome di quel residente, che entra nella coda del mestiere esattamente come se l'avesse inviata lui dall'app — quindi eredita assegnazione automatica, stima ore e tempo di attesa già esistenti.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">Tracciabilità: <code>loggedBy</code> / <code>loggedByRole</code> <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">Ogni richiesta creata per telefono porta l'uid dell'agente che l'ha presa. Serve a due cose: il tab "Le mie chiamate" mostra all'agente solo le proprie, e in futuro si potrà distinguere le chiamate telefoniche dalle richieste inviate direttamente dai residenti.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">Permessi Firestore stretti sul nuovo ruolo <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">L'agente può leggere i profili dei residenti (serve per la ricerca per unità) e creare richieste dove <code>loggedBy</code> è il proprio uid — e basta. Niente finanza, niente gestione operai, nessun cambio di stato sulle richieste, nessuna lettura delle richieste altrui. La regola blocca anche il caso in cui un agente provasse a scrivere un <code>loggedBy</code> diverso dal proprio.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge todo">!</div>
+      <div class="step-body">
+        <div class="step-title">Da ricordare al deploy <span class="status-tag todo">Da fare</span></div>
+        <div class="step-detail">Le nuove <code>firestore.rules</code> vanno ripubblicate, altrimenti l'agente riceve "permission denied" sia sulla ricerca residenti sia sulla registrazione della chiamata. Serve anche un indice Firestore per la query <code>loggedBy</code> + <code>createdAt</code> del tab "Le mie chiamate": alla prima apertura Firebase mostra in console un link che lo crea in un click.</div>
+      </div>
+    </div>
+
+    <div class="desc" style="margin-top:14px"><strong>Collaudo eseguito:</strong> <code>node --check</code> su tutti i JS toccati e parsing di <code>call-center.html</code> e <code>admin.html</code>; verificate tutte le 24 chiavi i18n usate dal nuovo pannello, presenti sia in arabo sia in inglese; testata isolata la ricerca per unità (corrispondenza parziale, maiuscole/minuscole, query vuota); testata isolata la regola di creazione su 8 casi, inclusi quelli che devono essere rifiutati — residente che scrive per un altro residente, agente che falsifica <code>loggedBy</code>, agente sospeso, operaio che si spaccia per call center.</div>
+  </div>
+
+  <div class="card">
+    <h2>Sessione precedente — Cloud Function server-side per la coda: tentata, poi annullata</h2>
+    <div class="desc">Costruita una Cloud Function (<code>recomputeMaintenanceQueue</code>) per spostare il calcolo di <code>queueAhead</code>/<code>queueEtaHours</code> dal browser di admin/manager al server. Richiedeva il piano a pagamento Blaze di Firebase per il deploy — rifiutato per costo, quindi annullata su richiesta esplicita prima di qualunque pubblicazione.</div>
+
+    <div class="step">
+      <div class="step-badge todo">✕</div>
+      <div class="step-body">
+        <div class="step-title">Cloud Function rimossa <span class="status-tag todo">Annullato</span></div>
+        <div class="step-detail">Cancellati <code>functions/index.js</code>, <code>functions/package.json</code> e <code>firebase.json</code>. Mai pubblicata: nessuna Function è stata effettivamente attiva sul progetto Firebase in nessun momento, quindi nessun costo è stato generato.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">admin.js / manager.js ripristinati <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">Tornato esattamente al calcolo lato client della sessione precedente (stessa funzione <code>recomputeQueuePositions()</code>, stesso fallback di 1 ora, stesso richiamo a ogni snapshot). Il limite noto resta quindi lo stesso di prima: il calcolo dipende da un admin o site manager con il tab Manutenzione aperto.</div>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-badge done">✓</div>
+      <div class="step-body">
+        <div class="step-title">README ripulito <span class="status-tag done">Fatto</span></div>
+        <div class="step-detail">Rimossa la sezione "Deploy the maintenance-queue Cloud Function" aggiunta per l'occasione. Resta solo la voce nel backlog "advanced" (Cloud Function per gli overdue), invariata rispetto a prima.</div>
+      </div>
+    </div>
+
+    <div class="desc" style="margin-top:14px"><strong>Stato risultante:</strong> identico a fine sessione precedente — nessun file nuovo, nessuna dipendenza da un piano a pagamento, nessuna funzionalità persa. Il calcolo del tempo di attesa (stima ore + fallback + coda) resta quello lato client, già collaudato.</div>
+  </div>
+
+  <div class="card">
+    <h2>Sessione precedente — Stima in ore dell'operaio e tempo di attesa per il residente</h2>
     <div class="desc">Prosegue lo scenario Call Center: la coda del residente smette di essere un semplice conteggio e diventa un tempo stimato, alimentato dall'operaio. File toccati: <code>worker.js</code>, <code>admin.js</code>, <code>manager.js</code>, <code>resident.js</code>, <code>i18n.js</code>, <code>firestore.rules</code> (copie radice).</div>
 
     <div class="step">
@@ -220,6 +299,7 @@
     </div>
 
     <div class="desc" style="margin-top:14px"><strong>Collaudo eseguito:</strong> <code>node --check</code> su tutti i file toccati; test headless dell'algoritmo coda+tempo su 7 richieste di due mestieri diversi (stime presenti, stime mancanti, richiesta già completata esclusa) — posizioni e ore attese tutte corrette; verifica che ogni chiave <code>t("...")</code> usata esista e che le nuove etichette siano presenti sia in inglese sia in arabo.</div>
+    <div class="desc"><strong>Verificato in produzione:</strong> confermato lato residente su una richiesta reale (AC / Cooling → "2 richieste prima della tua · ≈ 1.5 ore di attesa"), con il numero di ore coerente con le stime inserite dall'operaio sulle richieste in coda davanti.</div>
   </div>
 
   <div class="card">
@@ -495,11 +575,11 @@
 
       <div class="cat-card">
         <h3>Call Center — Coda chiamate manutenzione</h3>
-        <div class="count">4 da fare · 4 fatte (vedi sopra)</div>
+        <div class="count">2 da fare · 6 fatte (vedi sopra)</div>
         <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Smistamento verso l'operaio più libero — fatto per <code>maintenanceRequests</code> (distribuzione automatica per mestiere), non ancora per un vero flusso Call Center con chiamate manuali</div>
         <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Posizione in coda del residente — fatta, ora con stima in ore ("N richieste prima della tua ≈ 3 ore")</div>
-        <div class="item">Nuovo ruolo "Call Center" con account dedicato e permessi propri (non admin, non manager) — oggi questa funzione la copre l'admin/site manager sullo stesso tab Manutenzione</div>
-        <div class="item">Pannello Call Center: form per inserire una chiamata telefonica manualmente (unità/residente, tipo problema) e assegnarla a un operaio</div>
+        <div class="item">✓ Nuovo ruolo "Call Center" con account dedicato e permessi propri — fatto: ruolo <code>callcenter</code>, creato solo dall'admin, permessi limitati alla ricerca residenti e alla registrazione chiamate</div>
+        <div class="item">✓ Pannello Call Center: form per inserire una chiamata manualmente — fatto (ricerca per unità, categoria, descrizione). L'assegnazione all'operaio resta quella automatica/manuale già esistente lato admin e site manager, non si fa dal pannello Call Center</div>
         <div class="item">Nuova struttura dati "coda" per operaio: task on-site (assegnati dal manager) + chiamate residenti (da app o da Call Center), con ordine e provenienza distinguibili — oggi <code>maintenanceRequests</code> resta un'unica collezione senza task on-site separati</div>
         <div class="item">✓ UI operaio: dropdown per stimare la durata (in ore) — fatto sulle richieste <code>maintenanceRequests</code>, non ancora su una vera coda con task on-site</div>
         <div class="item">UI operaio: completamento di una voce in coda → passaggio automatico alla successiva (oggi ogni richiesta resta indipendente, l'operaio la apre e chiude singolarmente)</div>
@@ -511,8 +591,8 @@
   </div>
 
   <div class="footnote">
-    Aggiornato dopo la sessione sul flusso Manutenzione (stato "assegnato", distribuzione automatica per mestiere, tab Site Manager, posizione in coda del residente, fix permessi Firestore).<br>
-    Il backlog "Call Center" è stato rivisto: due voci sono segnate come fatte a un livello più semplice, le altre restano invariate. Il resto del backlog e le card precedenti non sono stati toccati in questo intervento.
+    Aggiornato dopo la sessione sul pannello Call Center (nuovo ruolo <code>callcenter</code>, gestione account dall'admin, registrazione chiamate per conto dei residenti, permessi Firestore dedicati). Ricordarsi di ripubblicare le regole Firestore e di creare l'indice per la query "Le mie chiamate".<br>
+    Backlog "Call Center": due voci in più segnate come fatte. Il resto del backlog e le card precedenti non sono stati toccati in questo intervento.
   </div>
 
 </div>
