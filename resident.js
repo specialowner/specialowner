@@ -238,6 +238,7 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
     residentId: user.uid,
     unit: profile.unit || "",
     category, description,
+    source: "resident",
     status: "pending",
     statusSeenByResident: true,
     createdAt: serverTimestamp()

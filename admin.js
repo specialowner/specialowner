@@ -732,6 +732,19 @@ const DEFAULT_TASK_HOURS = 1;
 let workerOptionsCache = [];
 let lastMaintDocs = [];
 
+// Where a queue entry came from: the resident app, a call logged over the phone, or a
+// task an admin/site manager sent a worker to directly (no resident involved at all).
+function originLabel(m) {
+  if (m.source === "onsite") return t("originOnsite");
+  if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
+  return t("originResident");
+}
+// On-site tasks have no unit to show (there's no resident) — they carry a free-text
+// location instead, entered by whoever created the task.
+function placeLabel(m) {
+  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+}
+
 // Picks the least-busy active worker of the matching craft (equal distribution across
 // workers doing the same kind of job), per the site's request.
 function pickWorkerForCategory(category) {
@@ -787,7 +800,8 @@ function renderMaintList() {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
+          <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
+          <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
           <div class="sub">${m.description}</div>
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
@@ -855,6 +869,64 @@ function renderMaintList() {
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderOnsiteWorkerOptions();
+});
+
+// ---------- Direct on-site task: admin sends a worker straight to a job, no resident involved ----------
+// The worker list depends on which craft the chosen category maps to (same mapping used
+// for auto-assign), so it's rebuilt whenever the category or the worker list changes.
+function renderOnsiteWorkerOptions() {
+  const categorySel = document.getElementById("onsiteCategory");
+  const workerSel = document.getElementById("onsiteWorkerSelect");
+  if (!categorySel || !workerSel) return;
+  const craft = CATEGORY_TO_CRAFT[categorySel.value] || "maintenance";
+  const candidates = workerOptionsCache.filter(w => w.workerType === craft && (w.accountStatus || "active") === "active");
+  const previous = workerSel.value;
+  workerSel.innerHTML = `<option value="">${t("selectWorkerOption")}</option>` +
+    candidates.map(w => `<option value="${w.id}">${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("");
+  if (candidates.some(w => w.id === previous)) workerSel.value = previous;
+}
+document.getElementById("onsiteCategory")?.addEventListener("change", renderOnsiteWorkerOptions);
+renderOnsiteWorkerOptions();
+
+document.getElementById("createOnsiteTaskBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("createOnsiteTaskBtn");
+  const errEl = document.getElementById("onsiteTaskError");
+  errEl.style.display = "none";
+  const category = document.getElementById("onsiteCategory").value;
+  const workerId = document.getElementById("onsiteWorkerSelect").value;
+  const location = document.getElementById("onsiteLocationInput").value.trim();
+  const description = document.getElementById("onsiteDescInput").value.trim();
+  if (!category || !workerId || !description) {
+    errEl.textContent = t("fillOnsiteFields");
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    // Created already "accepted" — the worker is chosen up front, unlike a resident/call
+    // center request which starts "pending" until someone assigns it. It still joins the
+    // same craft queue (recomputeQueuePositions groups by category, not by source), so it
+    // occupies the worker's time exactly like any other request ahead of it.
+    await addDoc(collection(db, "maintenanceRequests"), {
+      source: "onsite",
+      category, description, location,
+      assignedWorkerId: workerId,
+      status: "accepted",
+      statusSeenByResident: true,
+      createdBy: user.uid,
+      createdAt: serverTimestamp()
+    });
+    document.getElementById("onsiteLocationInput").value = "";
+    document.getElementById("onsiteDescInput").value = "";
+    alert(t("onsiteTaskCreated"));
+  } catch (err) {
+    console.error("Failed to create on-site task:", err);
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {

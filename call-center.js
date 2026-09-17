@@ -113,6 +113,7 @@ document.getElementById("submitCallBtn").addEventListener("click", async () => {
       residentId: selectedResident.id,
       unit: selectedResident.unit || "",
       category, description,
+      source: "call_center",
       status: "pending",
       statusSeenByResident: true,
       loggedBy: user.uid,

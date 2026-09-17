@@ -348,6 +348,17 @@ function categoryLabel(cat) {
   const key = CATEGORY_I18N_KEY[cat];
   return key ? t(key) : cat; // fallback for any legacy/custom value
 }
+// Where the order came from: the resident app, a call logged over the phone by the call
+// center, or a task an admin/site manager sent the worker to directly (no resident at all).
+function originLabel(m) {
+  if (m.source === "onsite") return t("originOnsite");
+  if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
+  return t("originResident");
+}
+// On-site tasks carry a free-text location instead of a resident's unit.
+function placeLabel(m) {
+  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+}
 // Duration estimates the worker can pick, in hours (0.5 = half an hour).
 const ESTIMATE_CHOICES = [0.5, 1, 2, 3, 4, 6, 8];
 function estimateLabel(h) {
@@ -379,7 +390,8 @@ if (!isSecurity) {
       el.innerHTML += `
         <div class="list-item">
           <div class="meta">
-            <div class="title">${categoryLabel(o.category)} · ${o.unit || "—"}</div>
+            <div class="title">${categoryLabel(o.category)} · ${placeLabel(o)}</div>
+            <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(o)}</div>
             <div class="sub">${o.description}</div>
             ${estSelect}
           </div>

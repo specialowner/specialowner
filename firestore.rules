@@ -90,10 +90,19 @@ service cloud.firestore {
         (isActiveCallCenter() && resource.data.loggedBy == request.auth.uid));
       // A resident logs their own request. Call center logs one on a resident's behalf over
       // the phone — same shape, but residentId is whoever they looked up, not their own uid,
-      // and loggedBy/loggedByRole record who actually typed it in for traceability.
+      // and loggedBy/loggedByRole record who actually typed it in for traceability. Admin/
+      // site manager can also send a worker straight to a job with no resident involved at
+      // all: source == 'onsite', already "accepted" with a worker picked up front, and
+      // createdBy records who sent it (same traceability role as loggedBy above).
       allow create: if (isOwner(request.resource.data.residentId) && isActiveResident()) ||
         (isActiveCallCenter() && request.resource.data.loggedBy == request.auth.uid &&
-         request.resource.data.loggedByRole == 'callcenter');
+         request.resource.data.loggedByRole == 'callcenter') ||
+        ((isAdmin() || isActiveManager()) &&
+         request.resource.data.source == 'onsite' &&
+         request.resource.data.createdBy == request.auth.uid &&
+         request.resource.data.status == 'accepted' &&
+         request.resource.data.assignedWorkerId is string &&
+         request.resource.data.assignedWorkerId.size() > 0);
       // Admin/manager can assign workers, change status, and recompute queue positions on
       // every request. An assigned active worker may only move their own order forward
       // (status + the bookkeeping fields written alongside a status change), or set the
