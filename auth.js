@@ -15,7 +15,7 @@ function t(key) {
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
 
-const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html", manager: "manager.html" };
+const HOME_PAGE = { admin: "admin.html", worker: "worker.html", resident: "resident.html", manager: "manager.html", callcenter: "call-center.html" };
 
 const modeToggle = document.getElementById("modeToggle");
 const nameField = document.getElementById("nameField");

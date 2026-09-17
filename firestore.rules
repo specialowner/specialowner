@@ -35,11 +35,23 @@ service cloud.firestore {
     function isActiveManager() {
       return isManager() && myData().accountStatus == 'active';
     }
+    // Call center: reports to the admin, staff-only account (created by admin, same
+    // as manager/worker — no self sign-up). Logs a phone-in maintenance request on a
+    // resident's behalf: needs to look residents up by unit and create the request,
+    // nothing more (no finance, no worker management, no status changes).
+    function isCallCenter() {
+      return isSignedIn() && myData().role == 'callcenter';
+    }
+    function isActiveCallCenter() {
+      return isCallCenter() && myData().accountStatus == 'active';
+    }
 
     match /users/{userId} {
       // A manager may read worker profiles (needed for the Workers/Security/Leaves views), on top of their own doc.
+      // Call center reads resident profiles too, but only to look someone up by unit when logging a call — nothing else.
       allow read: if isOwner(userId) || isAdmin() ||
-        (isActiveManager() && resource.data.role == 'worker');
+        (isActiveManager() && resource.data.role == 'worker') ||
+        (isActiveCallCenter() && resource.data.role == 'resident');
       // Self-registration is residents-only (public sign-up). The admin can create
       // any account (site managers, workers, or promote/adjust anyone). An active
       // site manager can create worker accounts only — never manager or admin
@@ -74,8 +86,14 @@ service cloud.firestore {
       // Admin and the (active) site manager both need the full list to distribute work
       // between workers and to show call-center-style totals.
       allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
-        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
+        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid ||
+        (isActiveCallCenter() && resource.data.loggedBy == request.auth.uid));
+      // A resident logs their own request. Call center logs one on a resident's behalf over
+      // the phone — same shape, but residentId is whoever they looked up, not their own uid,
+      // and loggedBy/loggedByRole record who actually typed it in for traceability.
+      allow create: if (isOwner(request.resource.data.residentId) && isActiveResident()) ||
+        (isActiveCallCenter() && request.resource.data.loggedBy == request.auth.uid &&
+         request.resource.data.loggedByRole == 'callcenter');
       // Admin/manager can assign workers, change status, and recompute queue positions on
       // every request. An assigned active worker may only move their own order forward
       // (status + the bookkeeping fields written alongside a status change), or set the

@@ -297,6 +297,37 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap
   });
 });
 
+// ---------- Call center accounts ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "callcenter")), (snap) => {
+  const el = document.getElementById("callCenterAccountsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noCallCenterYet")}</p>`; return; }
+  el.innerHTML = "";
+  snap.docs.forEach(d => {
+    const r = { id: d.id, ...d.data() };
+    const status = r.accountStatus || "active";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.name || r.email}</div>
+          <div class="sub">${r.email || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${status === "active" ? "active" : "overdue"}">${status}</span>
+          <button class="btn btn-sm ${status === "active" ? "btn-danger" : "btn-primary"}" data-cc-action="${status === "active" ? "suspend" : "approve"}" data-id="${r.id}">
+            ${status === "active" ? t("suspend") : t("approve")}
+          </button>
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-cc-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "users", btn.dataset.id), {
+        accountStatus: btn.dataset.ccAction === "approve" ? "active" : "suspended"
+      });
+    });
+  });
+});
+
 // ---------- Salary breakdown & leave balance management ----------
 function renderSalaryManageList() {
   const el = document.getElementById("salaryManageList");
@@ -504,6 +535,34 @@ document.getElementById("addManagerAccBtn").addEventListener("click", async () =
     document.getElementById("mgrAccName").value = "";
     document.getElementById("mgrAccEmail").value = "";
     document.getElementById("mgrAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Add call center account (admin) ----------
+document.getElementById("addCallCenterAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("addCallCenterAccBtn");
+  const errEl = document.getElementById("ccAccError");
+  errEl.style.display = "none";
+  const name = document.getElementById("ccAccName").value.trim();
+  const email = document.getElementById("ccAccEmail").value.trim();
+  const password = document.getElementById("ccAccPassword").value;
+  if (!name || !email || !password) {
+    errEl.textContent = "Please fill in the name, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "callcenter", createdBy: user.uid });
+    document.getElementById("ccAccName").value = "";
+    document.getElementById("ccAccEmail").value = "";
+    document.getElementById("ccAccPassword").value = "";
     alert(t("accountCreated") || "Account created.");
   } catch (err) {
     errEl.textContent = friendlyStaffCreateError(err);

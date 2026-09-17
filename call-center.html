@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Call Center</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 id="greetName">Hi 👋</h1>
+        <div class="sub" id="greetRole" data-i18n="callCenter">Call Center</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+
+    <!-- HOME: log a new call -->
+    <section id="tab-home">
+      <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
+
+      <div class="card">
+        <h3 data-i18n="searchResidentByUnit">Search resident by unit number</h3>
+        <div class="field">
+          <input type="text" id="unitSearchInput" data-i18n-placeholder="unitNumberPh" placeholder="e.g. B12">
+        </div>
+        <div id="unitSearchResults"></div>
+      </div>
+
+      <div class="card" id="logCallCard" style="display:none">
+        <h3 data-i18n="logNewCall">Log a new call</h3>
+        <div class="field">
+          <label data-i18n="selectResident">Select resident</label>
+          <div id="selectedResidentBox" style="font-weight:700;padding:8px 0"></div>
+        </div>
+        <div class="field">
+          <label data-i18n="category">Category</label>
+          <select id="callCategory">
+            <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
+            <option value="Electrical" data-i18n="catElectrical">Electrical</option>
+            <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
+            <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
+            <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
+            <option value="Other" data-i18n="catOther">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="callDescription">What's the issue?</label>
+          <textarea id="callDesc" data-i18n-placeholder="callDescriptionPh" placeholder="Describe what the resident reported"></textarea>
+        </div>
+        <p class="error-text" id="logCallError" style="display:none"></p>
+        <button class="btn btn-primary" id="submitCallBtn" data-i18n="submitCall">Log call</button>
+      </div>
+    </section>
+
+    <!-- HISTORY: calls this agent logged -->
+    <section id="tab-history" style="display:none">
+      <div class="card">
+        <h3 data-i18n="myLoggedCalls">Calls I've logged</h3>
+        <div id="loggedCallsList"><p class="empty-state" data-i18n="noCallsLogged">No calls logged yet.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="home"><span class="tab-icon">📞</span><span data-i18n="tabCallCenterHome">Log a call</span></button>
+    <button class="tab-btn" data-tab="history"><span class="tab-icon">🗒️</span><span data-i18n="tabCallCenterHistory">My calls</span></button>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script type="module" src="call-center.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
+</body>
+</html>
