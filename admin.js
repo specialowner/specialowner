@@ -667,8 +667,6 @@ const CATEGORY_TO_CRAFT = {
 // A request is "active" for load-balancing purposes once a worker has it and hasn't
 // finished — i.e. assigned-but-not-started or in progress.
 const ACTIVE_STATUSES = ["accepted", "in_progress"];
-// Fallback length for a request no worker has estimated yet (hours).
-const DEFAULT_TASK_HOURS = 1;
 
 let workerOptionsCache = [];
 let lastMaintDocs = [];
@@ -689,34 +687,10 @@ function pickWorkerForCategory(category) {
   return candidates.sort((a, b) => load[a.id] - load[b.id])[0];
 }
 
-// Queue position: how many other non-completed requests of the same craft were created
-// earlier than this one. Written back onto each doc so the resident view (which can't
-// read other residents' requests) can show "N requests ahead of yours" from its own doc.
-async function recomputeQueuePositions() {
-  const byCraft = {};
-  lastMaintDocs.forEach(m => {
-    if (m.status === "completed") return;
-    const craft = CATEGORY_TO_CRAFT[m.category] || "maintenance";
-    (byCraft[craft] ||= []).push(m);
-  });
-  const writes = [];
-  Object.values(byCraft).forEach(list => {
-    list.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
-    let hoursSoFar = 0;
-    list.forEach((m, idx) => {
-      // Waiting time = the durations the workers estimated for everything queued before
-      // this request. Items nobody has estimated yet count as DEFAULT_TASK_HOURS so the
-      // number never silently under-reports; it's shown to the resident as approximate.
-      const eta = Math.round(hoursSoFar * 2) / 2;
-      const patch = {};
-      if (m.queueAhead !== idx) patch.queueAhead = idx;
-      if (m.queueEtaHours !== eta) patch.queueEtaHours = eta;
-      if (Object.keys(patch).length) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), patch));
-      hoursSoFar += Number(m.estimatedHours) > 0 ? Number(m.estimatedHours) : DEFAULT_TASK_HOURS;
-    });
-  });
-  if (writes.length) await Promise.all(writes).catch(() => {});
-}
+// Queue position and wait time (queueAhead / queueEtaHours) are now computed
+// server-side by the recomputeMaintenanceQueue Cloud Function (functions/index.js),
+// triggered on every write to maintenanceRequests — so they stay correct even with
+// no admin or site manager browser open. This file only reads those fields now.
 
 function renderMaintList() {
   const el = document.getElementById("adminMaintList");
@@ -802,7 +776,6 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
   renderMaintStats();
-  recomputeQueuePositions();
 });
 
 // ---------- Maintenance stats: average resolution time per category ----------
