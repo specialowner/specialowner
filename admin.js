@@ -794,6 +794,7 @@ const CATEGORY_I18N_KEY = {
   "AC / Cooling": "catAC",
   "Carpentry": "catCarpentry",
   "Cleaning": "catCleaning",
+  "Garden": "catGarden",
   "Other": "catOther"
 };
 function categoryLabel(cat) {
@@ -805,6 +806,7 @@ function categoryLabel(cat) {
 // maintenance craft — the data model doesn't split those into separate worker types yet.
 const CATEGORY_TO_CRAFT = {
   "Cleaning": "cleaning",
+  "Garden": "garden",
   "Plumbing": "maintenance",
   "Electrical": "maintenance",
   "AC / Cooling": "maintenance",
@@ -824,13 +826,18 @@ let lastMaintDocs = [];
 // task an admin/site manager sent a worker to directly (no resident involved at all).
 function originLabel(m) {
   if (m.source === "onsite") return t("originOnsite");
+  if (m.source === "resident_report") return t("originReport");
   if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
   return t("originResident");
 }
 // On-site tasks have no unit to show (there's no resident) — they carry a free-text
 // location instead, entered by whoever created the task.
 function placeLabel(m) {
-  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+  if (m.source === "onsite") return m.location || "—";
+  // A compound report is about a common area, so the spot the resident typed matters
+  // more than their unit — both are shown, the location first.
+  if (m.source === "resident_report") return `${m.location || "—"} (${m.unit || "—"})`;
+  return m.unit || "—";
 }
 
 // Picks the least-busy active worker of the matching craft (equal distribution across
@@ -891,6 +898,7 @@ function renderMaintList() {
           <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
           <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
           <div class="sub">${m.description}</div>
+          ${m.photoData ? `<img class="photo-thumb maint-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -952,7 +960,75 @@ function renderMaintList() {
       }
     });
   });
+  el.querySelectorAll(".maint-photo").forEach(img => {
+    img.addEventListener("click", () => openDataUrl(img.src));
+  });
 }
+
+// ---------- Service subscriptions (car wash / home cleaning / garden care) ----------
+const SERVICE_I18N_KEY = {
+  car_wash: "svcCarWash",
+  home_cleaning: "svcHomeClean",
+  garden_care: "svcGarden"
+};
+const FREQ_I18N_KEY = {
+  weekly: "freqWeekly",
+  biweekly: "freqBiweekly",
+  monthly: "freqMonthly",
+  once: "freqOnce"
+};
+let lastSubDocs = [];
+
+onSnapshot(query(collection(db, "serviceSubscriptions"), orderBy("requestedAt", "desc")), (snap) => {
+  lastSubDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderSubsList();
+}, (err) => console.error("Subscriptions listener failed:", err));
+
+function renderSubsList() {
+  const el = document.getElementById("adminSubsList");
+  if (!el) return;
+  if (lastSubDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noSubscriptions")}</p>`; return; }
+  el.innerHTML = lastSubDocs.map(s => `
+    <div class="list-item">
+      <div class="meta">
+        <div class="title">${s.unit || "—"} · ${t(SERVICE_I18N_KEY[s.service]) || s.service}</div>
+        <div class="sub">${t(FREQ_I18N_KEY[s.frequency]) || s.frequency || ""}${s.price ? ` · ${s.price}` : ""}</div>
+        ${s.notes ? `<div class="sub">${s.notes}</div>` : ""}
+        ${s.status === "requested" ? `
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <input type="text" class="sub-price" data-id="${s.id}" placeholder="${t("svcPricePh")}" style="width:120px;padding:6px 8px;border:1px solid #dfe6e3;border-radius:8px;font-size:12px">
+            <button type="button" class="btn btn-sm btn-primary sub-approve" data-id="${s.id}">${t("svcApprove")}</button>
+            <button type="button" class="btn btn-sm btn-outline sub-reject" data-id="${s.id}">${t("svcReject")}</button>
+          </div>` : ""}
+        ${s.status === "active" ? `<button type="button" class="btn btn-sm btn-outline sub-stop" data-id="${s.id}" style="margin-top:6px">${t("svcStop")}</button>` : ""}
+      </div>
+      <span class="badge ${s.status}">${t(`sub_${s.status}`) || s.status}</span>
+    </div>`).join("");
+
+  el.querySelectorAll(".sub-approve").forEach(btn => btn.addEventListener("click", async () => {
+    const price = el.querySelector(`.sub-price[data-id="${btn.dataset.id}"]`)?.value.trim() || "";
+    await updateSub(btn, { status: "active", price, approvedBy: user.uid, approvedAt: serverTimestamp() });
+  }));
+  el.querySelectorAll(".sub-reject").forEach(btn => btn.addEventListener("click", async () => {
+    await updateSub(btn, { status: "rejected", reviewedAt: serverTimestamp() });
+  }));
+  el.querySelectorAll(".sub-stop").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("svcStopConfirm"))) return;
+    await updateSub(btn, { status: "cancelled", cancelledAt: serverTimestamp() });
+  }));
+}
+
+async function updateSub(btn, payload) {
+  btn.disabled = true;
+  try {
+    await updateDoc(doc(db, "serviceSubscriptions", btn.dataset.id), payload);
+  } catch (err) {
+    console.error("Failed to update subscription:", err);
+    alert(err.message || String(err));
+    btn.disabled = false;
+  }
+}
+window.addEventListener("so-lang-changed", renderSubsList);
 
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));

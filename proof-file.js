@@ -54,6 +54,37 @@ export async function prepareProofFile(file) {
   const e = new Error("Image too large"); e.code = "too_large"; throw e;
 }
 
+// Photos attached to maintenance requests / compound reports. Same inline-in-Firestore
+// idea as the payment receipts above, but capped much lower: the admin screen loads every
+// request at once, so a 800KB picture per row would make that list crawl.
+const MAX_PHOTO_CHARS = 320000; // ~320KB of data URL
+
+// Returns { dataUrl, fileName }. Throws Error with .code = "too_large" | "bad_image".
+export async function preparePhotoFile(file) {
+  let img;
+  try { img = await loadImage(file); }
+  catch { const e = new Error("Unsupported image"); e.code = "bad_image"; throw e; }
+
+  let maxSide = 1000, quality = 0.7;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const scale = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#fff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const dataUrl = canvas.toDataURL("image/jpeg", quality);
+    if (dataUrl.length <= MAX_PHOTO_CHARS) {
+      return { dataUrl, fileName: file.name.replace(/\.[^.]+$/, "") + ".jpg" };
+    }
+    maxSide = Math.round(maxSide * 0.75);
+    quality = Math.max(0.45, quality - 0.08);
+  }
+  const e = new Error("Image too large"); e.code = "too_large"; throw e;
+}
+
 // Browsers block navigating to data: URLs, so convert to a blob: URL and open that.
 export function openDataUrl(dataUrl) {
   const [head, b64] = dataUrl.split(",");

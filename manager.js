@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
+import { openDataUrl } from "./proof-file.js";
 import {
   collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp
@@ -228,6 +229,7 @@ const CATEGORY_I18N_KEY = {
   "AC / Cooling": "catAC",
   "Carpentry": "catCarpentry",
   "Cleaning": "catCleaning",
+  "Garden": "catGarden",
   "Other": "catOther"
 };
 function categoryLabel(cat) {
@@ -236,6 +238,7 @@ function categoryLabel(cat) {
 }
 const CATEGORY_TO_CRAFT = {
   "Cleaning": "cleaning",
+  "Garden": "garden",
   "Plumbing": "maintenance",
   "Electrical": "maintenance",
   "AC / Cooling": "maintenance",
@@ -252,12 +255,16 @@ let lastMaintDocs = [];
 function originLabel(m) {
   if (m.source === "onsite") return t("originOnsite");
   if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
+  if (m.source === "resident_report") return t("originReport");
   return t("originResident");
 }
 // On-site tasks have no unit to show (there's no resident) — they carry a free-text
 // location instead, entered by whoever created the task.
 function placeLabel(m) {
-  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+  if (m.source === "onsite") return m.location || "—";
+  // A compound report is about a common area: show the reported spot, unit in brackets.
+  if (m.source === "resident_report") return `${m.location || "—"} (${m.unit || "—"})`;
+  return m.unit || "—";
 }
 
 function pickWorkerForCategory(category) {
@@ -316,6 +323,7 @@ function renderMaintList() {
           <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
           <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
           <div class="sub">${m.description}</div>
+          ${m.photoData ? `<img class="photo-thumb mgr-maint-photo" src="${m.photoData}" alt="">` : ""}
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="mgr-maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -325,6 +333,9 @@ function renderMaintList() {
         </div>
         <span class="badge ${m.status}">${t(m.status) || m.status}</span>
       </div>`;
+  });
+  el.querySelectorAll(".mgr-maint-photo").forEach(img => {
+    img.addEventListener("click", () => openDataUrl(img.src));
   });
   el.querySelectorAll(".mgr-maint-assign").forEach(sel => {
     sel.addEventListener("change", async () => {
