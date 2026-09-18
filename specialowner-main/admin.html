@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Admin</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a4f45">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+<script src="qrcode.min.js"></script>
+<script src="html5-qrcode.min.js"></script>
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 data-i18n="adminTitle">Admin</h1>
+        <div class="sub" data-i18n="adminSub">Special Owner · Compound control</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="dash-switch">
+    <button class="dash-btn active" data-dash="res"><span class="tab-icon">🏠</span><span data-i18n="dashResidents">Residents</span></button>
+    <button class="dash-btn" data-dash="ops"><span class="tab-icon">🛠️</span><span data-i18n="dashOps">Operations</span></button>
+  </div>
+
+  <div class="content">
+
+    <!-- RESIDENTS -->
+    <section id="tab-residents" data-dashboard="res">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-box"><div class="num" id="statResidents">0</div><div class="lbl" data-i18n="residents">Residents</div></div>
+        <div class="stat-box"><div class="num" id="statWorkers">0</div><div class="lbl" data-i18n="activeWorkers">Active workers</div></div>
+        <div class="stat-box"><div class="num" id="statPending">0</div><div class="lbl" data-i18n="pendingRequests">Pending requests</div></div>
+        <div class="stat-box"><div class="num" id="statOverdue">0</div><div class="lbl" data-i18n="overduePayments">Overdue payments</div></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="residentsAndRequests">Residents & activation requests</h3>
+        <div id="residentsList"><p class="empty-state" data-i18n="noResidentsYet">No residents yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addResidentAccount">Add resident</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addResidentAccountNote">Creates a resident login directly and activates it right away — residents can still also sign themselves up from the login screen.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="residentAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="unitNumber">Unit / Villa number</label><input type="text" id="residentAccUnit" placeholder="e.g. B-204" data-i18n-placeholder="unitNumberPh"></div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="residentAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="residentAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="residentAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addResidentAccBtn" data-i18n="addResidentAccount">Add resident</button>
+      </div>
+    </section>
+
+    <!-- ANNOUNCEMENTS -->
+    <section id="tab-announcements" data-dashboard="res" style="display:none">
+      <div class="card">
+        <h3 data-i18n="postAnnouncement">Post an announcement</h3>
+        <div class="field"><label data-i18n="title">Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday" data-i18n-placeholder="titlePh"></div>
+        <div class="field"><label data-i18n="details">Details</label><textarea id="annBody" placeholder="Details for residents" data-i18n-placeholder="detailsPh"></textarea></div>
+        <div class="field">
+          <label data-i18n="audience">Audience</label>
+          <select id="annAudience">
+            <option value="all" data-i18n="audienceAll">Everyone</option>
+            <option value="residents" data-i18n="audienceResidents">Residents only</option>
+            <option value="workers" data-i18n="audienceWorkers">Staff only</option>
+          </select>
+        </div>
+        <div class="field" id="annTargetField" style="display:none">
+          <label data-i18n="chooseRecipients">Choose recipients</label>
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">
+            <input type="checkbox" id="annSelectAll" checked>
+            <label for="annSelectAll" style="font-size:12px" data-i18n="selectAll">Select all</label>
+          </div>
+          <div id="annTargetList" style="max-height:220px;overflow-y:auto;border:1px solid #dfe6e3;border-radius:8px;padding:8px"></div>
+        </div>
+        <button class="btn btn-primary" id="postAnnBtn" data-i18n="publish">Publish</button>
+      </div>
+    </section>
+
+    <!-- ACCESS -->
+    <section id="tab-access" data-dashboard="ops" style="display:none">
+      <div class="card">
+        <h3 data-i18n="generateMasterQr">Generate master access QR</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:12px" data-i18n="masterQrDesc">Opens all gates, elevators, intercoms and garages. Use for maintenance crews or emergencies.</p>
+        <div class="field">
+          <label data-i18n="label">Label</label>
+          <input type="text" id="masterLabel" placeholder="e.g. Elevator maintenance crew" data-i18n-placeholder="masterLabelPh">
+        </div>
+        <div class="field">
+          <label data-i18n="expiresOptional">Expires at (optional)</label>
+          <input type="datetime-local" id="masterExpiry">
+        </div>
+        <div class="field">
+          <label data-i18n="accessZones">Access zones</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;font-size:12px">
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="gate" checked><span data-i18n="gate">Gate</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="elevator" checked><span data-i18n="elevator">Elevator</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="intercom" checked><span data-i18n="intercom">Intercom</span></label>
+            <label style="display:flex;align-items:center;gap:4px"><input type="checkbox" class="zoneCheck" value="garage" checked><span data-i18n="garage">Garage</span></label>
+          </div>
+        </div>
+        <button class="btn btn-accent" id="generateMasterBtn" data-i18n="generateMasterBtn">Generate master QR</button>
+      </div>
+
+      <div class="card" id="masterQrResultCard" style="display:none;text-align:center">
+        <h3 data-i18n="masterQrReady">Master QR ready</h3>
+        <div class="qr-box"><canvas id="masterQrCanvas"></canvas></div>
+        <button class="btn btn-danger" id="revokeMasterBtn" style="margin-top:12px" data-i18n="revoke">Revoke this code</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="activeMasterCodes">Active master codes</h3>
+        <div id="masterCodesList"><p class="empty-state" data-i18n="noMasterCodes">No master codes yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
+        <div id="qrReader" style="border-radius:10px;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px" data-i18n="cameraLoading">Loading camera…</div>
+        <p id="scanResult" style="margin-top:10px;font-size:13px"></p>
+      </div>
+      <div class="card">
+        <h3 data-i18n="recentAccessLog">Recent access log</h3>
+        <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+      </div>
+    </section>
+
+    <!-- WORKERS -->
+    <section id="tab-workers" data-dashboard="ops" style="display:none">
+      <div class="card">
+        <h3 data-i18n="staffAccountsAndRequests">Staff accounts & activation requests</h3>
+        <div id="staffAccountsList"><p class="empty-state" data-i18n="noStaffYet">No staff accounts yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="siteManagerAccounts">Site manager accounts</h3>
+        <div id="managerAccountsList"><p class="empty-state" data-i18n="noManagersYet">No site manager accounts yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addManagerAccount">Add site manager</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addManagerNote">Only the admin can create a site manager account. Give them the email and password you set here to log in.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="mgrAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="mgrAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="mgrAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="mgrAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addManagerAccBtn" data-i18n="addManagerAccount">Add site manager</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="callCenterAccounts">Call center accounts</h3>
+        <div id="callCenterAccountsList"><p class="empty-state" data-i18n="noCallCenterYet">No call center accounts yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addCallCenterAccount">Add call center account</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addCallCenterNote">Only the admin can create a call center account. Give them the email and password you set here to log in.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="ccAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="ccAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="ccAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="ccAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addCallCenterAccBtn" data-i18n="addCallCenterAccount">Add call center account</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addWorkerAccount">Add worker account</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="addWorkerAccountNote">Creates a login for the worker. Give them the email and password you set here.</p>
+        <div class="field"><label data-i18n="fullName">Full name</label><input type="text" id="workerAccName" placeholder="e.g. Ahmed Salama" data-i18n-placeholder="fullNamePh"></div>
+        <div class="field"><label data-i18n="workerCategory">Staff category</label>
+          <select id="workerAccType">
+            <option value="security" data-i18n="security">Security</option>
+            <option value="maintenance" data-i18n="maintenanceStaff">Maintenance</option>
+            <option value="cleaning" data-i18n="cleaningStaff">Cleaning</option>
+            <option value="porter" data-i18n="porterStaff">Porter</option>
+            <option value="garden" data-i18n="gardenStaff">Gardening</option>
+          </select>
+        </div>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="workerAccEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="password">Password</label><input type="password" id="workerAccPassword" placeholder="••••••••" data-i18n-placeholder="passwordPh"></div>
+        <p class="error-text" id="workerAccError" style="display:none"></p>
+        <button class="btn btn-primary" id="addWorkerAccBtn" data-i18n="addWorkerAccount">Add worker account</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="workerShifts">Worker shifts</h3>
+        <div id="shiftsList"><p class="empty-state" data-i18n="noShiftsYet">No shifts recorded yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="leaveRequestsReview">Leave requests</h3>
+        <div id="leaveRequestsList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="advanceRequestsReview">Advance requests</h3>
+        <div id="advanceRequestsList"><p class="empty-state" data-i18n="noAdvanceRequests">No advance requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="salaryAndLeaveManage">Salary & leave balance</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="salaryManageNote">Set each worker's monthly salary breakdown and leave balance, then archive the month once it's final.</p>
+        <div id="salaryManageList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="addWorker">Add worker (roster only)</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="rosterNote">Roster entry only, no app login. For staff who need to log in, use "Add worker account" above instead.</p>
+        <div class="field"><label data-i18n="workerName">Name</label><input type="text" id="workerName" placeholder="Worker full name" data-i18n-placeholder="workerNamePh"></div>
+        <div class="field"><label data-i18n="workerRole">Role</label><input type="text" id="workerRole" placeholder="e.g. Electrician" data-i18n-placeholder="workerRolePh"></div>
+        <div class="field"><label data-i18n="workerPhone">Phone</label><input type="text" id="workerPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="workerPhonePh"></div>
+        <button class="btn btn-primary" id="addWorkerBtn" data-i18n="addWorker">Add worker</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="workers">Workers</h3>
+        <div id="workersList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FINANCES -->
+    <section id="tab-finance" data-dashboard="res" style="display:none">
+      <div class="card">
+        <h3 data-i18n="addPaymentRecord">Add payment record</h3>
+        <div class="field"><label data-i18n="residentUnit">Resident unit</label><input type="text" id="payUnit" placeholder="e.g. B-204" data-i18n-placeholder="unitNumberPh"></div>
+        <div class="field"><label data-i18n="residentEmail">Resident email</label><input type="text" id="payEmail" placeholder="resident's account email" data-i18n-placeholder="residentEmailPh"></div>
+        <div class="field"><label data-i18n="amount">Amount (EGP)</label><input type="number" id="payAmount" placeholder="0"></div>
+        <div class="field"><label data-i18n="dueDate">Due date</label><input type="date" id="payDue"></div>
+        <div class="field"><label data-i18n="description">Description</label><input type="text" id="payDesc" placeholder="e.g. Monthly maintenance fee" data-i18n-placeholder="descriptionPh"></div>
+        <button class="btn btn-primary" id="addPayBtn" data-i18n="addRecord">Add record</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="paymentReceipts">Payment receipts</h3>
+        <div id="proofsList"><p class="empty-state" data-i18n="noReceipts">No receipts uploaded yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="allPayments">All payments</h3>
+        <div id="financeList"><p class="empty-state" data-i18n="noPaymentRecords">No payment records yet.</p></div>
+      </div>
+    </section>
+
+    <!-- MAINTENANCE -->
+    <section id="tab-maint" data-dashboard="ops" style="display:none">
+      <div class="card">
+        <h3 data-i18n="onsiteTasksTitle">Direct on-site tasks</h3>
+        <p class="sub" data-i18n="onsiteTasksDesc">Send a worker straight to a job — no resident involved. It joins their queue like any other request.</p>
+        <div class="field">
+          <label data-i18n="category">Category</label>
+          <select id="onsiteCategory">
+            <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
+            <option value="Electrical" data-i18n="catElectrical">Electrical</option>
+            <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
+            <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
+            <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
+            <option value="Garden" data-i18n="catGarden">Garden</option>
+            <option value="Other" data-i18n="catOther">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="onsiteAssignTo">Assign to</label>
+          <select id="onsiteWorkerSelect">
+            <option value="" data-i18n="selectWorkerOption">Select a worker</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="onsiteLocation">Location / task</label>
+          <input type="text" id="onsiteLocationInput" data-i18n-placeholder="onsiteLocationPh" placeholder="e.g. Pool, Lobby, Building A garden">
+        </div>
+        <div class="field">
+          <textarea id="onsiteDescInput" data-i18n-placeholder="onsiteDescPh" placeholder="What needs to be done"></textarea>
+        </div>
+        <p class="error-text" id="onsiteTaskError" style="display:none"></p>
+        <button class="btn btn-primary" id="createOnsiteTaskBtn" data-i18n="createOnsiteTask">Create task</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="maintenanceRequests">Maintenance requests</h3>
+        <div id="adminMaintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="subscriptionsTitle">Service subscriptions</h3>
+        <div id="adminSubsList"><p class="empty-state" data-i18n="noSubscriptions">No subscription requests yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="maintStatsTitle">Average resolution time by category</h3>
+        <div id="maintStats"><p class="empty-state" data-i18n="noMaintStats">No resolved requests with timing yet.</p></div>
+      </div>
+    </section>
+
+  </div>
+
+  <div class="tabbar">
+    <button class="tab-btn active" data-tab="residents" data-dashboard="res"><span class="tab-icon">👥</span><span data-i18n="tabResidents">Residents</span></button>
+    <button class="tab-btn" data-tab="finance" data-dashboard="res"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
+    <button class="tab-btn" data-tab="announcements" data-dashboard="res"><span class="tab-icon">📢</span><span data-i18n="tabAnnouncements">Announce</span></button>
+    <button class="tab-btn" data-tab="access" data-dashboard="ops" style="display:none"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
+    <button class="tab-btn" data-tab="workers" data-dashboard="ops" style="display:none"><span class="tab-icon">👷</span><span data-i18n="tabWorkers">Workers</span></button>
+    <button class="tab-btn" data-tab="maint" data-dashboard="ops" style="display:none"><span class="tab-icon">🛠️</span><span data-i18n="tabMaintShort">Maint.</span></button>
+  </div>
+</div>
+
+<script src="i18n.js"></script>
+<script type="module" src="admin.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
+</body>
+</html>

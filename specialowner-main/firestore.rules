@@ -1,0 +1,221 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    function myData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function isAdmin() {
+      return isSignedIn() && myData().role == 'admin';
+    }
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+    function isActiveResident() {
+      return isSignedIn() && myData().role == 'resident' && myData().accountStatus == 'active';
+    }
+    function isWorker() {
+      return isSignedIn() && myData().role == 'worker';
+    }
+    function isActiveWorker() {
+      return isWorker() && myData().accountStatus == 'active';
+    }
+    function isActiveSecurityWorker() {
+      return isActiveWorker() && myData().workerType == 'security';
+    }
+    // Site manager: reports to the compound owner (admin). Can see workers, their
+    // movements/attendance, security logs and guest visits, approve workers' leave
+    // requests, and post announcements to residents — but has no access to finance.
+    function isManager() {
+      return isSignedIn() && myData().role == 'manager';
+    }
+    function isActiveManager() {
+      return isManager() && myData().accountStatus == 'active';
+    }
+    // Call center: reports to the admin, staff-only account (created by admin, same
+    // as manager/worker — no self sign-up). Logs a phone-in maintenance request on a
+    // resident's behalf: needs to look residents up by unit and create the request,
+    // nothing more (no finance, no worker management, no status changes).
+    function isCallCenter() {
+      return isSignedIn() && myData().role == 'callcenter';
+    }
+    function isActiveCallCenter() {
+      return isCallCenter() && myData().accountStatus == 'active';
+    }
+
+    match /users/{userId} {
+      // A manager may read worker profiles (needed for the Workers/Security/Leaves views), on top of their own doc.
+      // Call center reads resident profiles too, but only to look someone up by unit when logging a call — nothing else.
+      allow read: if isOwner(userId) || isAdmin() ||
+        (isActiveManager() && resource.data.role == 'worker') ||
+        (isActiveCallCenter() && resource.data.role == 'resident');
+      // Self-registration is residents-only (public sign-up). The admin can create
+      // any account (site managers, workers, or promote/adjust anyone). An active
+      // site manager can create worker accounts only — never manager or admin
+      // accounts. This is the real gate: the app UI no longer offers worker/manager
+      // sign-up, but that alone wouldn't stop a crafted request without this rule.
+      allow create: if
+        (isOwner(userId) && request.resource.data.role == 'resident') ||
+        isAdmin() ||
+        (isActiveManager() && request.resource.data.role == 'worker');
+      // A resident/worker/manager may only touch their own activation-request fields — not role, accountStatus, salary, or points.
+      allow update: if isAdmin() ||
+        (isOwner(userId) &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['activationRequestStatus', 'activationRequestedAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /invitations/{inviteId} {
+      allow read: if isSignedIn(); // security/admin/manager need to read any invite to validate a scan or view visits
+      allow create: if isAdmin() ||
+        (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
+      allow update: if isAdmin() || isActiveSecurityWorker(); // admin or security staff mark an invite as used
+      allow delete: if isAdmin();
+    }
+
+    match /payments/{payId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // A resident can attach proof of payment (receipt/screenshot) to one of their
+    // own payments — but the payments doc itself stays admin-only (above), so this
+    // lives in its own collection: the resident can only create it, never edit or
+    // delete it afterwards, and admin reviews it (approves/rejects) via update.
+    match /paymentProofs/{proofId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      // A new receipt is always "pending_review": the resident can't pre-fill approval
+      // fields, and the linked payment only becomes "paid" when an admin approves it.
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'pending_review' &&
+        request.resource.data.keys().hasOnly(['paymentId', 'residentId', 'unit', 'fileData', 'fileName', 'status', 'uploadedAt']) &&
+        request.resource.data.uploadedAt == request.time &&
+        request.resource.data.fileData is string &&
+        request.resource.data.fileData.size() < 900000;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /maintenanceRequests/{reqId} {
+      // Admin and the (active) site manager both need the full list to distribute work
+      // between workers and to show call-center-style totals.
+      allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
+        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid ||
+        (isActiveCallCenter() && resource.data.loggedBy == request.auth.uid));
+      // A resident logs their own request. Call center logs one on a resident's behalf over
+      // the phone — same shape, but residentId is whoever they looked up, not their own uid,
+      // and loggedBy/loggedByRole record who actually typed it in for traceability. Admin/
+      // site manager can also send a worker straight to a job with no resident involved at
+      // all: source == 'onsite', already "accepted" with a worker picked up front, and
+      // createdBy records who sent it (same traceability role as loggedBy above).
+      allow create: if (isOwner(request.resource.data.residentId) && isActiveResident()) ||
+        (isActiveCallCenter() && request.resource.data.loggedBy == request.auth.uid &&
+         request.resource.data.loggedByRole == 'callcenter') ||
+        ((isAdmin() || isActiveManager()) &&
+         request.resource.data.source == 'onsite' &&
+         request.resource.data.createdBy == request.auth.uid &&
+         request.resource.data.status == 'accepted' &&
+         request.resource.data.assignedWorkerId is string &&
+         request.resource.data.assignedWorkerId.size() > 0);
+      // Admin/manager can assign workers, change status, and recompute queue positions on
+      // every request. An assigned active worker may only move their own order forward
+      // (status + the bookkeeping fields written alongside a status change), or set the
+      // duration estimate that feeds the residents' waiting time.
+      allow update: if isAdmin() || isActiveManager() ||
+        (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours']));
+      allow delete: if isAdmin();
+    }
+
+    // Recurring services a resident subscribes to (car wash / home cleaning / garden
+    // care). The resident creates it as "requested" and can later cancel their own —
+    // everything else (approving it, setting the price) is the admin's call, same
+    // shape as the payment-proof flow above.
+    match /serviceSubscriptions/{subId} {
+      allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
+        resource.data.residentId == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'requested' &&
+        request.resource.data.keys().hasOnly(['residentId', 'unit', 'service', 'frequency', 'notes', 'status', 'requestedAt']) &&
+        request.resource.data.service in ['car_wash', 'home_cleaning', 'garden_care'] &&
+        request.resource.data.frequency in ['weekly', 'biweekly', 'monthly', 'once'] &&
+        request.resource.data.requestedAt == request.time;
+      // The resident may only ever cancel their own subscription; the admin (and the
+      // site manager, who runs the cleaning/garden crews) handles approval and pricing.
+      allow update: if isAdmin() || isActiveManager() ||
+        (isOwner(resource.data.residentId) &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']));
+      allow delete: if isAdmin();
+    }
+
+    match /announcements/{annId} {
+      allow read: if isSignedIn();
+      // Manager may post announcements too, but only ones aimed at residents (not staff-wide, not finance-related).
+      allow write: if isAdmin() ||
+        (isActiveManager() &&
+         (request.resource == null || request.resource.data.audience == 'residents'));
+    }
+
+    match /shops/{shopId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /workers/{workerId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /accessLogs/{logId} {
+      allow read: if isAdmin() || isActiveSecurityWorker() || isActiveManager();
+      allow create: if isAdmin() || isActiveSecurityWorker();
+    }
+
+    match /pointsTransactions/{txId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    match /attendance/{attId} {
+      // Manager can see everyone's movements; a worker/manager only ever writes their own shift.
+      allow read: if isAdmin() || isActiveManager() ||
+        ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
+      allow create: if (isActiveWorker() || isActiveManager()) && request.resource.data.workerId == request.auth.uid;
+      // Worker/manager may only close their own shift or toggle their own break; admin can do anything.
+      allow update: if isAdmin() ||
+        ((isActiveWorker() || isActiveManager()) && resource.data.workerId == request.auth.uid &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['clockOut', 'status', 'onBreak', 'breakStart', 'totalBreakSeconds']));
+      allow delete: if isAdmin();
+    }
+
+    match /leaveRequests/{leaveId} {
+      // Manager can see every leave request (to review workers') plus create/read their own.
+      allow read: if isAdmin() || isActiveManager() ||
+        ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
+      allow create: if (isActiveWorker() || isActiveManager()) && request.resource.data.workerId == request.auth.uid;
+      // Admin approves anyone; an active manager may approve/reject a worker's request, but never their own.
+      allow update: if isAdmin() ||
+        (isActiveManager() && resource.data.workerId != request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /advanceRequests/{advId} {
+      allow read: if isAdmin() || (isWorker() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveWorker() && request.resource.data.workerId == request.auth.uid;
+      allow update: if isAdmin(); // only admin approves/rejects
+      allow delete: if isAdmin();
+    }
+
+    match /salaryRecords/{recordId} {
+      allow read: if isAdmin() || ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
+      allow write: if isAdmin(); // admin builds and archives the monthly breakdown
+    }
+  }
+}
