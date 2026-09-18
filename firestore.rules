@@ -88,9 +88,15 @@ service cloud.firestore {
     // delete it afterwards, and admin reviews it (approves/rejects) via update.
     match /paymentProofs/{proofId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      // A new receipt is always "pending_review": the resident can't pre-fill approval
+      // fields, and the linked payment only becomes "paid" when an admin approves it.
       allow create: if isActiveResident() &&
         request.resource.data.residentId == request.auth.uid &&
-        request.resource.data.status == 'pending_review';
+        request.resource.data.status == 'pending_review' &&
+        request.resource.data.keys().hasOnly(['paymentId', 'residentId', 'unit', 'fileData', 'fileName', 'status', 'uploadedAt']) &&
+        request.resource.data.uploadedAt == request.time &&
+        request.resource.data.fileData is string &&
+        request.resource.data.fileData.size() < 900000;
       allow update: if isAdmin();
       allow delete: if isAdmin();
     }

@@ -1,9 +1,10 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { openDataUrl } from "./proof-file.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp
+  onSnapshot, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("admin");
@@ -704,6 +705,7 @@ function escHtml(v) {
   return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 }
 function safeUrl(u) { return /^https:\/\//.test(u || "") ? u : "#"; }
+const proofData = {}; // proofId -> data URL, for opening in a new tab
 
 onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc")), (snap) => {
   const el = document.getElementById("proofsList");
@@ -712,10 +714,16 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
   snap.forEach(d => {
     const p = d.data();
     const when = p.uploadedAt?.toDate ? p.uploadedAt.toDate().toLocaleString() : "";
-    const isImage = /\.(png|jpe?g|gif|webp|heic)$/i.test(p.fileName || "");
-    const preview = isImage && p.fileURL
-      ? `<a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener"><img src="${safeUrl(p.fileURL)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0"></a>`
+    const src = p.fileData || p.fileURL || "";
+    if (p.fileData) proofData[d.id] = p.fileData;
+    const isImage = /^data:image\//.test(src) || /\.(png|jpe?g|gif|webp|heic)$/i.test(p.fileName || "");
+    const imgSrc = /^data:image\/[a-z+]+;base64,/.test(src) ? src : safeUrl(p.fileURL);
+    const preview = isImage && src
+      ? `<img src="${imgSrc}" alt="" class="proof-open" data-id="${d.id}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer">`
       : "";
+    const viewLink = p.fileData
+      ? `<a href="#" class="sub proof-open" data-id="${d.id}" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+      : `<a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`;
     const pending = p.status === "pending_review";
     el.innerHTML += `
       <div class="list-item" style="flex-direction:column;align-items:stretch">
@@ -725,7 +733,7 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
             <div class="meta">
               <div class="title">${escHtml(p.unit || "—")} · ${escHtml(p.fileName || "")}</div>
               <div class="sub">${escHtml(when)}</div>
-              <a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>
+              ${viewLink}
             </div>
           </div>
           <span class="badge ${escHtml(p.status)}">${t("proof_" + p.status) || escHtml(p.status)}</span>
@@ -737,16 +745,23 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
         ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
       </div>`;
   });
+  el.querySelectorAll(".proof-open").forEach(x => x.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (proofData[x.dataset.id]) openDataUrl(proofData[x.dataset.id]);
+  }));
   el.querySelectorAll(".proof-approve").forEach(btn => {
     btn.addEventListener("click", async () => {
       btn.disabled = true;
       try {
-        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
+        // One atomic commit: the receipt is approved AND the payment is paid, or neither.
+        const batch = writeBatch(db);
+        batch.update(doc(db, "paymentProofs", btn.dataset.id), {
           status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
         });
-        await updateDoc(doc(db, "payments", btn.dataset.payment), {
+        batch.update(doc(db, "payments", btn.dataset.payment), {
           status: "paid", paidAt: serverTimestamp()
         });
+        await batch.commit();
       } catch (err) {
         console.error(err);
         alert(t("proofActionFailed"));

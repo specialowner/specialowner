@@ -1,12 +1,9 @@
-import { db, storage } from "./firebase-config.js";
+import { db } from "./firebase-config.js";
+import { prepareProofFile, openDataUrl } from "./proof-file.js";
 import { requireAuth, logout } from "./guard.js";
 import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-import {
-  ref as storageRef, uploadBytesResumable, getDownloadURL
-} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
-
 const { user, profile } = await requireAuth("resident");
 
 function t(key) {
@@ -87,16 +84,12 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 
 // ---------- Payments ----------
 // Proof-of-payment uploads: residents can attach a receipt/screenshot to any
-// payment that isn't already marked "paid" by admin. The file goes to Storage
+// payment that isn't already marked "paid" by admin. The file (compressed, stored inline)
 // and a review record is created in "paymentProofs" (residents can only create
 // that doc, not edit it afterwards — admin reviews it and updates its status).
 let lastPaymentRows = [];
 let proofsByPayment = {}; // paymentId -> latest proof {id, status, fileURL, ...}
 const uploadingPayments = new Set(); // paymentIds currently mid-upload, for a local "Uploading…" state
-const uploadProgress = {}; // paymentId -> 0..100
-// Fail fast instead of silently retrying for 10 minutes if Storage is unreachable / not set up.
-storage.maxUploadRetryTime = 30000;
-storage.maxOperationRetryTime = 30000;
 
 const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
@@ -142,15 +135,16 @@ function renderPayments() {
 
 function proofControlsHtml(paymentId) {
   if (uploadingPayments.has(paymentId)) {
-    const pct = uploadProgress[paymentId];
-    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}${pct != null ? ` ${pct}%` : ""}</div>`;
+    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}</div>`;
   }
   const proof = proofsByPayment[paymentId];
   if (!proof) {
     return `<button type="button" class="btn btn-outline btn-sm upload-proof-btn" data-payment-id="${paymentId}" style="margin-top:8px">${t("uploadProof")}</button>`;
   }
   const statusLabel = t(`proof_${proof.status}`) || proof.status;
-  const viewLink = proof.fileURL
+  const viewLink = proof.fileData
+    ? `<a href="#" class="sub view-proof-link" data-payment-id="${paymentId}" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+    : proof.fileURL
     ? `<a href="${proof.fileURL}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
     : "";
   const canReplace = proof.status !== "pending_review";
@@ -167,6 +161,13 @@ function proofControlsHtml(paymentId) {
 // hidden file input; delegation is needed since the list is re-rendered often.
 let pendingProofPaymentId = null;
 document.getElementById("paymentsList").addEventListener("click", (e) => {
+  const link = e.target.closest(".view-proof-link");
+  if (link) {
+    e.preventDefault();
+    const pr = proofsByPayment[link.dataset.paymentId];
+    if (pr?.fileData) openDataUrl(pr.fileData);
+    return;
+  }
   const btn = e.target.closest(".upload-proof-btn");
   if (!btn) return;
   pendingProofPaymentId = btn.dataset.paymentId;
@@ -179,43 +180,36 @@ document.getElementById("proofFileInput").addEventListener("change", async (e) =
   e.target.value = ""; // allow re-selecting the same file later
   if (!file || !paymentId) return;
 
-  const MAX_BYTES = 5 * 1024 * 1024;
-  if (file.size > MAX_BYTES) { alert(t("proofTooLarge")); return; }
   if (!/^image\/|^application\/pdf$/.test(file.type)) { alert(t("proofInvalidType")); return; }
+  if (file.size > 25 * 1024 * 1024) { alert(t("proofTooLarge")); return; }
 
   uploadingPayments.add(paymentId);
   renderPayments();
   try {
-    const path = `paymentProofs/${user.uid}/${paymentId}/${Date.now()}_${file.name}`;
-    const fileRef = storageRef(storage, path);
-    await new Promise((resolve, reject) => {
-      const task = uploadBytesResumable(fileRef, file, { contentType: file.type });
-      task.on("state_changed",
-        (snapshot) => {
-          uploadProgress[paymentId] = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-          renderPayments();
-        },
-        reject,
-        resolve
-      );
-    });
-    const fileURL = await getDownloadURL(fileRef);
-    await addDoc(collection(db, "paymentProofs"), {
+    const { dataUrl, fileName } = await prepareProofFile(file);
+    const save = addDoc(collection(db, "paymentProofs"), {
       paymentId,
       residentId: user.uid,
       unit: profile.unit || "",
-      fileURL,
-      filePath: path,
-      fileName: file.name,
+      fileData: dataUrl,
+      fileName,
       status: "pending_review",
       uploadedAt: serverTimestamp()
     });
+    // addDoc waits for the server; don't let the UI hang forever if the connection is dead.
+    await Promise.race([
+      save,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout - check your connection")), 30000))
+    ]);
   } catch (err) {
     console.error("Proof upload failed:", err);
-    alert(t("proofUploadFailed") + (err.message ? ` (${err.message})` : ""));
+    const msg = err.code === "pdf_too_large" ? t("proofPdfTooLarge")
+      : err.code === "too_large" ? t("proofTooLarge")
+      : err.code === "bad_image" ? t("proofInvalidType")
+      : t("proofUploadFailed") + (err.message ? ` (${err.message})` : "");
+    alert(msg);
   } finally {
     uploadingPayments.delete(paymentId);
-    delete uploadProgress[paymentId];
     renderPayments();
   }
 });
