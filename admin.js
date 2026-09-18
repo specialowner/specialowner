@@ -1,9 +1,10 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { openDataUrl } from "./proof-file.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp
+  onSnapshot, serverTimestamp, writeBatch
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("admin");
@@ -297,6 +298,37 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap
   });
 });
 
+// ---------- Call center accounts ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "callcenter")), (snap) => {
+  const el = document.getElementById("callCenterAccountsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noCallCenterYet")}</p>`; return; }
+  el.innerHTML = "";
+  snap.docs.forEach(d => {
+    const r = { id: d.id, ...d.data() };
+    const status = r.accountStatus || "active";
+    el.innerHTML += `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${r.name || r.email}</div>
+          <div class="sub">${r.email || ""}</div>
+        </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${status === "active" ? "active" : "overdue"}">${status}</span>
+          <button class="btn btn-sm ${status === "active" ? "btn-danger" : "btn-primary"}" data-cc-action="${status === "active" ? "suspend" : "approve"}" data-id="${r.id}">
+            ${status === "active" ? t("suspend") : t("approve")}
+          </button>
+        </div>
+      </div>`;
+  });
+  el.querySelectorAll("button[data-cc-action]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "users", btn.dataset.id), {
+        accountStatus: btn.dataset.ccAction === "approve" ? "active" : "suspended"
+      });
+    });
+  });
+});
+
 // ---------- Salary breakdown & leave balance management ----------
 function renderSalaryManageList() {
   const el = document.getElementById("salaryManageList");
@@ -513,6 +545,34 @@ document.getElementById("addManagerAccBtn").addEventListener("click", async () =
   }
 });
 
+// ---------- Add call center account (admin) ----------
+document.getElementById("addCallCenterAccBtn").addEventListener("click", async () => {
+  const btn = document.getElementById("addCallCenterAccBtn");
+  const errEl = document.getElementById("ccAccError");
+  errEl.style.display = "none";
+  const name = document.getElementById("ccAccName").value.trim();
+  const email = document.getElementById("ccAccEmail").value.trim();
+  const password = document.getElementById("ccAccPassword").value;
+  if (!name || !email || !password) {
+    errEl.textContent = "Please fill in the name, email and password.";
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    await createStaffAccount({ name, email, password, role: "callcenter", createdBy: user.uid });
+    document.getElementById("ccAccName").value = "";
+    document.getElementById("ccAccEmail").value = "";
+    document.getElementById("ccAccPassword").value = "";
+    alert(t("accountCreated") || "Account created.");
+  } catch (err) {
+    errEl.textContent = friendlyStaffCreateError(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
 // ---------- Add worker account (admin) ----------
 document.getElementById("addWorkerAccBtn").addEventListener("click", async () => {
   const btn = document.getElementById("addWorkerAccBtn");
@@ -640,6 +700,93 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   });
 });
 
+// ---------- Payment receipts (proof of payment review) ----------
+function escHtml(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function safeUrl(u) { return /^https:\/\//.test(u || "") ? u : "#"; }
+const proofData = {}; // proofId -> data URL, for opening in a new tab
+
+onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc")), (snap) => {
+  const el = document.getElementById("proofsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noReceipts")}</p>`; return; }
+  el.innerHTML = "";
+  snap.forEach(d => {
+    const p = d.data();
+    const when = p.uploadedAt?.toDate ? p.uploadedAt.toDate().toLocaleString() : "";
+    const src = p.fileData || p.fileURL || "";
+    if (p.fileData) proofData[d.id] = p.fileData;
+    const isImage = /^data:image\//.test(src) || /\.(png|jpe?g|gif|webp|heic)$/i.test(p.fileName || "");
+    const imgSrc = /^data:image\/[a-z+]+;base64,/.test(src) ? src : safeUrl(p.fileURL);
+    const preview = isImage && src
+      ? `<img src="${imgSrc}" alt="" class="proof-open" data-id="${d.id}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer">`
+      : "";
+    const viewLink = p.fileData
+      ? `<a href="#" class="sub proof-open" data-id="${d.id}" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+      : `<a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`;
+    const pending = p.status === "pending_review";
+    el.innerHTML += `
+      <div class="list-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            ${preview}
+            <div class="meta">
+              <div class="title">${escHtml(p.unit || "—")} · ${escHtml(p.fileName || "")}</div>
+              <div class="sub">${escHtml(when)}</div>
+              ${viewLink}
+            </div>
+          </div>
+          <span class="badge ${escHtml(p.status)}">${t("proof_" + p.status) || escHtml(p.status)}</span>
+        </div>
+        ${pending ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary proof-approve" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("approveProof")}</button>
+          <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}">${t("rejectProof")}</button>
+        </div>` : ""}
+        ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
+      </div>`;
+  });
+  el.querySelectorAll(".proof-open").forEach(x => x.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (proofData[x.dataset.id]) openDataUrl(proofData[x.dataset.id]);
+  }));
+  el.querySelectorAll(".proof-approve").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        // One atomic commit: the receipt is approved AND the payment is paid, or neither.
+        const batch = writeBatch(db);
+        batch.update(doc(db, "paymentProofs", btn.dataset.id), {
+          status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        });
+        batch.update(doc(db, "payments", btn.dataset.payment), {
+          status: "paid", paidAt: serverTimestamp()
+        });
+        await batch.commit();
+      } catch (err) {
+        console.error(err);
+        alert(t("proofActionFailed"));
+        btn.disabled = false;
+      }
+    });
+  });
+  el.querySelectorAll(".proof-reject").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const note = prompt(t("rejectReasonPrompt"));
+      if (note === null) return;
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
+          status: "rejected", reviewNote: note.trim(), reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error(err);
+        alert(t("proofActionFailed"));
+        btn.disabled = false;
+      }
+    });
+  });
+});
+
 // ---------- Maintenance (admin view + status update + assign worker) ----------
 const CATEGORY_I18N_KEY = {
   "Plumbing": "catPlumbing",
@@ -667,9 +814,24 @@ const CATEGORY_TO_CRAFT = {
 // A request is "active" for load-balancing purposes once a worker has it and hasn't
 // finished — i.e. assigned-but-not-started or in progress.
 const ACTIVE_STATUSES = ["accepted", "in_progress"];
+// Fallback length for a request no worker has estimated yet (hours).
+const DEFAULT_TASK_HOURS = 1;
 
 let workerOptionsCache = [];
 let lastMaintDocs = [];
+
+// Where a queue entry came from: the resident app, a call logged over the phone, or a
+// task an admin/site manager sent a worker to directly (no resident involved at all).
+function originLabel(m) {
+  if (m.source === "onsite") return t("originOnsite");
+  if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
+  return t("originResident");
+}
+// On-site tasks have no unit to show (there's no resident) — they carry a free-text
+// location instead, entered by whoever created the task.
+function placeLabel(m) {
+  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+}
 
 // Picks the least-busy active worker of the matching craft (equal distribution across
 // workers doing the same kind of job), per the site's request.
@@ -700,8 +862,17 @@ async function recomputeQueuePositions() {
   const writes = [];
   Object.values(byCraft).forEach(list => {
     list.sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0));
+    let hoursSoFar = 0;
     list.forEach((m, idx) => {
-      if (m.queueAhead !== idx) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), { queueAhead: idx }));
+      // Waiting time = the durations the workers estimated for everything queued before
+      // this request. Items nobody has estimated yet count as DEFAULT_TASK_HOURS so the
+      // number never silently under-reports; it's shown to the resident as approximate.
+      const eta = Math.round(hoursSoFar * 2) / 2;
+      const patch = {};
+      if (m.queueAhead !== idx) patch.queueAhead = idx;
+      if (m.queueEtaHours !== eta) patch.queueEtaHours = eta;
+      if (Object.keys(patch).length) writes.push(updateDoc(doc(db, "maintenanceRequests", m.id), patch));
+      hoursSoFar += Number(m.estimatedHours) > 0 ? Number(m.estimatedHours) : DEFAULT_TASK_HOURS;
     });
   });
   if (writes.length) await Promise.all(writes).catch(() => {});
@@ -717,8 +888,10 @@ function renderMaintList() {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
-          <div class="title">${m.unit || "—"} · ${categoryLabel(m.category)}</div>
+          <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
+          <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
           <div class="sub">${m.description}</div>
+          <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
             ${assignableWorkers.map(w => `<option value="${w.id}" ${m.assignedWorkerId === w.id ? "selected" : ""}>${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("")}
@@ -784,6 +957,64 @@ function renderMaintList() {
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderOnsiteWorkerOptions();
+});
+
+// ---------- Direct on-site task: admin sends a worker straight to a job, no resident involved ----------
+// The worker list depends on which craft the chosen category maps to (same mapping used
+// for auto-assign), so it's rebuilt whenever the category or the worker list changes.
+function renderOnsiteWorkerOptions() {
+  const categorySel = document.getElementById("onsiteCategory");
+  const workerSel = document.getElementById("onsiteWorkerSelect");
+  if (!categorySel || !workerSel) return;
+  const craft = CATEGORY_TO_CRAFT[categorySel.value] || "maintenance";
+  const candidates = workerOptionsCache.filter(w => w.workerType === craft && (w.accountStatus || "active") === "active");
+  const previous = workerSel.value;
+  workerSel.innerHTML = `<option value="">${t("selectWorkerOption")}</option>` +
+    candidates.map(w => `<option value="${w.id}">${w.name} (${workerTypeLabel(w.workerType)})</option>`).join("");
+  if (candidates.some(w => w.id === previous)) workerSel.value = previous;
+}
+document.getElementById("onsiteCategory")?.addEventListener("change", renderOnsiteWorkerOptions);
+renderOnsiteWorkerOptions();
+
+document.getElementById("createOnsiteTaskBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("createOnsiteTaskBtn");
+  const errEl = document.getElementById("onsiteTaskError");
+  errEl.style.display = "none";
+  const category = document.getElementById("onsiteCategory").value;
+  const workerId = document.getElementById("onsiteWorkerSelect").value;
+  const location = document.getElementById("onsiteLocationInput").value.trim();
+  const description = document.getElementById("onsiteDescInput").value.trim();
+  if (!category || !workerId || !description) {
+    errEl.textContent = t("fillOnsiteFields");
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    // Created already "accepted" — the worker is chosen up front, unlike a resident/call
+    // center request which starts "pending" until someone assigns it. It still joins the
+    // same craft queue (recomputeQueuePositions groups by category, not by source), so it
+    // occupies the worker's time exactly like any other request ahead of it.
+    await addDoc(collection(db, "maintenanceRequests"), {
+      source: "onsite",
+      category, description, location,
+      assignedWorkerId: workerId,
+      status: "accepted",
+      statusSeenByResident: true,
+      createdBy: user.uid,
+      createdAt: serverTimestamp()
+    });
+    document.getElementById("onsiteLocationInput").value = "";
+    document.getElementById("onsiteDescInput").value = "";
+    alert(t("onsiteTaskCreated"));
+  } catch (err) {
+    console.error("Failed to create on-site task:", err);
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
 });
 
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {

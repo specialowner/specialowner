@@ -32,13 +32,21 @@
     <!-- HOME -->
     <section id="tab-home">
       <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
+      <div class="card">
+        <h3 data-i18n="announcements">Announcements</h3>
+        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FINANCE -->
+    <section id="tab-finance" style="display:none">
       <div class="grid-2" style="margin-bottom:14px">
         <div class="stat-box">
           <div class="num" id="pointsNum">0</div>
           <div class="lbl" data-i18n="pointsBalance">Points balance</div>
         </div>
         <div class="stat-box">
-          <div class="num" id="dueNum">EGP 0</div>
+          <div class="num" id="dueNum">0</div>
           <div class="lbl" data-i18n="outstandingDue">Outstanding due</div>
         </div>
       </div>
@@ -46,11 +54,7 @@
       <div class="card">
         <h3 data-i18n="paymentStatus">Payment status</h3>
         <div id="paymentsList"><p class="empty-state" data-i18n="noPayments">No payment records yet.</p></div>
-      </div>
-
-      <div class="card">
-        <h3 data-i18n="announcements">Announcements</h3>
-        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+        <input type="file" id="proofFileInput" accept="image/*,application/pdf" style="display:none">
       </div>
     </section>
 
@@ -144,6 +148,7 @@
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabHome">Home</span></button>
+    <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
     <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabMaint">Maintenance</span></button>
     <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>

@@ -34,9 +34,9 @@ input,select,textarea{font-family:inherit}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
 .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:700}
-.badge.pending{background:#fbe9c9;color:var(--warning)}
-.badge.paid,.badge.completed,.badge.active{background:#d7f0e2;color:var(--success)}
-.badge.overdue,.badge.expired,.badge.revoked{background:#f7d7d2;color:var(--danger)}
+.badge.pending,.badge.pending_review{background:#fbe9c9;color:var(--warning)}
+.badge.paid,.badge.completed,.badge.active,.badge.approved{background:#d7f0e2;color:var(--success)}
+.badge.overdue,.badge.expired,.badge.revoked,.badge.rejected{background:#f7d7d2;color:var(--danger)}
 .badge.in_progress{background:#dbe7fb;color:#2a5db0}
 .badge.accepted{background:#e6ddf7;color:#5b3fa0}
 

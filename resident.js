@@ -1,9 +1,9 @@
 import { db } from "./firebase-config.js";
+import { prepareProofFile, openDataUrl } from "./proof-file.js";
 import { requireAuth, logout } from "./guard.js";
 import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
-
 const { user, profile } = await requireAuth("resident");
 
 function t(key) {
@@ -77,31 +77,149 @@ const tabs = document.querySelectorAll(".tab-btn");
 tabs.forEach(btn => btn.addEventListener("click", () => {
   tabs.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  ["home", "invites", "maint", "shops"].forEach(t => {
+  ["home", "finance", "invites", "maint", "shops"].forEach(t => {
     document.getElementById(`tab-${t}`).style.display = (t === btn.dataset.tab) ? "block" : "none";
   });
 }));
 
 // ---------- Payments ----------
+// Proof-of-payment uploads: residents can attach a receipt/screenshot to any
+// payment that isn't already marked "paid" by admin. The file (compressed, stored inline)
+// and a review record is created in "paymentProofs" (residents can only create
+// that doc, not edit it afterwards — admin reviews it and updates its status).
+let lastPaymentRows = [];
+let proofsByPayment = {}; // paymentId -> latest proof {id, status, fileURL, ...}
+const uploadingPayments = new Set(); // paymentIds currently mid-upload, for a local "Uploading…" state
+
 const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
+  lastPaymentRows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+  renderPayments();
+});
+
+const proofsQ = query(collection(db, "paymentProofs"), where("residentId", "==", user.uid));
+onSnapshot(proofsQ, (snap) => {
+  const latest = {};
+  snap.docs.map(d => ({ id: d.id, ...d.data() })).forEach(p => {
+    const existing = latest[p.paymentId];
+    const pTime = p.uploadedAt?.toMillis ? p.uploadedAt.toMillis() : 0;
+    const eTime = existing?.uploadedAt?.toMillis ? existing.uploadedAt.toMillis() : -1;
+    if (!existing || pTime >= eTime) latest[p.paymentId] = p;
+  });
+  proofsByPayment = latest;
+  renderPayments();
+});
+
+// Currency formatting follows the reading direction: "EGP 500" in English, "500 ج.م" in Arabic.
+function money(n) {
+  const cur = t("currencyEgp");
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  return lang === "ar" ? `${n} ${cur}` : `${cur} ${n}`;
+}
+window.addEventListener("so-lang-changed", () => renderPayments());
+
+function renderPayments() {
   const el = document.getElementById("paymentsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
+  if (lastPaymentRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
   let totalDue = 0;
   el.innerHTML = "";
-  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
-  rows.forEach(p => {
+  lastPaymentRows.forEach(p => {
     if (p.status !== "paid") totalDue += Number(p.amount || 0);
     el.innerHTML += `
-      <div class="list-item">
-        <div class="meta">
-          <div class="title">${p.description || "Monthly fee"}</div>
-          <div class="sub">EGP ${p.amount} · due ${fmtDate(p.dueDate)}</div>
+      <div class="list-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div class="meta">
+            <div class="title">${p.description || t("monthlyFee")}</div>
+            <div class="sub">${money(p.amount)} · ${t("dueLabel")} ${fmtDate(p.dueDate)}</div>
+          </div>
+          <span class="badge ${p.status}">${t(p.status) || p.status}</span>
         </div>
-        <span class="badge ${p.status}">${t(p.status) || p.status}</span>
+        ${p.status === "paid" ? "" : proofControlsHtml(p.id)}
       </div>`;
   });
-  document.getElementById("dueNum").textContent = `EGP ${totalDue}`;
+  document.getElementById("dueNum").textContent = money(totalDue);
+}
+
+function proofControlsHtml(paymentId) {
+  if (uploadingPayments.has(paymentId)) {
+    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}</div>`;
+  }
+  const proof = proofsByPayment[paymentId];
+  if (!proof) {
+    return `<button type="button" class="btn btn-outline btn-sm upload-proof-btn" data-payment-id="${paymentId}" style="margin-top:8px">${t("uploadProof")}</button>`;
+  }
+  const statusLabel = t(`proof_${proof.status}`) || proof.status;
+  const viewLink = proof.fileData
+    ? `<a href="#" class="sub view-proof-link" data-payment-id="${paymentId}" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+    : proof.fileURL
+    ? `<a href="${proof.fileURL}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+    : "";
+  const canReplace = proof.status !== "pending_review";
+  return `
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="badge ${proof.status}">${statusLabel}</span>
+      ${viewLink}
+      ${canReplace ? `<button type="button" class="btn btn-outline btn-sm upload-proof-btn" data-payment-id="${paymentId}">${t("replaceProof")}</button>` : ""}
+    </div>
+    ${proof.status === "rejected" && proof.reviewNote ? `<div class="sub" style="margin-top:4px">${proof.reviewNote}</div>` : ""}`;
+}
+
+// Clicking any (current or future) "upload proof" button opens the shared
+// hidden file input; delegation is needed since the list is re-rendered often.
+let pendingProofPaymentId = null;
+document.getElementById("paymentsList").addEventListener("click", (e) => {
+  const link = e.target.closest(".view-proof-link");
+  if (link) {
+    e.preventDefault();
+    const pr = proofsByPayment[link.dataset.paymentId];
+    if (pr?.fileData) openDataUrl(pr.fileData);
+    return;
+  }
+  const btn = e.target.closest(".upload-proof-btn");
+  if (!btn) return;
+  pendingProofPaymentId = btn.dataset.paymentId;
+  document.getElementById("proofFileInput").click();
+});
+
+document.getElementById("proofFileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  const paymentId = pendingProofPaymentId;
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file || !paymentId) return;
+
+  if (!/^image\/|^application\/pdf$/.test(file.type)) { alert(t("proofInvalidType")); return; }
+  if (file.size > 25 * 1024 * 1024) { alert(t("proofTooLarge")); return; }
+
+  uploadingPayments.add(paymentId);
+  renderPayments();
+  try {
+    const { dataUrl, fileName } = await prepareProofFile(file);
+    const save = addDoc(collection(db, "paymentProofs"), {
+      paymentId,
+      residentId: user.uid,
+      unit: profile.unit || "",
+      fileData: dataUrl,
+      fileName,
+      status: "pending_review",
+      uploadedAt: serverTimestamp()
+    });
+    // addDoc waits for the server; don't let the UI hang forever if the connection is dead.
+    await Promise.race([
+      save,
+      new Promise((_, rej) => setTimeout(() => rej(new Error("timeout - check your connection")), 30000))
+    ]);
+  } catch (err) {
+    console.error("Proof upload failed:", err);
+    const msg = err.code === "pdf_too_large" ? t("proofPdfTooLarge")
+      : err.code === "too_large" ? t("proofTooLarge")
+      : err.code === "bad_image" ? t("proofInvalidType")
+      : t("proofUploadFailed") + (err.message ? ` (${err.message})` : "");
+    alert(msg);
+  } finally {
+    uploadingPayments.delete(paymentId);
+    renderPayments();
+  }
 });
 
 // ---------- Announcements ----------
@@ -238,6 +356,7 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
     residentId: user.uid,
     unit: profile.unit || "",
     category, description,
+    source: "resident",
     status: "pending",
     statusSeenByResident: true,
     createdAt: serverTimestamp()
@@ -272,9 +391,15 @@ onSnapshot(maintQ, (snap) => {
     // Queue position is written onto the doc by the admin/manager clients (residents
     // can't read other residents' requests to count it themselves).
     const showQueue = (m.status === "pending" || m.status === "accepted") && typeof m.queueAhead === "number";
+    // Waiting time is maintained on the doc alongside queueAhead: the sum of the
+    // durations the workers estimated for the requests queued before this one.
+    const eta = Number(m.queueEtaHours);
+    const etaText = showQueue && m.queueAhead > 0 && eta > 0
+      ? ` · ≈ ${eta === 0.5 ? t("estHalfHour") : `${eta} ${eta === 1 ? t("estHour") : t("estHours")}`} ${t("estWait")}`
+      : "";
     const queueLine = !showQueue ? "" : (m.queueAhead === 0
       ? `<div class="sub" style="color:#3a7d5c">${t("yourTurnNow")}</div>`
-      : `<div class="sub">${m.queueAhead === 1 ? t("requestsAheadSingular") : `${m.queueAhead} ${t("requestsAheadPlural")}`}</div>`);
+      : `<div class="sub">${m.queueAhead === 1 ? t("requestsAheadSingular") : `${m.queueAhead} ${t("requestsAheadPlural")}`}${etaText}</div>`);
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">

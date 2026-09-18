@@ -35,11 +35,23 @@ service cloud.firestore {
     function isActiveManager() {
       return isManager() && myData().accountStatus == 'active';
     }
+    // Call center: reports to the admin, staff-only account (created by admin, same
+    // as manager/worker — no self sign-up). Logs a phone-in maintenance request on a
+    // resident's behalf: needs to look residents up by unit and create the request,
+    // nothing more (no finance, no worker management, no status changes).
+    function isCallCenter() {
+      return isSignedIn() && myData().role == 'callcenter';
+    }
+    function isActiveCallCenter() {
+      return isCallCenter() && myData().accountStatus == 'active';
+    }
 
     match /users/{userId} {
       // A manager may read worker profiles (needed for the Workers/Security/Leaves views), on top of their own doc.
+      // Call center reads resident profiles too, but only to look someone up by unit when logging a call — nothing else.
       allow read: if isOwner(userId) || isAdmin() ||
-        (isActiveManager() && resource.data.role == 'worker');
+        (isActiveManager() && resource.data.role == 'worker') ||
+        (isActiveCallCenter() && resource.data.role == 'resident');
       // Self-registration is residents-only (public sign-up). The admin can create
       // any account (site managers, workers, or promote/adjust anyone). An active
       // site manager can create worker accounts only — never manager or admin
@@ -70,19 +82,54 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // A resident can attach proof of payment (receipt/screenshot) to one of their
+    // own payments — but the payments doc itself stays admin-only (above), so this
+    // lives in its own collection: the resident can only create it, never edit or
+    // delete it afterwards, and admin reviews it (approves/rejects) via update.
+    match /paymentProofs/{proofId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      // A new receipt is always "pending_review": the resident can't pre-fill approval
+      // fields, and the linked payment only becomes "paid" when an admin approves it.
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'pending_review' &&
+        request.resource.data.keys().hasOnly(['paymentId', 'residentId', 'unit', 'fileData', 'fileName', 'status', 'uploadedAt']) &&
+        request.resource.data.uploadedAt == request.time &&
+        request.resource.data.fileData is string &&
+        request.resource.data.fileData.size() < 900000;
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     match /maintenanceRequests/{reqId} {
       // Admin and the (active) site manager both need the full list to distribute work
       // between workers and to show call-center-style totals.
       allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
-        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid);
-      allow create: if isOwner(request.resource.data.residentId) && isActiveResident();
+        resource.data.residentId == request.auth.uid || resource.data.assignedWorkerId == request.auth.uid ||
+        (isActiveCallCenter() && resource.data.loggedBy == request.auth.uid));
+      // A resident logs their own request. Call center logs one on a resident's behalf over
+      // the phone — same shape, but residentId is whoever they looked up, not their own uid,
+      // and loggedBy/loggedByRole record who actually typed it in for traceability. Admin/
+      // site manager can also send a worker straight to a job with no resident involved at
+      // all: source == 'onsite', already "accepted" with a worker picked up front, and
+      // createdBy records who sent it (same traceability role as loggedBy above).
+      allow create: if (isOwner(request.resource.data.residentId) && isActiveResident()) ||
+        (isActiveCallCenter() && request.resource.data.loggedBy == request.auth.uid &&
+         request.resource.data.loggedByRole == 'callcenter') ||
+        ((isAdmin() || isActiveManager()) &&
+         request.resource.data.source == 'onsite' &&
+         request.resource.data.createdBy == request.auth.uid &&
+         request.resource.data.status == 'accepted' &&
+         request.resource.data.assignedWorkerId is string &&
+         request.resource.data.assignedWorkerId.size() > 0);
       // Admin/manager can assign workers, change status, and recompute queue positions on
       // every request. An assigned active worker may only move their own order forward
-      // (status + the bookkeeping fields written alongside a status change).
+      // (status + the bookkeeping fields written alongside a status change), or set the
+      // duration estimate that feeds the residents' waiting time.
       allow update: if isAdmin() || isActiveManager() ||
         (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt']));
+           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours']));
       allow delete: if isAdmin();
     }
 

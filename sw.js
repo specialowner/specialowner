@@ -1,4 +1,4 @@
-const CACHE_NAME = "special-owner-v5";
+const CACHE_NAME = "special-owner-v8";
 const APP_SHELL = [
   "index.html",
   "resident.html",

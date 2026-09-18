@@ -22,7 +22,7 @@ import { firebaseConfig, db as primaryDb } from "./firebase-config.js";
  * @param {string} params.name
  * @param {string} params.email
  * @param {string} params.password
- * @param {"worker"|"manager"} params.role
+ * @param {"worker"|"manager"|"callcenter"} params.role
  * @param {string} params.createdBy   uid of the admin/manager creating this account
  * @param {Object} [params.extra]     extra fields to store (e.g. workerType)
  * @returns {Promise<string>} the new user's uid
