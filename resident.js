@@ -4,7 +4,7 @@ import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 import {
-  ref as storageRef, uploadBytes, getDownloadURL
+  ref as storageRef, uploadBytesResumable, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
 const { user, profile } = await requireAuth("resident");
@@ -93,6 +93,10 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 let lastPaymentRows = [];
 let proofsByPayment = {}; // paymentId -> latest proof {id, status, fileURL, ...}
 const uploadingPayments = new Set(); // paymentIds currently mid-upload, for a local "Uploading…" state
+const uploadProgress = {}; // paymentId -> 0..100
+// Fail fast instead of silently retrying for 10 minutes if Storage is unreachable / not set up.
+storage.maxUploadRetryTime = 30000;
+storage.maxOperationRetryTime = 30000;
 
 const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
@@ -138,7 +142,8 @@ function renderPayments() {
 
 function proofControlsHtml(paymentId) {
   if (uploadingPayments.has(paymentId)) {
-    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}</div>`;
+    const pct = uploadProgress[paymentId];
+    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}${pct != null ? ` ${pct}%` : ""}</div>`;
   }
   const proof = proofsByPayment[paymentId];
   if (!proof) {
@@ -183,7 +188,17 @@ document.getElementById("proofFileInput").addEventListener("change", async (e) =
   try {
     const path = `paymentProofs/${user.uid}/${paymentId}/${Date.now()}_${file.name}`;
     const fileRef = storageRef(storage, path);
-    await uploadBytes(fileRef, file, { contentType: file.type });
+    await new Promise((resolve, reject) => {
+      const task = uploadBytesResumable(fileRef, file, { contentType: file.type });
+      task.on("state_changed",
+        (snapshot) => {
+          uploadProgress[paymentId] = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+          renderPayments();
+        },
+        reject,
+        resolve
+      );
+    });
     const fileURL = await getDownloadURL(fileRef);
     await addDoc(collection(db, "paymentProofs"), {
       paymentId,
@@ -200,6 +215,7 @@ document.getElementById("proofFileInput").addEventListener("change", async (e) =
     alert(t("proofUploadFailed") + (err.message ? ` (${err.message})` : ""));
   } finally {
     uploadingPayments.delete(paymentId);
+    delete uploadProgress[paymentId];
     renderPayments();
   }
 });
