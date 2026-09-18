@@ -1,8 +1,11 @@
-import { db } from "./firebase-config.js";
+import { db, storage } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+import {
+  ref as storageRef, uploadBytes, getDownloadURL
+} from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
 
 const { user, profile } = await requireAuth("resident");
 
@@ -83,25 +86,122 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 }));
 
 // ---------- Payments ----------
+// Proof-of-payment uploads: residents can attach a receipt/screenshot to any
+// payment that isn't already marked "paid" by admin. The file goes to Storage
+// and a review record is created in "paymentProofs" (residents can only create
+// that doc, not edit it afterwards — admin reviews it and updates its status).
+let lastPaymentRows = [];
+let proofsByPayment = {}; // paymentId -> latest proof {id, status, fileURL, ...}
+const uploadingPayments = new Set(); // paymentIds currently mid-upload, for a local "Uploading…" state
+
 const paymentsQ = query(collection(db, "payments"), where("residentId", "==", user.uid));
 onSnapshot(paymentsQ, (snap) => {
+  lastPaymentRows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
+  renderPayments();
+});
+
+const proofsQ = query(collection(db, "paymentProofs"), where("residentId", "==", user.uid));
+onSnapshot(proofsQ, (snap) => {
+  const latest = {};
+  snap.docs.map(d => ({ id: d.id, ...d.data() })).forEach(p => {
+    const existing = latest[p.paymentId];
+    const pTime = p.uploadedAt?.toMillis ? p.uploadedAt.toMillis() : 0;
+    const eTime = existing?.uploadedAt?.toMillis ? existing.uploadedAt.toMillis() : -1;
+    if (!existing || pTime >= eTime) latest[p.paymentId] = p;
+  });
+  proofsByPayment = latest;
+  renderPayments();
+});
+
+function renderPayments() {
   const el = document.getElementById("paymentsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
+  if (lastPaymentRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
   let totalDue = 0;
   el.innerHTML = "";
-  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.dueDate || "").localeCompare(a.dueDate || ""));
-  rows.forEach(p => {
+  lastPaymentRows.forEach(p => {
     if (p.status !== "paid") totalDue += Number(p.amount || 0);
     el.innerHTML += `
-      <div class="list-item">
-        <div class="meta">
-          <div class="title">${p.description || "Monthly fee"}</div>
-          <div class="sub">EGP ${p.amount} · due ${fmtDate(p.dueDate)}</div>
+      <div class="list-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div class="meta">
+            <div class="title">${p.description || "Monthly fee"}</div>
+            <div class="sub">EGP ${p.amount} · due ${fmtDate(p.dueDate)}</div>
+          </div>
+          <span class="badge ${p.status}">${t(p.status) || p.status}</span>
         </div>
-        <span class="badge ${p.status}">${t(p.status) || p.status}</span>
+        ${p.status === "paid" ? "" : proofControlsHtml(p.id)}
       </div>`;
   });
   document.getElementById("dueNum").textContent = `EGP ${totalDue}`;
+}
+
+function proofControlsHtml(paymentId) {
+  if (uploadingPayments.has(paymentId)) {
+    return `<div class="sub" style="margin-top:8px">${t("uploadingProof")}</div>`;
+  }
+  const proof = proofsByPayment[paymentId];
+  if (!proof) {
+    return `<button type="button" class="btn btn-outline btn-sm upload-proof-btn" data-payment-id="${paymentId}" style="margin-top:8px">${t("uploadProof")}</button>`;
+  }
+  const statusLabel = t(`proof_${proof.status}`) || proof.status;
+  const viewLink = proof.fileURL
+    ? `<a href="${proof.fileURL}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
+    : "";
+  const canReplace = proof.status !== "pending_review";
+  return `
+    <div style="margin-top:8px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span class="badge ${proof.status}">${statusLabel}</span>
+      ${viewLink}
+      ${canReplace ? `<button type="button" class="btn btn-outline btn-sm upload-proof-btn" data-payment-id="${paymentId}">${t("replaceProof")}</button>` : ""}
+    </div>
+    ${proof.status === "rejected" && proof.reviewNote ? `<div class="sub" style="margin-top:4px">${proof.reviewNote}</div>` : ""}`;
+}
+
+// Clicking any (current or future) "upload proof" button opens the shared
+// hidden file input; delegation is needed since the list is re-rendered often.
+let pendingProofPaymentId = null;
+document.getElementById("paymentsList").addEventListener("click", (e) => {
+  const btn = e.target.closest(".upload-proof-btn");
+  if (!btn) return;
+  pendingProofPaymentId = btn.dataset.paymentId;
+  document.getElementById("proofFileInput").click();
+});
+
+document.getElementById("proofFileInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  const paymentId = pendingProofPaymentId;
+  e.target.value = ""; // allow re-selecting the same file later
+  if (!file || !paymentId) return;
+
+  const MAX_BYTES = 5 * 1024 * 1024;
+  if (file.size > MAX_BYTES) { alert(t("proofTooLarge")); return; }
+  if (!/^image\/|^application\/pdf$/.test(file.type)) { alert(t("proofInvalidType")); return; }
+
+  uploadingPayments.add(paymentId);
+  renderPayments();
+  try {
+    const path = `paymentProofs/${user.uid}/${paymentId}/${Date.now()}_${file.name}`;
+    const fileRef = storageRef(storage, path);
+    await uploadBytes(fileRef, file, { contentType: file.type });
+    const fileURL = await getDownloadURL(fileRef);
+    await addDoc(collection(db, "paymentProofs"), {
+      paymentId,
+      residentId: user.uid,
+      unit: profile.unit || "",
+      fileURL,
+      filePath: path,
+      fileName: file.name,
+      status: "pending_review",
+      uploadedAt: serverTimestamp()
+    });
+  } catch (err) {
+    console.error("Proof upload failed:", err);
+    alert(t("proofUploadFailed") + (err.message ? ` (${err.message})` : ""));
+  } finally {
+    uploadingPayments.delete(paymentId);
+    renderPayments();
+  }
 });
 
 // ---------- Announcements ----------

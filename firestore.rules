@@ -82,6 +82,19 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // A resident can attach proof of payment (receipt/screenshot) to one of their
+    // own payments — but the payments doc itself stays admin-only (above), so this
+    // lives in its own collection: the resident can only create it, never edit or
+    // delete it afterwards, and admin reviews it (approves/rejects) via update.
+    match /paymentProofs/{proofId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'pending_review';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     match /maintenanceRequests/{reqId} {
       // Admin and the (active) site manager both need the full list to distribute work
       // between workers and to show call-center-style totals.

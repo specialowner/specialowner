@@ -1,0 +1,21 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    // Proof-of-payment receipts uploaded by residents from the Payments card.
+    // Path: paymentProofs/{residentId}/{paymentId}/{fileName}
+    // A resident may only write into their own folder; admin (checked against
+    // their Firestore user doc) can read anything for review. Files can't be
+    // overwritten or deleted from the client — only added, so a review trail
+    // is preserved (each upload gets its own timestamped file name).
+    match /paymentProofs/{residentId}/{paymentId}/{fileName} {
+      allow read: if request.auth != null &&
+        (request.auth.uid == residentId ||
+         firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin');
+      allow create: if request.auth != null && request.auth.uid == residentId &&
+        request.resource.size < 5 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*|application/pdf');
+      allow update, delete: if false;
+    }
+  }
+}
