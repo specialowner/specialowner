@@ -41,7 +41,8 @@
     <!-- FINANCE -->
     <section id="tab-finance" style="display:none">
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="stat-box">
+        <!-- Points balance hidden temporarily from the UI; logic/markup kept as-is for when it's re-enabled -->
+        <div class="stat-box" style="display:none">
           <div class="num" id="pointsNum">0</div>
           <div class="lbl" data-i18n="pointsBalance">Points balance</div>
         </div>
@@ -226,7 +227,8 @@
     <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
     <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabRequests">Requests</span></button>
-    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
+    <!-- Shops tab hidden temporarily from the UI; markup/logic kept as-is for when it's re-enabled -->
+    <button class="tab-btn" data-tab="shops" style="display:none"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
   </div>
 </div>
 
