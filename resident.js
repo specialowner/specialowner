@@ -77,7 +77,7 @@ const tabs = document.querySelectorAll(".tab-btn");
 tabs.forEach(btn => btn.addEventListener("click", () => {
   tabs.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
-  ["home", "invites", "maint", "shops"].forEach(t => {
+  ["home", "finance", "invites", "maint", "shops"].forEach(t => {
     document.getElementById(`tab-${t}`).style.display = (t === btn.dataset.tab) ? "block" : "none";
   });
 }));
@@ -111,6 +111,14 @@ onSnapshot(proofsQ, (snap) => {
   renderPayments();
 });
 
+// Currency formatting follows the reading direction: "EGP 500" in English, "500 ج.م" in Arabic.
+function money(n) {
+  const cur = t("currencyEgp");
+  const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
+  return lang === "ar" ? `${n} ${cur}` : `${cur} ${n}`;
+}
+window.addEventListener("so-lang-changed", () => renderPayments());
+
 function renderPayments() {
   const el = document.getElementById("paymentsList");
   if (lastPaymentRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
@@ -122,15 +130,15 @@ function renderPayments() {
       <div class="list-item" style="flex-direction:column;align-items:stretch">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
           <div class="meta">
-            <div class="title">${p.description || "Monthly fee"}</div>
-            <div class="sub">EGP ${p.amount} · due ${fmtDate(p.dueDate)}</div>
+            <div class="title">${p.description || t("monthlyFee")}</div>
+            <div class="sub">${money(p.amount)} · ${t("dueLabel")} ${fmtDate(p.dueDate)}</div>
           </div>
           <span class="badge ${p.status}">${t(p.status) || p.status}</span>
         </div>
         ${p.status === "paid" ? "" : proofControlsHtml(p.id)}
       </div>`;
   });
-  document.getElementById("dueNum").textContent = `EGP ${totalDue}`;
+  document.getElementById("dueNum").textContent = money(totalDue);
 }
 
 function proofControlsHtml(paymentId) {

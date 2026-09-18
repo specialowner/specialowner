@@ -44,6 +44,9 @@ const translations = {
     noAnnouncements: "No announcements yet.",
 
     tabHome: "Home",
+    monthlyFee: "Monthly fee",
+    currencyEgp: "EGP",
+    dueLabel: "due",
     tabInvites: "Invites",
     tabMaint: "Maintenance",
     tabShops: "Shops",
@@ -390,6 +393,9 @@ const translations = {
     noAnnouncements: "لا توجد إعلانات بعد.",
 
     tabHome: "الرئيسية",
+    monthlyFee: "الرسوم الشهرية",
+    currencyEgp: "ج.م",
+    dueLabel: "الاستحقاق",
     tabInvites: "الدعوات",
     tabMaint: "الصيانة",
     tabShops: "المتاجر",
