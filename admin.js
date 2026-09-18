@@ -699,6 +699,79 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   });
 });
 
+// ---------- Payment receipts (proof of payment review) ----------
+function escHtml(v) {
+  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+}
+function safeUrl(u) { return /^https:\/\//.test(u || "") ? u : "#"; }
+
+onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc")), (snap) => {
+  const el = document.getElementById("proofsList");
+  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noReceipts")}</p>`; return; }
+  el.innerHTML = "";
+  snap.forEach(d => {
+    const p = d.data();
+    const when = p.uploadedAt?.toDate ? p.uploadedAt.toDate().toLocaleString() : "";
+    const isImage = /\.(png|jpe?g|gif|webp|heic)$/i.test(p.fileName || "");
+    const preview = isImage && p.fileURL
+      ? `<a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener"><img src="${safeUrl(p.fileURL)}" alt="" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0"></a>`
+      : "";
+    const pending = p.status === "pending_review";
+    el.innerHTML += `
+      <div class="list-item" style="flex-direction:column;align-items:stretch">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+          <div style="display:flex;align-items:center;gap:10px">
+            ${preview}
+            <div class="meta">
+              <div class="title">${escHtml(p.unit || "—")} · ${escHtml(p.fileName || "")}</div>
+              <div class="sub">${escHtml(when)}</div>
+              <a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>
+            </div>
+          </div>
+          <span class="badge ${escHtml(p.status)}">${t("proof_" + p.status) || escHtml(p.status)}</span>
+        </div>
+        ${pending ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+          <button class="btn btn-sm btn-primary proof-approve" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("approveProof")}</button>
+          <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}">${t("rejectProof")}</button>
+        </div>` : ""}
+        ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
+      </div>`;
+  });
+  el.querySelectorAll(".proof-approve").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
+          status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        });
+        await updateDoc(doc(db, "payments", btn.dataset.payment), {
+          status: "paid", paidAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error(err);
+        alert(t("proofActionFailed"));
+        btn.disabled = false;
+      }
+    });
+  });
+  el.querySelectorAll(".proof-reject").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const note = prompt(t("rejectReasonPrompt"));
+      if (note === null) return;
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
+          status: "rejected", reviewNote: note.trim(), reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        });
+      } catch (err) {
+        console.error(err);
+        alert(t("proofActionFailed"));
+        btn.disabled = false;
+      }
+    });
+  });
+});
+
 // ---------- Maintenance (admin view + status update + assign worker) ----------
 const CATEGORY_I18N_KEY = {
   "Plumbing": "catPlumbing",
