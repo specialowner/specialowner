@@ -6,8 +6,7 @@ const HOME_PAGE = {
   admin: "admin.html",
   worker: "worker.html",
   resident: "resident.html",
-  manager: "manager.html",
-  callcenter: "call-center.html"
+  manager: "manager.html"
 };
 
 // Resolves with { user, profile } once auth state is known and role matches.

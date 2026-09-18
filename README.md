@@ -17,12 +17,6 @@ A base residential-compound management app: resident interface + admin dashboard
 - Finance: add payment records per resident (by unit + email), view all payments
 - Maintenance: view all requests and change status (pending → in progress → completed)
 
-**Call center panel** (`call-center.html`)
-- Staff-only account created by the admin (no self sign-up), same as site manager and worker accounts
-- Log a call: search a resident by unit number, pick them, choose a category and describe the issue — creates a maintenance request on their behalf, which then flows into the normal queue and worker assignment
-- My calls: the agent sees only the requests they logged themselves, with live status
-- Each logged request records `loggedBy` / `loggedByRole` so a phone-in request is traceable back to the agent who took the call
-
 **Not built yet (flagged in your outline as future work):** payroll/accounting module and bank-account integration. The data model below already has room for these.
 
 ## 1. Set up Firebase
@@ -36,10 +30,10 @@ A base residential-compound management app: resident interface + admin dashboard
 
 ### Firestore data model
 ```
-users/{uid}            name, email, unit, role(resident|admin|manager|worker|callcenter), accountStatus, points, createdAt
+users/{uid}            name, email, unit, role(resident|admin), points, createdAt
 invitations/{id}       residentId, residentUnit, guestName, guestPhone, visitDate, token, status(pending|used), type, createdAt
 payments/{id}          residentId, unit, amount, dueDate, description, status(pending|paid|overdue), createdAt
-maintenanceRequests/{id} residentId, unit, category, description, status(pending|accepted|in_progress|completed), assignedWorkerId, estimatedHours, queueAhead, queueEtaHours, loggedBy, loggedByRole, createdAt
+maintenanceRequests/{id} residentId, unit, category, description, status(pending|in_progress|completed), createdAt
 announcements/{id}     title, body, createdBy, createdAt
 shops/{id}             name, category, description, offer
 workers/{id}           name, role, phone, status(active|inactive), createdAt

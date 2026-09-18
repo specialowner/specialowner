@@ -348,23 +348,6 @@ function categoryLabel(cat) {
   const key = CATEGORY_I18N_KEY[cat];
   return key ? t(key) : cat; // fallback for any legacy/custom value
 }
-// Where the order came from: the resident app, a call logged over the phone by the call
-// center, or a task an admin/site manager sent the worker to directly (no resident at all).
-function originLabel(m) {
-  if (m.source === "onsite") return t("originOnsite");
-  if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
-  return t("originResident");
-}
-// On-site tasks carry a free-text location instead of a resident's unit.
-function placeLabel(m) {
-  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
-}
-// Duration estimates the worker can pick, in hours (0.5 = half an hour).
-const ESTIMATE_CHOICES = [0.5, 1, 2, 3, 4, 6, 8];
-function estimateLabel(h) {
-  if (h === 0.5) return t("estHalfHour");
-  return `${h} ${h === 1 ? t("estHour") : t("estHours")}`;
-}
 if (!isSecurity) {
   const ordersQ = query(collection(db, "maintenanceRequests"), where("assignedWorkerId", "==", user.uid));
   onSnapshot(ordersQ, (snap) => {
@@ -379,21 +362,11 @@ if (!isSecurity) {
       let actionBtn = "";
       if (o.status === "accepted") actionBtn = `<button type="button" class="btn btn-sm btn-primary order-action" data-id="${o.id}" data-next="in_progress">${t("startWork")}</button>`;
       else if (o.status === "in_progress") actionBtn = `<button type="button" class="btn btn-sm btn-primary order-action" data-id="${o.id}" data-next="completed">${t("markComplete")}</button>`;
-      // As soon as the worker understands the job, they pick how long they expect to
-      // spend on it. The estimate feeds the waiting time shown to residents further
-      // down the same craft's queue, so it's only offered while the job is still open.
-      const estSelect = o.status === "completed" ? "" : `
-            <select data-id="${o.id}" class="order-eta" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
-              <option value="">${t("estDuration")}: ${t("estNotSet")}</option>
-              ${ESTIMATE_CHOICES.map(h => `<option value="${h}" ${Number(o.estimatedHours) === h ? "selected" : ""}>${estimateLabel(h)}</option>`).join("")}
-            </select>`;
       el.innerHTML += `
         <div class="list-item">
           <div class="meta">
-            <div class="title">${categoryLabel(o.category)} · ${placeLabel(o)}</div>
-            <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(o)}</div>
+            <div class="title">${categoryLabel(o.category)} · ${o.unit || "—"}</div>
             <div class="sub">${o.description}</div>
-            ${estSelect}
           </div>
           <span class="badge ${o.status}">${t(o.status) || o.status}</span>
           ${actionBtn}
@@ -419,29 +392,6 @@ if (!isSecurity) {
             : (err.message || String(err)));
         }
       });
-    });
-    el.querySelectorAll(".order-eta").forEach(sel => {
-      sel.addEventListener("click", (e) => e.stopPropagation());
-      sel.addEventListener("change", async () => {
-        if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
-        const previous = sel.dataset.previous || "";
-        sel.disabled = true;
-        try {
-          await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), {
-            estimatedHours: sel.value === "" ? null : Number(sel.value)
-          });
-          sel.dataset.previous = sel.value;
-        } catch (err) {
-          console.error("Failed to save duration estimate:", err);
-          sel.value = previous; // put the control back where it was so it isn't misleading
-          alert(err.code === "permission-denied"
-            ? "Permission denied — ask the admin to publish the latest Firestore rules."
-            : (err.message || String(err)));
-        } finally {
-          sel.disabled = false;
-        }
-      });
-      sel.dataset.previous = sel.value;
     });
   });
 }
