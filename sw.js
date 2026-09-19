@@ -1,4 +1,5 @@
-const CACHE_NAME = "special-owner-v5";
+importScripts("version.js"); // defines self.SO_VERSION
+const CACHE_NAME = "special-owner-v" + self.SO_VERSION;
 const APP_SHELL = [
   "index.html",
   "resident.html",
@@ -6,6 +7,7 @@ const APP_SHELL = [
   "worker.html",
   "style.css",
   "i18n.js",
+  "version.js",
   "qrcode.min.js",
   "html5-qrcode.min.js",
   "manifest.json"
@@ -33,6 +35,9 @@ self.addEventListener("activate", (event) => {
 // after new files are deployed.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Announcement photos/videos live on Firebase Storage: let the browser handle them
+  // directly (no caching of large files, and video playback uses Range requests).
+  if (event.request.url.includes("firebasestorage.googleapis.com") || event.request.headers.has("range")) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {

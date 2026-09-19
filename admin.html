@@ -66,6 +66,25 @@
         <div class="field"><label data-i18n="title">Title</label><input type="text" id="annTitle" placeholder="e.g. Water maintenance Friday" data-i18n-placeholder="titlePh"></div>
         <div class="field"><label data-i18n="details">Details</label><textarea id="annBody" placeholder="Details for residents" data-i18n-placeholder="detailsPh"></textarea></div>
         <div class="field">
+          <label data-i18n="annMedia">Photo or video (optional)</label>
+          <div style="display:flex;flex-wrap:wrap;gap:8px">
+            <button type="button" class="btn btn-sm btn-outline" id="annCamPhotoBtn">📷 <span data-i18n="annTakePhoto">Take photo</span></button>
+            <button type="button" class="btn btn-sm btn-outline" id="annCamVideoBtn">🎥 <span data-i18n="annRecordVideo">Record video</span></button>
+            <button type="button" class="btn btn-sm btn-outline" id="annGalleryBtn">🖼️ <span data-i18n="annChooseFile">Upload from device</span></button>
+          </div>
+          <input type="file" id="annPhotoCapture" accept="image/*" capture="environment" style="display:none">
+          <input type="file" id="annVideoCapture" accept="video/*" capture="environment" style="display:none">
+          <input type="file" id="annGalleryInput" accept="image/*,video/*" style="display:none">
+          <div id="annMediaPreview" style="display:none;margin-top:10px">
+            <div id="annMediaPreviewBox"></div>
+            <button type="button" class="btn btn-sm btn-danger" id="annMediaRemoveBtn" style="margin-top:8px" data-i18n="annRemoveMedia">Remove</button>
+          </div>
+          <div id="annUploadProgress" style="display:none;margin-top:10px">
+            <div style="height:8px;background:#e6ecea;border-radius:6px;overflow:hidden"><div id="annUploadBar" style="height:100%;width:0;background:var(--primary);transition:width .2s"></div></div>
+            <div id="annUploadText" style="font-size:12px;margin-top:4px"></div>
+          </div>
+        </div>
+        <div class="field">
           <label data-i18n="audience">Audience</label>
           <select id="annAudience">
             <option value="all" data-i18n="audienceAll">Everyone</option>
@@ -225,6 +244,10 @@
         <button class="btn btn-primary" id="addPayBtn" data-i18n="addRecord">Add record</button>
       </div>
       <div class="card">
+        <h3 data-i18n="paymentReceipts">Payment receipts</h3>
+        <div id="proofsList"><p class="empty-state" data-i18n="noReceipts">No receipts uploaded yet.</p></div>
+      </div>
+      <div class="card">
         <h3 data-i18n="allPayments">All payments</h3>
         <div id="financeList"><p class="empty-state" data-i18n="noPaymentRecords">No payment records yet.</p></div>
       </div>
@@ -232,6 +255,17 @@
 
     <!-- MAINTENANCE -->
     <section id="tab-maint" data-dashboard="ops" style="display:none">
+      <div class="card" id="opsOverviewCard">
+        <h3 data-i18n="opsOverviewTitle">Operations overview</h3>
+        <div id="opsTiles" class="ops-tiles"></div>
+        <h4 class="ops-subtitle" data-i18n="opsPerWorker">Requests per worker</h4>
+        <div id="opsWorkerChart"><p class="empty-state" data-i18n="opsNoWorkers">No workers yet.</p></div>
+        <div class="ops-legend">
+          <span><i class="dot accepted"></i><span data-i18n="opsToDo">Assigned – to do</span></span>
+          <span><i class="dot in_progress"></i><span data-i18n="in_progress">In progress</span></span>
+          <span><i class="dot completed"></i><span data-i18n="completed">Completed</span></span>
+        </div>
+      </div>
       <div class="card">
         <h3 data-i18n="onsiteTasksTitle">Direct on-site tasks</h3>
         <p class="sub" data-i18n="onsiteTasksDesc">Send a worker straight to a job — no resident involved. It joins their queue like any other request.</p>
@@ -243,6 +277,7 @@
             <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
             <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
             <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
+            <option value="Garden" data-i18n="catGarden">Garden</option>
             <option value="Other" data-i18n="catOther">Other</option>
           </select>
         </div>
@@ -267,6 +302,10 @@
         <div id="adminMaintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
       </div>
       <div class="card">
+        <h3 data-i18n="subscriptionsTitle">Service subscriptions</h3>
+        <div id="adminSubsList"><p class="empty-state" data-i18n="noSubscriptions">No subscription requests yet.</p></div>
+      </div>
+      <div class="card">
         <h3 data-i18n="maintStatsTitle">Average resolution time by category</h3>
         <div id="maintStats"><p class="empty-state" data-i18n="noMaintStats">No resolved requests with timing yet.</p></div>
       </div>
@@ -284,6 +323,7 @@
   </div>
 </div>
 
+<script src="version.js"></script>
 <script src="i18n.js"></script>
 <script type="module" src="admin.js"></script>
 <script>

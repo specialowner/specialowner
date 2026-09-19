@@ -32,13 +32,22 @@
     <!-- HOME -->
     <section id="tab-home">
       <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
+      <div class="card">
+        <h3 data-i18n="announcements">Announcements</h3>
+        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+      </div>
+    </section>
+
+    <!-- FINANCE -->
+    <section id="tab-finance" style="display:none">
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="stat-box">
+        <!-- Points balance hidden temporarily from the UI; logic/markup kept as-is for when it's re-enabled -->
+        <div class="stat-box" style="display:none">
           <div class="num" id="pointsNum">0</div>
           <div class="lbl" data-i18n="pointsBalance">Points balance</div>
         </div>
         <div class="stat-box">
-          <div class="num" id="dueNum">EGP 0</div>
+          <div class="num" id="dueNum">0</div>
           <div class="lbl" data-i18n="outstandingDue">Outstanding due</div>
         </div>
       </div>
@@ -46,11 +55,7 @@
       <div class="card">
         <h3 data-i18n="paymentStatus">Payment status</h3>
         <div id="paymentsList"><p class="empty-state" data-i18n="noPayments">No payment records yet.</p></div>
-      </div>
-
-      <div class="card">
-        <h3 data-i18n="announcements">Announcements</h3>
-        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
+        <input type="file" id="proofFileInput" accept="image/*,application/pdf" style="display:none">
       </div>
     </section>
 
@@ -105,35 +110,110 @@
         <button class="btn btn-accent" id="requestActivationBtnMaint" data-i18n="requestActivation">Request activation</button>
       </div>
       <div id="maintUnlockedArea">
-      <div class="card">
-        <h3 data-i18n="newMaintRequest">New maintenance request</h3>
-        <div class="field">
-          <label data-i18n="category">Category</label>
-          <select id="maintCategory">
-            <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
-            <option value="Electrical" data-i18n="catElectrical">Electrical</option>
-            <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
-            <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
-            <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
-            <option value="Other" data-i18n="catOther">Other</option>
-          </select>
-        </div>
-        <div class="field">
-          <label data-i18n="describeIssue">Describe the issue</label>
-          <textarea id="maintDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
-        </div>
-        <button class="btn btn-primary" id="createMaintBtn" data-i18n="submitRequest">Submit request</button>
+
+      <!-- The three entry points: in-unit maintenance, recurring services, compound report -->
+      <div class="seg-switch" id="reqSwitch">
+        <button class="active" data-req="maint"><span class="seg-icon">🛠️</span><span data-i18n="reqTabMaint">Maintenance</span></button>
+        <button data-req="subs"><span class="seg-icon">🔁</span><span data-i18n="reqTabSubs">Services</span></button>
+        <button data-req="report"><span class="seg-icon">📣</span><span data-i18n="reqTabReport">Report</span></button>
       </div>
-      <div class="card">
-        <h3 data-i18n="myRequests">My requests</h3>
-        <div id="maintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
+
+      <!-- 1) IN-UNIT MAINTENANCE -->
+      <div id="req-maint">
+        <div class="card">
+          <h3 data-i18n="newMaintRequest">New maintenance request</h3>
+          <p class="sub-note" data-i18n="maintIntro">Something broken inside your unit — a technician comes to you.</p>
+          <div class="field">
+            <label data-i18n="category">Category</label>
+            <select id="maintCategory">
+              <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
+              <option value="Electrical" data-i18n="catElectrical">Electrical</option>
+              <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
+              <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
+              <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
+              <option value="Other" data-i18n="catOther">Other</option>
+            </select>
+          </div>
+          <div class="field">
+            <label data-i18n="describeIssue">Describe the issue</label>
+            <textarea id="maintDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
+          </div>
+          <div class="field">
+            <label data-i18n="photoOptional">Photo (optional)</label>
+            <button type="button" class="btn btn-outline btn-sm" id="maintPhotoBtn" data-i18n="addPhoto">Add photo</button>
+            <input type="file" id="maintPhotoInput" accept="image/*" capture="environment" style="display:none">
+            <div class="photo-preview" id="maintPhotoPreview" style="display:none">
+              <img id="maintPhotoImg" alt="">
+              <button type="button" class="photo-remove" id="maintPhotoRemove">✕</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="createMaintBtn" data-i18n="submitRequest">Submit request</button>
+        </div>
+        <div class="card">
+          <h3 data-i18n="myRequests">My requests</h3>
+          <div id="maintList"><p class="empty-state" data-i18n="noRequests">No requests yet.</p></div>
+        </div>
       </div>
+
+      <!-- 2) SERVICE SUBSCRIPTIONS -->
+      <div id="req-subs" style="display:none">
+        <div class="card">
+          <h3 data-i18n="servicesTitle">Service subscriptions</h3>
+          <p class="sub-note" data-i18n="servicesIntro">Recurring services for your unit. The admin confirms the price before it starts.</p>
+        </div>
+        <div id="servicesList"></div>
+      </div>
+
+      <!-- 3) COMPOUND REPORT -->
+      <div id="req-report" style="display:none">
+        <div class="card">
+          <h3 data-i18n="reportTitle">Report something in the compound</h3>
+          <p class="sub-note" data-i18n="reportIntro">A dirty common area, a broken light, uncollected garbage — anything outside your unit.</p>
+          <div class="field">
+            <label data-i18n="reportType">What is it about?</label>
+            <select id="reportType">
+              <option value="cleanliness" data-i18n="repCleanliness">Dirty common area</option>
+              <option value="lighting" data-i18n="repLighting">Broken / burnt-out light</option>
+              <option value="garbage" data-i18n="repGarbage">Uncollected garbage</option>
+              <option value="garden" data-i18n="repGarden">Garden / landscaping</option>
+              <option value="water" data-i18n="repWater">Water leak</option>
+              <option value="elevator" data-i18n="repElevator">Elevator / gate / door</option>
+              <option value="safety" data-i18n="repSafety">Safety hazard</option>
+              <option value="other" data-i18n="repOther">Something else</option>
+            </select>
+          </div>
+          <div class="field">
+            <label data-i18n="reportLocation">Where exactly?</label>
+            <input type="text" id="reportLocation" placeholder="e.g. Building B stairs, 2nd floor" data-i18n-placeholder="reportLocationPh">
+          </div>
+          <div class="field">
+            <label data-i18n="describeIssue">Describe the issue</label>
+            <textarea id="reportDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
+          </div>
+          <div class="field">
+            <label data-i18n="photoOptional">Photo (optional)</label>
+            <button type="button" class="btn btn-outline btn-sm" id="reportPhotoBtn" data-i18n="addPhoto">Add photo</button>
+            <input type="file" id="reportPhotoInput" accept="image/*" capture="environment" style="display:none">
+            <div class="photo-preview" id="reportPhotoPreview" style="display:none">
+              <img id="reportPhotoImg" alt="">
+              <button type="button" class="photo-remove" id="reportPhotoRemove">✕</button>
+            </div>
+          </div>
+          <button class="btn btn-primary" id="createReportBtn" data-i18n="sendReport">Send report</button>
+        </div>
+        <div class="card">
+          <h3 data-i18n="myReports">My reports</h3>
+          <div id="reportList"><p class="empty-state" data-i18n="noReports">No reports yet.</p></div>
+        </div>
+      </div>
+
       </div>
     </section>
 
     <!-- SHOPS -->
     <section id="tab-shops" style="display:none">
-      <div class="card" style="text-align:center">
+      <!-- Points balance hidden temporarily from the UI; logic/markup kept as-is for when it's re-enabled -->
+      <div class="card" style="text-align:center;display:none">
         <div class="label" data-i18n="yourPointsBalance">Your points balance</div>
         <div style="font-size:26px;font-weight:800;color:var(--primary)" id="shopsPoints">0</div>
       </div>
@@ -144,12 +224,15 @@
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabHome">Home</span></button>
+    <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
-    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabMaint">Maintenance</span></button>
-    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
+    <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabRequests">Requests</span></button>
+    <!-- Shops tab hidden temporarily from the UI; markup/logic kept as-is for when it's re-enabled -->
+    <button class="tab-btn" data-tab="shops" style="display:none"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
   </div>
 </div>
 
+<script src="version.js"></script>
 <script src="i18n.js"></script>
 <script type="module" src="resident.js"></script>
 <script>
