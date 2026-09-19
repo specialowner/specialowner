@@ -1,7 +1,6 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
-import { prepareAnnouncementMedia, uploadAnnouncementMedia, removeUploadedMedia } from "./announcement-media.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
@@ -196,15 +195,23 @@ document.getElementById("annTargetList").addEventListener("change", (e) => {
   document.getElementById("annSelectAll").checked = all.length > 0 && all.length === checked.length;
 });
 
+// The media helper is loaded defensively: if announcement-media.js is missing on the server,
+// the rest of the admin panel must keep working (only the photo/video feature is unavailable).
+let mediaLib = null;
+try { mediaLib = await import("./announcement-media.js"); }
+catch (e) { console.error("announcement-media.js failed to load:", e); }
+// Null-safe element lookup: an outdated admin.html without the media fields must not crash the page.
+const el = (id) => document.getElementById(id) || document.createElement("div");
+
 // ----- Announcement photo / video (camera or gallery) -----
 let annFile = null;          // the File the admin picked or recorded
 let annPreviewUrl = null;
 let annUploading = false;
 let annUploadTask = null;
 
-const annPreview = document.getElementById("annMediaPreview");
-const annPreviewBox = document.getElementById("annMediaPreviewBox");
-const annMediaInputs = ["annPhotoCapture", "annVideoCapture", "annGalleryInput"].map(id => document.getElementById(id));
+const annPreview = el("annMediaPreview");
+const annPreviewBox = el("annMediaPreviewBox");
+const annMediaInputs = ["annPhotoCapture", "annVideoCapture", "annGalleryInput"].map(id => el(id));
 
 function annClearMedia() {
   annFile = null;
@@ -226,38 +233,38 @@ function annSetMedia(file) {
   annPreview.style.display = "block";
 }
 
-document.getElementById("annCamPhotoBtn").addEventListener("click", () => document.getElementById("annPhotoCapture").click());
-document.getElementById("annCamVideoBtn").addEventListener("click", () => document.getElementById("annVideoCapture").click());
-document.getElementById("annGalleryBtn").addEventListener("click", () => document.getElementById("annGalleryInput").click());
+el("annCamPhotoBtn").addEventListener("click", () => el("annPhotoCapture").click());
+el("annCamVideoBtn").addEventListener("click", () => el("annVideoCapture").click());
+el("annGalleryBtn").addEventListener("click", () => el("annGalleryInput").click());
 annMediaInputs.forEach(inp => inp.addEventListener("change", () => {
   const f = inp.files && inp.files[0];
   annMediaInputs.forEach(o => { if (o !== inp) o.value = ""; });
   if (f) annSetMedia(f);
 }));
-document.getElementById("annMediaRemoveBtn").addEventListener("click", () => { if (!annUploading) annClearMedia(); });
+el("annMediaRemoveBtn").addEventListener("click", () => { if (!annUploading) annClearMedia(); });
 
 function annSetBusy(busy) {
   annUploading = busy;
   ["postAnnBtn", "annCamPhotoBtn", "annCamVideoBtn", "annGalleryBtn", "annMediaRemoveBtn"]
-    .forEach(id => { document.getElementById(id).disabled = busy; });
+    .forEach(id => { el(id).disabled = busy; });
 }
 function annShowProgress(text, fraction) {
-  document.getElementById("annUploadProgress").style.display = "block";
-  document.getElementById("annUploadText").textContent = text;
-  document.getElementById("annUploadBar").style.width = Math.round((fraction || 0) * 100) + "%";
+  el("annUploadProgress").style.display = "block";
+  el("annUploadText").textContent = text;
+  el("annUploadBar").style.width = Math.round((fraction || 0) * 100) + "%";
 }
 function annHideProgress() {
-  document.getElementById("annUploadProgress").style.display = "none";
-  document.getElementById("annUploadBar").style.width = "0";
+  el("annUploadProgress").style.display = "none";
+  el("annUploadBar").style.width = "0";
 }
 // Warn before closing the tab while a video is still uploading.
 window.addEventListener("beforeunload", (e) => { if (annUploading) { e.preventDefault(); e.returnValue = ""; } });
 
-document.getElementById("postAnnBtn").addEventListener("click", async () => {
+el("postAnnBtn").addEventListener("click", async () => {
   if (annUploading) return;
-  const title = document.getElementById("annTitle").value.trim();
-  const body = document.getElementById("annBody").value.trim();
-  const audience = document.getElementById("annAudience").value; // all | residents | workers
+  const title = el("annTitle").value.trim();
+  const body = el("annBody").value.trim();
+  const audience = el("annAudience").value; // all | residents | workers
   if (!title) { alert(t("enterTitleAlert") || "Please enter a title."); return; }
 
   const payload = { title, body, audience, createdBy: user.uid, createdAt: serverTimestamp() };
@@ -268,7 +275,7 @@ document.getElementById("postAnnBtn").addEventListener("click", async () => {
     payload.targetIds = targetIds;
   }
 
-  const postBtn = document.getElementById("postAnnBtn");
+  const postBtn = el("postAnnBtn");
   const originalLabel = postBtn.textContent;
   let uploadedPath = null;
   annSetBusy(true);
@@ -277,9 +284,10 @@ document.getElementById("postAnnBtn").addEventListener("click", async () => {
     // 1) If there is a photo/video, finish uploading it FIRST. The announcement is only
     //    published (and therefore only reaches residents) once the file is fully uploaded.
     if (annFile) {
+      if (!mediaLib) throw new Error("media module not loaded");
       annShowProgress(t("annPreparing"), 0);
-      const prepared = await prepareAnnouncementMedia(annFile);
-      const { promise, cancel } = uploadAnnouncementMedia(prepared, user.uid, (frac) => {
+      const prepared = await mediaLib.prepareAnnouncementMedia(annFile);
+      const { promise, cancel } = mediaLib.uploadAnnouncementMedia(prepared, user.uid, (frac) => {
         annShowProgress(`${t("annUploading")} ${Math.round(frac * 100)}%`, frac);
       });
       annUploadTask = { cancel };
@@ -294,13 +302,13 @@ document.getElementById("postAnnBtn").addEventListener("click", async () => {
     postBtn.textContent = "…";
     await addDoc(collection(db, "announcements"), payload);
 
-    document.getElementById("annTitle").value = "";
-    document.getElementById("annBody").value = "";
+    el("annTitle").value = "";
+    el("annBody").value = "";
     annClearMedia();
     alert(t("announcementPublished") || "Announcement published.");
   } catch (err) {
     console.error("Publish announcement failed:", err);
-    if (uploadedPath) removeUploadedMedia(uploadedPath); // don't leave an orphan file behind
+    if (uploadedPath) mediaLib && mediaLib.removeUploadedMedia(uploadedPath); // don't leave an orphan file behind
     const code = err && (err.code || "");
     let msg;
     if (code === "too_large") msg = t("annMediaTooLarge");

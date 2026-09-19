@@ -1,10 +1,13 @@
 import { db } from "./firebase-config.js";
 import { prepareProofFile, preparePhotoFile, openDataUrl } from "./proof-file.js";
 import { requireAuth, logout } from "./guard.js";
-import { announcementMediaHtml } from "./announcement-media.js";
 import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
+// Optional media renderer: if announcement-media.js is missing, announcements still show (text only).
+let announcementMediaHtml = () => "";
+try { ({ announcementMediaHtml } = await import("./announcement-media.js")); }
+catch (e) { console.error("announcement-media.js failed to load:", e); }
 const { user, profile } = await requireAuth("resident");
 
 function t(key) {

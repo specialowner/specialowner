@@ -3,10 +3,15 @@
 // Firestore document, so announcement media goes to Firebase Storage and the announcement
 // document only keeps the download URL (mediaUrl) + type (mediaType) + storage path (mediaPath).
 
-import { storage } from "./firebase-config.js";
+// Side-effect import only: makes sure the Firebase app is initialised, without depending on
+// firebase-config.js exporting anything specific (older copies of it don't export `storage`).
+import "./firebase-config.js";
+import { getApp } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-app.js";
 import {
-  ref, uploadBytesResumable, getDownloadURL, deleteObject
+  getStorage, ref, uploadBytesResumable, getDownloadURL, deleteObject
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-storage.js";
+
+const getStore = () => getStorage(getApp());
 
 export const MAX_VIDEO_BYTES = 50 * 1024 * 1024;   // keep in sync with storage.rules
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;   // size of the *compressed* image (storage.rules)
@@ -91,7 +96,7 @@ export async function prepareAnnouncementMedia(file) {
 export function uploadAnnouncementMedia(prepared, uid, onProgress) {
   const name = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${prepared.ext}`;
   const path = `announcements/${uid}/${name}`;
-  const task = uploadBytesResumable(ref(storage, path), prepared.blob, { contentType: prepared.contentType });
+  const task = uploadBytesResumable(ref(getStore(), path), prepared.blob, { contentType: prepared.contentType });
   const promise = new Promise((resolve, reject) => {
     task.on(
       "state_changed",
@@ -108,7 +113,7 @@ export function uploadAnnouncementMedia(prepared, uid, onProgress) {
 
 // Best-effort cleanup (e.g. the file uploaded but saving the announcement failed).
 export async function removeUploadedMedia(path) {
-  try { await deleteObject(ref(storage, path)); } catch { /* ignore */ }
+  try { await deleteObject(ref(getStore(), path)); } catch { /* ignore */ }
 }
 
 function escAttr(s) {
