@@ -82,25 +82,6 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
-    // A resident can attach proof of payment (receipt/screenshot) to one of their
-    // own payments — but the payments doc itself stays admin-only (above), so this
-    // lives in its own collection: the resident can only create it, never edit or
-    // delete it afterwards, and admin reviews it (approves/rejects) via update.
-    match /paymentProofs/{proofId} {
-      allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
-      // A new receipt is always "pending_review": the resident can't pre-fill approval
-      // fields, and the linked payment only becomes "paid" when an admin approves it.
-      allow create: if isActiveResident() &&
-        request.resource.data.residentId == request.auth.uid &&
-        request.resource.data.status == 'pending_review' &&
-        request.resource.data.keys().hasOnly(['paymentId', 'residentId', 'unit', 'fileData', 'fileName', 'status', 'uploadedAt']) &&
-        request.resource.data.uploadedAt == request.time &&
-        request.resource.data.fileData is string &&
-        request.resource.data.fileData.size() < 900000;
-      allow update: if isAdmin();
-      allow delete: if isAdmin();
-    }
-
     match /maintenanceRequests/{reqId} {
       // Admin and the (active) site manager both need the full list to distribute work
       // between workers and to show call-center-style totals.
@@ -130,29 +111,6 @@ service cloud.firestore {
         (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours']));
-      allow delete: if isAdmin();
-    }
-
-    // Recurring services a resident subscribes to (car wash / home cleaning / garden
-    // care). The resident creates it as "requested" and can later cancel their own —
-    // everything else (approving it, setting the price) is the admin's call, same
-    // shape as the payment-proof flow above.
-    match /serviceSubscriptions/{subId} {
-      allow read: if isSignedIn() && (isAdmin() || isActiveManager() ||
-        resource.data.residentId == request.auth.uid);
-      allow create: if isActiveResident() &&
-        request.resource.data.residentId == request.auth.uid &&
-        request.resource.data.status == 'requested' &&
-        request.resource.data.keys().hasOnly(['residentId', 'unit', 'service', 'frequency', 'notes', 'status', 'requestedAt']) &&
-        request.resource.data.service in ['car_wash', 'home_cleaning', 'garden_care'] &&
-        request.resource.data.frequency in ['weekly', 'biweekly', 'monthly', 'once'] &&
-        request.resource.data.requestedAt == request.time;
-      // The resident may only ever cancel their own subscription; the admin (and the
-      // site manager, who runs the cleaning/garden crews) handles approval and pricing.
-      allow update: if isAdmin() || isActiveManager() ||
-        (isOwner(resource.data.residentId) &&
-         request.resource.data.status == 'cancelled' &&
-         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']));
       allow delete: if isAdmin();
     }
 
