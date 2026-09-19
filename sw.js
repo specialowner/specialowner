@@ -1,4 +1,5 @@
-const CACHE_NAME = "special-owner-v9";
+importScripts("version.js"); // defines self.SO_VERSION
+const CACHE_NAME = "special-owner-v" + self.SO_VERSION;
 const APP_SHELL = [
   "index.html",
   "resident.html",
@@ -6,6 +7,7 @@ const APP_SHELL = [
   "worker.html",
   "style.css",
   "i18n.js",
+  "version.js",
   "qrcode.min.js",
   "html5-qrcode.min.js",
   "manifest.json"
