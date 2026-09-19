@@ -233,8 +233,24 @@ function annSetMedia(file) {
   annPreview.style.display = "block";
 }
 
-el("annCamPhotoBtn").addEventListener("click", () => el("annPhotoCapture").click());
-el("annCamVideoBtn").addEventListener("click", () => el("annVideoCapture").click());
+// Phones: the native camera app via <input capture>. Laptops/desktops ignore "capture" (they'd just
+// show a file picker), so there we open the webcam in our own capture window.
+async function annCapture(mode) {
+  const native = () => el(mode === "photo" ? "annPhotoCapture" : "annVideoCapture").click();
+  if (!mediaLib || mediaLib.isPhoneLikeDevice() || !mediaLib.isCameraCaptureSupported()) { native(); return; }
+  try {
+    const file = await mediaLib.openCameraCapture(mode, {
+      capture: t("annCapture"), start: t("annStartRec"), stop: t("annStopRec"),
+      cancel: t("annCancel"), recording: t("annRecording")
+    });
+    if (file) annSetMedia(file);
+  } catch (err) {
+    if (err && err.code === "cam_unsupported") { native(); return; }
+    alert(err && err.code === "cam_missing" ? t("annCamMissing") : t("annCamDenied"));
+  }
+}
+el("annCamPhotoBtn").addEventListener("click", () => annCapture("photo"));
+el("annCamVideoBtn").addEventListener("click", () => annCapture("video"));
 el("annGalleryBtn").addEventListener("click", () => el("annGalleryInput").click());
 annMediaInputs.forEach(inp => inp.addEventListener("change", () => {
   const f = inp.files && inp.files[0];

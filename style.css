@@ -77,7 +77,7 @@ input,select,textarea{font-family:inherit}
 .role-toggle button{flex:1;padding:10px;border-radius:9px;font-size:13px;font-weight:700;color:var(--muted)}
 .role-toggle button.active{background:var(--primary);color:#fff}
 
-.lang-toggle{display:flex;background:#eef2f0;border-radius:20px;padding:3px;gap:2px;position:fixed;top:14px;inset-inline-end:14px;z-index:60}
+.lang-toggle{display:flex;background:#eef2f0;border-radius:20px;padding:3px;gap:2px;position:absolute;top:14px;inset-inline-end:14px;z-index:60}
 .lang-toggle button{padding:6px 12px;border-radius:16px;font-size:11px;font-weight:700;color:var(--muted)}
 .lang-toggle button.active{background:var(--primary);color:#fff}
 
@@ -125,3 +125,7 @@ input,select,textarea{font-family:inherit}
 /* Announcement photo / video */
 .ann-media{display:block;max-width:100%;max-height:360px;margin-top:8px;border-radius:10px;background:#000;object-fit:contain}
 img.ann-media{background:#eef2f0}
+
+/* On phones the language switch sits in its own row above the header content,
+   so it never covers the logout button. */
+@media (max-width:520px){.topbar{padding-top:58px}}
