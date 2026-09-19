@@ -95,6 +95,7 @@ onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), 
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   const el = document.getElementById("residentsList");
   residentsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  backfillResidentNames();
   if (document.getElementById("annAudience").value === "residents") renderAnnTargetList();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`; return; }
   el.innerHTML = "";
@@ -1014,6 +1015,7 @@ function renderMaintList() {
         <div class="meta">
           <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
           <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
+          ${m.residentName ? `<div class="sub">👤 ${opsEsc(m.residentName)}</div>` : ""}
           <div class="sub">${m.description}</div>
           ${m.photoData ? `<img class="photo-thumb maint-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
@@ -1150,6 +1152,7 @@ window.addEventListener("so-lang-changed", renderSubsList);
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderOpsOverview();
   renderOnsiteWorkerOptions();
 });
 
@@ -1213,9 +1216,86 @@ document.getElementById("createOnsiteTaskBtn")?.addEventListener("click", async 
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderOpsOverview();
   renderMaintStats();
   recomputeQueuePositions();
+  backfillResidentNames();
 });
+
+// ---------- Operations overview: request counts + how many each worker has been given ----------
+function opsEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function renderOpsOverview() {
+  const tilesEl = document.getElementById("opsTiles");
+  const chartEl = document.getElementById("opsWorkerChart");
+  if (!tilesEl || !chartEl) return; // markup not present in an older admin.html
+  const docs = lastMaintDocs;
+  const count = (st) => docs.filter(m => m.status === st).length;
+
+  const tiles = [
+    { cls: "total",       n: docs.length,          label: t("opsTotal") },
+    { cls: "pending",     n: count("pending"),     label: t("opsWaiting") },
+    { cls: "accepted",    n: count("accepted"),    label: t("opsToDo") },
+    { cls: "in_progress", n: count("in_progress"), label: t("in_progress") },
+    { cls: "completed",   n: count("completed"),   label: t("completed") }
+  ];
+  tilesEl.innerHTML = tiles.map(x =>
+    `<div class="ops-tile ${x.cls}"><div class="n">${x.n}</div><div class="l">${x.label}</div></div>`).join("");
+
+  // Per-worker workload: everything currently or previously assigned to each worker.
+  const per = {};
+  docs.forEach(m => {
+    if (!m.assignedWorkerId) return;
+    const w = (per[m.assignedWorkerId] ||= { accepted: 0, in_progress: 0, completed: 0 });
+    if (w[m.status] !== undefined) w[m.status]++;
+  });
+  // Security guards don't take requests, so they only show up if they somehow have some.
+  const rows = workerOptionsCache
+    .filter(w => w.workerType !== "security" || per[w.id])
+    .map(w => {
+      const c = per[w.id] || { accepted: 0, in_progress: 0, completed: 0 };
+      return { w, c, open: c.accepted + c.in_progress, total: c.accepted + c.in_progress + c.completed };
+    })
+    .sort((a, b) => (b.open - a.open) || (b.total - a.total) || String(a.w.name || "").localeCompare(String(b.w.name || "")));
+
+  if (rows.length === 0) { chartEl.innerHTML = `<p class="empty-state">${t("opsNoWorkers")}</p>`; return; }
+
+  const maxTotal = Math.max(1, ...rows.map(r => r.total));
+  const seg = (n, cls, label) => n
+    ? `<div class="ops-seg ${cls}" style="width:${(n / maxTotal * 100).toFixed(1)}%" title="${opsEsc(label)}: ${n}">${n}</div>` : "";
+  chartEl.innerHTML = rows.map(r => `
+    <div class="ops-row">
+      <div class="ops-head">
+        <span class="ops-name">${opsEsc(r.w.name || r.w.email || r.w.id)} <small>· ${opsEsc(workerTypeLabel(r.w.workerType))}</small></span>
+        <span class="ops-count">${r.total}</span>
+      </div>
+      <div class="ops-track">
+        ${seg(r.c.accepted, "accepted", t("opsToDo"))}${seg(r.c.in_progress, "in_progress", t("in_progress"))}${seg(r.c.completed, "completed", t("completed"))}
+      </div>
+    </div>`).join("");
+}
+window.addEventListener("so-lang-changed", renderOpsOverview);
+
+// Requests created before names were stored on them: the admin can read resident profiles
+// (workers can't), so copy the resident's name onto the request so the assigned worker can
+// see who the job is for.
+function backfillResidentNames() {
+  try {
+    if (!residentsCache.length || !lastMaintDocs.length) return;
+    const inFlight = (window.__soNameBackfill ||= new Set());
+    lastMaintDocs.forEach(m => {
+      if (!m.residentId || m.residentName || inFlight.has(m.id)) return;
+      const r = residentsCache.find(x => x.id === m.residentId);
+      const name = r && (r.name || r.email);
+      if (!name) return;
+      inFlight.add(m.id);
+      updateDoc(doc(db, "maintenanceRequests", m.id), { residentName: name }).catch(() => inFlight.delete(m.id));
+    });
+  } catch { /* caches not ready yet */ }
+}
+
 
 // ---------- Maintenance stats: average resolution time per category ----------
 function renderMaintStats() {

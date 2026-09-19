@@ -13,9 +13,24 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.3.0";
+  var APP_VERSION = "1.4.0";
 
   var CHANGELOG = [
+    {
+      version: "1.4.0", date: "2026-09-19",
+      ar: [
+        "لوحة الأدمن (التشغيل ← الطلبات): نظرة عامة بالأرقام (إجمالي الطلبات، في انتظار التوزيع، مسندة، جاري، منتهية) ورسم بياني يوضح كام طلب اتوزع على كل عامل وحالته.",
+        "شاشة العامل: عدّادات للمهام (للتنفيذ / جاري / منتهية) وتفاصيل كل مهمة: لمين (اسم الساكن) وفين (الوحدة أو المكان) وإيه المطلوب. المهام المفتوحة فوق والمنتهية تحت.",
+        "الطلبات الجديدة (من الساكن أو الكول سنتر) بتحفظ اسم الساكن، والطلبات القديمة بيتم استكمال الاسم فيها تلقائيًا لما الأدمن يفتح لوحة التشغيل.",
+        "اسم الساكن ظاهر كمان في قائمة الطلبات عند الأدمن."
+      ],
+      en: [
+        "Admin (Operations → Requests): an overview with counts (total, waiting for assignment, assigned, in progress, completed) and a chart showing how many requests each worker has been given and their status.",
+        "Worker screen: job counters (to do / in progress / completed) and full detail for each job: who (resident name), where (unit or place) and what needs doing. Open jobs first, completed ones below.",
+        "New requests (from residents or the call center) now store the resident's name; older requests get the name filled in automatically when the admin opens the panel.",
+        "The resident's name is also shown in the admin's request list."
+      ]
+    },
     {
       version: "1.3.0", date: "2026-09-19",
       ar: [

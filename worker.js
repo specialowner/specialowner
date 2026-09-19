@@ -371,6 +371,20 @@ function placeLabel(m) {
   if (m.source === "resident_report") return `${m.location || "—"} (${m.unit || "—"})`;
   return m.unit || "—";
 }
+function woEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+// Counters at the top of "My work orders": how many jobs are waiting, in progress and done.
+function renderOrdersSummary(rows) {
+  const el = document.getElementById("ordersSummary");
+  if (!el) return;
+  const n = (st) => rows.filter(o => o.status === st).length;
+  el.innerHTML = [
+    { cls: "accepted",    n: n("accepted"),    label: t("woTodo") },
+    { cls: "in_progress", n: n("in_progress"), label: t("in_progress") },
+    { cls: "completed",   n: n("completed"),   label: t("completed") }
+  ].map(x => `<div class="ops-tile ${x.cls}"><div class="n">${x.n}</div><div class="l">${x.label}</div></div>`).join("");
+}
 // Duration estimates the worker can pick, in hours (0.5 = half an hour).
 const ESTIMATE_CHOICES = [0.5, 1, 2, 3, 4, 6, 8];
 function estimateLabel(h) {
@@ -381,11 +395,19 @@ if (!isSecurity) {
   const ordersQ = query(collection(db, "maintenanceRequests"), where("assignedWorkerId", "==", user.uid));
   onSnapshot(ordersQ, (snap) => {
     const el = document.getElementById("ordersList");
-    if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noWorkOrders")}</p>`; return; }
+    if (snap.empty) { renderOrdersSummary([]); el.innerHTML = `<p class="empty-state">${t("noWorkOrders")}</p>`; return; }
     el.innerHTML = "";
-    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-      .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-    rows.forEach(o => {
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderOrdersSummary(rows);
+    // Jobs still to do come first: the one already in progress, then the rest in the order
+    // they were created (oldest first = the queue order). Finished jobs go below.
+    const open = rows.filter(o => o.status !== "completed").sort((a, b) =>
+      ((b.status === "in_progress") - (a.status === "in_progress")) || ((a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)));
+    const done = rows.filter(o => o.status === "completed")
+      .sort((a, b) => (b.completedAt?.seconds || b.createdAt?.seconds || 0) - (a.completedAt?.seconds || a.createdAt?.seconds || 0))
+      .slice(0, 20);
+
+    const orderCard = (o) => {
       // A worker only ever moves their own order forward one step at a time —
       // accepted → in progress → completed — never sideways or backwards.
       let actionBtn = "";
@@ -399,19 +421,38 @@ if (!isSecurity) {
               <option value="">${t("estDuration")}: ${t("estNotSet")}</option>
               ${ESTIMATE_CHOICES.map(h => `<option value="${h}" ${Number(o.estimatedHours) === h ? "selected" : ""}>${estimateLabel(h)}</option>`).join("")}
             </select>`;
-      el.innerHTML += `
-        <div class="list-item">
+      // The detail the worker needs to actually go and do the job: WHO it is for, WHERE to
+      // go, and WHAT has to be done.
+      const isOnsite = o.source === "onsite";
+      const whoText = o.residentName || (isOnsite ? t("originOnsite") : "—");
+      const whereText = isOnsite
+        ? (o.location || "—")
+        : (o.source === "resident_report"
+            ? `${o.location || "—"} · ${t("unitLabel")} ${o.unit || "—"}`
+            : `${t("unitLabel")} ${o.unit || "—"}`);
+      const when = o.createdAt?.seconds
+        ? new Date(o.createdAt.seconds * 1000).toLocaleString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB",
+            { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
+        : "";
+      return `
+        <div class="list-item wo-card ${o.status}">
           <div class="meta">
-            <div class="title">${categoryLabel(o.category)} · ${placeLabel(o)}</div>
-            <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(o)}</div>
-            <div class="sub">${o.description}</div>
+            <div class="wo-row"><span class="wo-k">👤 ${t("woWho")}</span><span class="wo-v">${woEsc(whoText)}</span></div>
+            <div class="wo-row"><span class="wo-k">📍 ${t("woWhere")}</span><span class="wo-v">${woEsc(whereText)}</span></div>
+            <div class="wo-row"><span class="wo-k">🛠 ${t("woWhat")}</span><span class="wo-v">${woEsc(categoryLabel(o.category))}${o.description ? " — " + woEsc(o.description) : ""}</span></div>
+            <div class="sub" style="font-size:11px;color:#7b8a85;margin-top:4px">${originLabel(o)}${when ? " · " + when : ""}</div>
             ${o.photoData ? `<img class="photo-thumb order-photo" src="${o.photoData}" alt="">` : ""}
             ${estSelect}
           </div>
           <span class="badge ${o.status}">${t(o.status) || o.status}</span>
           ${actionBtn}
         </div>`;
-    });
+    };
+    const section = (title, list) => list.length
+      ? `<h4 class="ops-subtitle">${title} (${list.length})</h4>${list.map(orderCard).join("")}` : "";
+    el.innerHTML = section(t("woOpenTitle"), open) + section(t("woDoneTitle"), done)
+      || `<p class="empty-state">${t("woNoOpen")}</p>`;
+    if (open.length === 0 && done.length > 0) el.innerHTML = `<p class="empty-state">${t("woNoOpen")}</p>` + el.innerHTML;
     el.querySelectorAll(".order-photo").forEach(img => {
       img.addEventListener("click", () => openDataUrl(img.src));
     });

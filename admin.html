@@ -255,6 +255,17 @@
 
     <!-- MAINTENANCE -->
     <section id="tab-maint" data-dashboard="ops" style="display:none">
+      <div class="card" id="opsOverviewCard">
+        <h3 data-i18n="opsOverviewTitle">Operations overview</h3>
+        <div id="opsTiles" class="ops-tiles"></div>
+        <h4 class="ops-subtitle" data-i18n="opsPerWorker">Requests per worker</h4>
+        <div id="opsWorkerChart"><p class="empty-state" data-i18n="opsNoWorkers">No workers yet.</p></div>
+        <div class="ops-legend">
+          <span><i class="dot accepted"></i><span data-i18n="opsToDo">Assigned – to do</span></span>
+          <span><i class="dot in_progress"></i><span data-i18n="in_progress">In progress</span></span>
+          <span><i class="dot completed"></i><span data-i18n="completed">Completed</span></span>
+        </div>
+      </div>
       <div class="card">
         <h3 data-i18n="onsiteTasksTitle">Direct on-site tasks</h3>
         <p class="sub" data-i18n="onsiteTasksDesc">Send a worker straight to a job — no resident involved. It joins their queue like any other request.</p>

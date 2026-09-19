@@ -425,6 +425,7 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
   try {
     await addDoc(collection(db, "maintenanceRequests"), {
       residentId: user.uid,
+      residentName: profile.name || "",
       unit: profile.unit || "",
       category, description,
       source: "resident",
@@ -483,6 +484,7 @@ document.getElementById("createReportBtn").addEventListener("click", async () =>
   try {
     await addDoc(collection(db, "maintenanceRequests"), {
       residentId: user.uid,
+      residentName: profile.name || "",
       unit: profile.unit || "",
       category: REPORT_TYPE_TO_CATEGORY[reportType] || "Other",
       reportType,

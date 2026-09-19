@@ -129,3 +129,30 @@ img.ann-media{background:#eef2f0}
 /* On phones the language switch sits in its own row above the header content,
    so it never covers the logout button. */
 @media (max-width:520px){.topbar{padding-top:58px}}
+
+/* Operations overview (admin) + work-order summary/detail (worker) */
+.ops-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px;margin:8px 0 14px}
+.ops-tile{border-radius:12px;padding:10px 6px;text-align:center;background:#eef2f0;color:var(--text,#1c2b27)}
+.ops-tile .n{font-size:22px;font-weight:800;line-height:1.1}
+.ops-tile .l{font-size:10.5px;font-weight:600;margin-top:2px;opacity:.85}
+.ops-tile.pending{background:#fbe9c9;color:var(--warning)}
+.ops-tile.accepted{background:#e6ddf7;color:#5b3fa0}
+.ops-tile.in_progress{background:#dbe7fb;color:#2a5db0}
+.ops-tile.completed{background:#d7f0e2;color:var(--success)}
+.ops-subtitle{font-size:13px;margin:14px 0 6px;color:var(--muted)}
+.ops-row{margin:10px 0}
+.ops-head{display:flex;justify-content:space-between;align-items:baseline;font-size:13px;margin-bottom:4px}
+.ops-name small{color:var(--muted);font-weight:400}
+.ops-count{font-weight:800}
+.ops-track{display:flex;height:20px;background:#eef2f0;border-radius:10px;overflow:hidden}
+.ops-seg{display:flex;align-items:center;justify-content:center;color:#fff;font-size:11px;font-weight:700;min-width:18px}
+.ops-seg.accepted{background:#5b3fa0}
+.ops-seg.in_progress{background:#2a5db0}
+.ops-seg.completed{background:var(--success)}
+.ops-legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--muted);margin-top:8px}
+.ops-legend .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-inline-end:4px}
+.ops-legend .dot.accepted{background:#5b3fa0}.ops-legend .dot.in_progress{background:#2a5db0}.ops-legend .dot.completed{background:var(--success)}
+.wo-row{display:flex;gap:8px;font-size:13px;margin-top:4px;align-items:flex-start}
+.wo-k{color:var(--muted);min-width:78px;font-size:12px}
+.wo-v{flex:1;font-weight:600}
+.wo-card.completed{opacity:.7}
