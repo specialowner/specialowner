@@ -1,5 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { announcementMediaHtml } from "./announcement-media.js";
+import { openDataUrl } from "./proof-file.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp, Timestamp
@@ -330,6 +332,7 @@ onSnapshot(annQ, (snap) => {
         <div class="meta">
           <div class="title">${a.title}</div>
           <div class="sub">${a.body || ""}</div>
+          ${announcementMediaHtml(a)}
         </div>
       </div>`;
   });
@@ -342,6 +345,7 @@ const CATEGORY_I18N_KEY = {
   "AC / Cooling": "catAC",
   "Carpentry": "catCarpentry",
   "Cleaning": "catCleaning",
+  "Garden": "catGarden",
   "Other": "catOther"
 };
 function categoryLabel(cat) {
@@ -353,11 +357,16 @@ function categoryLabel(cat) {
 function originLabel(m) {
   if (m.source === "onsite") return t("originOnsite");
   if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
+  if (m.source === "resident_report") return t("originReport");
   return t("originResident");
 }
 // On-site tasks carry a free-text location instead of a resident's unit.
 function placeLabel(m) {
-  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
+  if (m.source === "onsite") return m.location || "—";
+  // A compound report points at a common area, so the spot the resident described is
+  // what the worker needs to walk to — their unit is only context.
+  if (m.source === "resident_report") return `${m.location || "—"} (${m.unit || "—"})`;
+  return m.unit || "—";
 }
 // Duration estimates the worker can pick, in hours (0.5 = half an hour).
 const ESTIMATE_CHOICES = [0.5, 1, 2, 3, 4, 6, 8];
@@ -393,11 +402,15 @@ if (!isSecurity) {
             <div class="title">${categoryLabel(o.category)} · ${placeLabel(o)}</div>
             <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(o)}</div>
             <div class="sub">${o.description}</div>
+            ${o.photoData ? `<img class="photo-thumb order-photo" src="${o.photoData}" alt="">` : ""}
             ${estSelect}
           </div>
           <span class="badge ${o.status}">${t(o.status) || o.status}</span>
           ${actionBtn}
         </div>`;
+    });
+    el.querySelectorAll(".order-photo").forEach(img => {
+      img.addEventListener("click", () => openDataUrl(img.src));
     });
     el.querySelectorAll(".order-action").forEach(btn => {
       btn.addEventListener("click", async () => {

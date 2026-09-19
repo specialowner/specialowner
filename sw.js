@@ -1,4 +1,4 @@
-const CACHE_NAME = "special-owner-v5";
+const CACHE_NAME = "special-owner-v9";
 const APP_SHELL = [
   "index.html",
   "resident.html",
@@ -33,6 +33,9 @@ self.addEventListener("activate", (event) => {
 // after new files are deployed.
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
+  // Announcement photos/videos live on Firebase Storage: let the browser handle them
+  // directly (no caching of large files, and video playback uses Range requests).
+  if (event.request.url.includes("firebasestorage.googleapis.com") || event.request.headers.has("range")) return;
   event.respondWith(
     fetch(event.request)
       .then((response) => {

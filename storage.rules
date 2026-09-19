@@ -8,6 +8,21 @@ service firebase.storage {
     // their Firestore user doc) can read anything for review. Files can't be
     // overwritten or deleted from the client — only added, so a review trail
     // is preserved (each upload gets its own timestamped file name).
+    // Photos / videos attached to announcements (posted from the admin panel).
+    // Path: announcements/{adminUid}/{fileName}
+    // Any signed-in user can view them (residents + staff read announcements);
+    // only an admin can upload (max 50 MB, image or video) into their own folder or delete.
+    match /announcements/{adminUid}/{fileName} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && request.auth.uid == adminUid &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin' &&
+        request.resource.size < 50 * 1024 * 1024 &&
+        request.resource.contentType.matches('image/.*|video/.*');
+      allow delete: if request.auth != null &&
+        firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow update: if false;
+    }
+
     match /paymentProofs/{residentId}/{paymentId}/{fileName} {
       allow read: if request.auth != null &&
         (request.auth.uid == residentId ||
