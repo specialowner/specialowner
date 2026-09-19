@@ -111,7 +111,6 @@ document.getElementById("submitCallBtn").addEventListener("click", async () => {
   try {
     await addDoc(collection(db, "maintenanceRequests"), {
       residentId: selectedResident.id,
-      residentName: selectedResident.name || selectedResident.email || "",
       unit: selectedResident.unit || "",
       category, description,
       source: "call_center",

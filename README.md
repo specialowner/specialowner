@@ -32,7 +32,6 @@ A base residential-compound management app: resident interface + admin dashboard
 3. Enable **Firestore Database** (production mode).
 4. In Project settings → your apps, add a **Web app** and copy the config object into `js/firebase-config.js` (replace the placeholder values).
 5. Deploy the rules in `firestore.rules` (Firebase console → Firestore → Rules, paste and publish — or `firebase deploy --only firestore:rules` if you use the CLI).
-5b. **Announcement photos/videos need Firebase Storage** (Firebase console → Storage → Get started; may require the Blaze plan). Then deploy `storage.rules` (`firebase deploy --only storage`).
 6. **Create your first admin manually:** sign up normally through the app (creates a `resident` user), then in the Firestore console open that user's document under `users/{uid}` and change `role` from `"resident"` to `"admin"`. Every admin after that can be promoted the same way, or you can build an "promote user" button later.
 
 ### Firestore data model
@@ -41,7 +40,7 @@ users/{uid}            name, email, unit, role(resident|admin|manager|worker|cal
 invitations/{id}       residentId, residentUnit, guestName, guestPhone, visitDate, token, status(pending|used), type, createdAt
 payments/{id}          residentId, unit, amount, dueDate, description, status(pending|paid|overdue), createdAt
 maintenanceRequests/{id} residentId, unit, category, description, status(pending|accepted|in_progress|completed), assignedWorkerId, estimatedHours, queueAhead, queueEtaHours, loggedBy, loggedByRole, createdAt
-announcements/{id}     title, body, audience, targetIds, mediaUrl, mediaType(image|video), mediaPath, createdBy, createdAt
+announcements/{id}     title, body, createdBy, createdAt
 shops/{id}             name, category, description, offer
 workers/{id}           name, role, phone, status(active|inactive), createdAt
 accessLogs/{id}        type(entry|exit), personType, personName, invitationId, timestamp

@@ -1,10 +1,9 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
-import { openDataUrl } from "./proof-file.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp, writeBatch
+  onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("admin");
@@ -95,7 +94,6 @@ onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), 
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   const el = document.getElementById("residentsList");
   residentsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  backfillResidentNames();
   if (document.getElementById("annAudience").value === "residents") renderAnnTargetList();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`; return; }
   el.innerHTML = "";
@@ -196,83 +194,10 @@ document.getElementById("annTargetList").addEventListener("change", (e) => {
   document.getElementById("annSelectAll").checked = all.length > 0 && all.length === checked.length;
 });
 
-// The media helper is loaded defensively: if announcement-media.js is missing on the server,
-// the rest of the admin panel must keep working (only the photo/video feature is unavailable).
-let mediaLib = null;
-try { mediaLib = await import("./announcement-media.js"); }
-catch (e) { console.error("announcement-media.js failed to load:", e); }
-// Null-safe element lookup: an outdated admin.html without the media fields must not crash the page.
-const el = (id) => document.getElementById(id) || document.createElement("div");
-
-// ----- Announcement photo / video (camera or gallery) -----
-let annFile = null;          // the File the admin picked or recorded
-let annPreviewUrl = null;
-let annUploading = false;
-let annUploadTask = null;
-
-const annPreview = el("annMediaPreview");
-const annPreviewBox = el("annMediaPreviewBox");
-const annMediaInputs = ["annPhotoCapture", "annVideoCapture", "annGalleryInput"].map(id => el(id));
-
-function annClearMedia() {
-  annFile = null;
-  if (annPreviewUrl) { URL.revokeObjectURL(annPreviewUrl); annPreviewUrl = null; }
-  annPreviewBox.innerHTML = "";
-  annPreview.style.display = "none";
-  annMediaInputs.forEach(inp => { inp.value = ""; });
-}
-
-function annSetMedia(file) {
-  if (!file) return;
-  const isVideo = (file.type || "").startsWith("video/") || /\.(mp4|mov|m4v|webm|3gp|3gpp|mkv)$/i.test(file.name || "");
-  if (annPreviewUrl) URL.revokeObjectURL(annPreviewUrl);
-  annFile = file;
-  annPreviewUrl = URL.createObjectURL(file);
-  annPreviewBox.innerHTML = isVideo
-    ? `<video class="ann-media" src="${annPreviewUrl}" controls playsinline preload="metadata"></video>`
-    : `<img class="ann-media" src="${annPreviewUrl}" alt="">`;
-  annPreview.style.display = "block";
-}
-
-// Take photo / Record video open the phone's native camera app (<input capture>), so they are
-// shown on phones/tablets only. On laptops/desktops only "Upload from device" is offered.
-const annIsPhone = !!(window.matchMedia && window.matchMedia("(pointer: coarse)").matches);
-if (!annIsPhone) {
-  el("annCamPhotoBtn").style.display = "none";
-  el("annCamVideoBtn").style.display = "none";
-}
-el("annCamPhotoBtn").addEventListener("click", () => el("annPhotoCapture").click());
-el("annCamVideoBtn").addEventListener("click", () => el("annVideoCapture").click());
-el("annGalleryBtn").addEventListener("click", () => el("annGalleryInput").click());
-annMediaInputs.forEach(inp => inp.addEventListener("change", () => {
-  const f = inp.files && inp.files[0];
-  annMediaInputs.forEach(o => { if (o !== inp) o.value = ""; });
-  if (f) annSetMedia(f);
-}));
-el("annMediaRemoveBtn").addEventListener("click", () => { if (!annUploading) annClearMedia(); });
-
-function annSetBusy(busy) {
-  annUploading = busy;
-  ["postAnnBtn", "annCamPhotoBtn", "annCamVideoBtn", "annGalleryBtn", "annMediaRemoveBtn"]
-    .forEach(id => { el(id).disabled = busy; });
-}
-function annShowProgress(text, fraction) {
-  el("annUploadProgress").style.display = "block";
-  el("annUploadText").textContent = text;
-  el("annUploadBar").style.width = Math.round((fraction || 0) * 100) + "%";
-}
-function annHideProgress() {
-  el("annUploadProgress").style.display = "none";
-  el("annUploadBar").style.width = "0";
-}
-// Warn before closing the tab while a video is still uploading.
-window.addEventListener("beforeunload", (e) => { if (annUploading) { e.preventDefault(); e.returnValue = ""; } });
-
-el("postAnnBtn").addEventListener("click", async () => {
-  if (annUploading) return;
-  const title = el("annTitle").value.trim();
-  const body = el("annBody").value.trim();
-  const audience = el("annAudience").value; // all | residents | workers
+document.getElementById("postAnnBtn").addEventListener("click", async () => {
+  const title = document.getElementById("annTitle").value.trim();
+  const body = document.getElementById("annBody").value.trim();
+  const audience = document.getElementById("annAudience").value; // all | residents | workers
   if (!title) { alert(t("enterTitleAlert") || "Please enter a title."); return; }
 
   const payload = { title, body, audience, createdBy: user.uid, createdAt: serverTimestamp() };
@@ -283,54 +208,10 @@ el("postAnnBtn").addEventListener("click", async () => {
     payload.targetIds = targetIds;
   }
 
-  const postBtn = el("postAnnBtn");
-  const originalLabel = postBtn.textContent;
-  let uploadedPath = null;
-  annSetBusy(true);
-
-  try {
-    // 1) If there is a photo/video, finish uploading it FIRST. The announcement is only
-    //    published (and therefore only reaches residents) once the file is fully uploaded.
-    if (annFile) {
-      if (!mediaLib) throw new Error("media module not loaded");
-      annShowProgress(t("annPreparing"), 0);
-      const prepared = await mediaLib.prepareAnnouncementMedia(annFile);
-      const { promise, cancel } = mediaLib.uploadAnnouncementMedia(prepared, user.uid, (frac) => {
-        annShowProgress(`${t("annUploading")} ${Math.round(frac * 100)}%`, frac);
-      });
-      annUploadTask = { cancel };
-      const { url, path } = await promise;
-      uploadedPath = path;
-      payload.mediaUrl = url;
-      payload.mediaPath = path;
-      payload.mediaType = prepared.kind; // "image" | "video"
-    }
-
-    // 2) Publish the announcement (text + media link) in one document.
-    postBtn.textContent = "…";
-    await addDoc(collection(db, "announcements"), payload);
-
-    el("annTitle").value = "";
-    el("annBody").value = "";
-    annClearMedia();
-    alert(t("announcementPublished") || "Announcement published.");
-  } catch (err) {
-    console.error("Publish announcement failed:", err);
-    if (uploadedPath) mediaLib && mediaLib.removeUploadedMedia(uploadedPath); // don't leave an orphan file behind
-    const code = err && (err.code || "");
-    let msg;
-    if (code === "too_large") msg = t("annMediaTooLarge");
-    else if (code === "bad_type") msg = t("annMediaBadType");
-    else if (code === "storage/canceled") msg = t("annUploadCanceled");
-    else if (code === "storage/unauthorized") msg = t("annStorageDenied");
-    else msg = (t("annUploadFailed") || "Upload failed.") + (err && err.message ? ` (${err.message})` : "");
-    alert(msg);
-  } finally {
-    annUploadTask = null;
-    annHideProgress();
-    postBtn.textContent = originalLabel;
-    annSetBusy(false);
-  }
+  await addDoc(collection(db, "announcements"), payload);
+  document.getElementById("annTitle").value = "";
+  document.getElementById("annBody").value = "";
+  alert(t("announcementPublished") || "Announcement published.");
 });
 
 // ---------- Staff accounts & activation requests ----------
@@ -818,93 +699,6 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   });
 });
 
-// ---------- Payment receipts (proof of payment review) ----------
-function escHtml(v) {
-  return String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
-}
-function safeUrl(u) { return /^https:\/\//.test(u || "") ? u : "#"; }
-const proofData = {}; // proofId -> data URL, for opening in a new tab
-
-onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc")), (snap) => {
-  const el = document.getElementById("proofsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noReceipts")}</p>`; return; }
-  el.innerHTML = "";
-  snap.forEach(d => {
-    const p = d.data();
-    const when = p.uploadedAt?.toDate ? p.uploadedAt.toDate().toLocaleString() : "";
-    const src = p.fileData || p.fileURL || "";
-    if (p.fileData) proofData[d.id] = p.fileData;
-    const isImage = /^data:image\//.test(src) || /\.(png|jpe?g|gif|webp|heic)$/i.test(p.fileName || "");
-    const imgSrc = /^data:image\/[a-z+]+;base64,/.test(src) ? src : safeUrl(p.fileURL);
-    const preview = isImage && src
-      ? `<img src="${imgSrc}" alt="" class="proof-open" data-id="${d.id}" style="width:64px;height:64px;object-fit:cover;border-radius:8px;flex-shrink:0;cursor:pointer">`
-      : "";
-    const viewLink = p.fileData
-      ? `<a href="#" class="sub proof-open" data-id="${d.id}" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`
-      : `<a href="${safeUrl(p.fileURL)}" target="_blank" rel="noopener" class="sub" style="color:var(--primary);font-weight:700;text-decoration:underline">${t("viewProof")}</a>`;
-    const pending = p.status === "pending_review";
-    el.innerHTML += `
-      <div class="list-item" style="flex-direction:column;align-items:stretch">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-          <div style="display:flex;align-items:center;gap:10px">
-            ${preview}
-            <div class="meta">
-              <div class="title">${escHtml(p.unit || "—")} · ${escHtml(p.fileName || "")}</div>
-              <div class="sub">${escHtml(when)}</div>
-              ${viewLink}
-            </div>
-          </div>
-          <span class="badge ${escHtml(p.status)}">${t("proof_" + p.status) || escHtml(p.status)}</span>
-        </div>
-        ${pending ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
-          <button class="btn btn-sm btn-primary proof-approve" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("approveProof")}</button>
-          <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}">${t("rejectProof")}</button>
-        </div>` : ""}
-        ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
-      </div>`;
-  });
-  el.querySelectorAll(".proof-open").forEach(x => x.addEventListener("click", (e) => {
-    e.preventDefault();
-    if (proofData[x.dataset.id]) openDataUrl(proofData[x.dataset.id]);
-  }));
-  el.querySelectorAll(".proof-approve").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      try {
-        // One atomic commit: the receipt is approved AND the payment is paid, or neither.
-        const batch = writeBatch(db);
-        batch.update(doc(db, "paymentProofs", btn.dataset.id), {
-          status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
-        });
-        batch.update(doc(db, "payments", btn.dataset.payment), {
-          status: "paid", paidAt: serverTimestamp()
-        });
-        await batch.commit();
-      } catch (err) {
-        console.error(err);
-        alert(t("proofActionFailed"));
-        btn.disabled = false;
-      }
-    });
-  });
-  el.querySelectorAll(".proof-reject").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      const note = prompt(t("rejectReasonPrompt"));
-      if (note === null) return;
-      btn.disabled = true;
-      try {
-        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
-          status: "rejected", reviewNote: note.trim(), reviewedBy: user.uid, reviewedAt: serverTimestamp()
-        });
-      } catch (err) {
-        console.error(err);
-        alert(t("proofActionFailed"));
-        btn.disabled = false;
-      }
-    });
-  });
-});
-
 // ---------- Maintenance (admin view + status update + assign worker) ----------
 const CATEGORY_I18N_KEY = {
   "Plumbing": "catPlumbing",
@@ -912,7 +706,6 @@ const CATEGORY_I18N_KEY = {
   "AC / Cooling": "catAC",
   "Carpentry": "catCarpentry",
   "Cleaning": "catCleaning",
-  "Garden": "catGarden",
   "Other": "catOther"
 };
 function categoryLabel(cat) {
@@ -924,7 +717,6 @@ function categoryLabel(cat) {
 // maintenance craft — the data model doesn't split those into separate worker types yet.
 const CATEGORY_TO_CRAFT = {
   "Cleaning": "cleaning",
-  "Garden": "garden",
   "Plumbing": "maintenance",
   "Electrical": "maintenance",
   "AC / Cooling": "maintenance",
@@ -944,18 +736,13 @@ let lastMaintDocs = [];
 // task an admin/site manager sent a worker to directly (no resident involved at all).
 function originLabel(m) {
   if (m.source === "onsite") return t("originOnsite");
-  if (m.source === "resident_report") return t("originReport");
   if (m.source === "call_center" || m.loggedByRole === "callcenter") return t("originCallCenter");
   return t("originResident");
 }
 // On-site tasks have no unit to show (there's no resident) — they carry a free-text
 // location instead, entered by whoever created the task.
 function placeLabel(m) {
-  if (m.source === "onsite") return m.location || "—";
-  // A compound report is about a common area, so the spot the resident typed matters
-  // more than their unit — both are shown, the location first.
-  if (m.source === "resident_report") return `${m.location || "—"} (${m.unit || "—"})`;
-  return m.unit || "—";
+  return m.source === "onsite" ? (m.location || "—") : (m.unit || "—");
 }
 
 // Picks the least-busy active worker of the matching craft (equal distribution across
@@ -1015,9 +802,7 @@ function renderMaintList() {
         <div class="meta">
           <div class="title">${placeLabel(m)} · ${categoryLabel(m.category)}</div>
           <div class="sub" style="font-size:11px;color:#7b8a85">${originLabel(m)}</div>
-          ${m.residentName ? `<div class="sub">👤 ${opsEsc(m.residentName)}</div>` : ""}
           <div class="sub">${m.description}</div>
-          ${m.photoData ? `<img class="photo-thumb maint-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -1079,80 +864,11 @@ function renderMaintList() {
       }
     });
   });
-  el.querySelectorAll(".maint-photo").forEach(img => {
-    img.addEventListener("click", () => openDataUrl(img.src));
-  });
 }
-
-// ---------- Service subscriptions (car wash / home cleaning / garden care) ----------
-const SERVICE_I18N_KEY = {
-  car_wash: "svcCarWash",
-  home_cleaning: "svcHomeClean",
-  garden_care: "svcGarden"
-};
-const FREQ_I18N_KEY = {
-  weekly: "freqWeekly",
-  biweekly: "freqBiweekly",
-  monthly: "freqMonthly",
-  once: "freqOnce"
-};
-let lastSubDocs = [];
-
-onSnapshot(query(collection(db, "serviceSubscriptions"), orderBy("requestedAt", "desc")), (snap) => {
-  lastSubDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  renderSubsList();
-}, (err) => console.error("Subscriptions listener failed:", err));
-
-function renderSubsList() {
-  const el = document.getElementById("adminSubsList");
-  if (!el) return;
-  if (lastSubDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noSubscriptions")}</p>`; return; }
-  el.innerHTML = lastSubDocs.map(s => `
-    <div class="list-item">
-      <div class="meta">
-        <div class="title">${s.unit || "—"} · ${t(SERVICE_I18N_KEY[s.service]) || s.service}</div>
-        <div class="sub">${t(FREQ_I18N_KEY[s.frequency]) || s.frequency || ""}${s.price ? ` · ${s.price}` : ""}</div>
-        ${s.notes ? `<div class="sub">${s.notes}</div>` : ""}
-        ${s.status === "requested" ? `
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-            <input type="text" class="sub-price" data-id="${s.id}" placeholder="${t("svcPricePh")}" style="width:120px;padding:6px 8px;border:1px solid #dfe6e3;border-radius:8px;font-size:12px">
-            <button type="button" class="btn btn-sm btn-primary sub-approve" data-id="${s.id}">${t("svcApprove")}</button>
-            <button type="button" class="btn btn-sm btn-outline sub-reject" data-id="${s.id}">${t("svcReject")}</button>
-          </div>` : ""}
-        ${s.status === "active" ? `<button type="button" class="btn btn-sm btn-outline sub-stop" data-id="${s.id}" style="margin-top:6px">${t("svcStop")}</button>` : ""}
-      </div>
-      <span class="badge ${s.status}">${t(`sub_${s.status}`) || s.status}</span>
-    </div>`).join("");
-
-  el.querySelectorAll(".sub-approve").forEach(btn => btn.addEventListener("click", async () => {
-    const price = el.querySelector(`.sub-price[data-id="${btn.dataset.id}"]`)?.value.trim() || "";
-    await updateSub(btn, { status: "active", price, approvedBy: user.uid, approvedAt: serverTimestamp() });
-  }));
-  el.querySelectorAll(".sub-reject").forEach(btn => btn.addEventListener("click", async () => {
-    await updateSub(btn, { status: "rejected", reviewedAt: serverTimestamp() });
-  }));
-  el.querySelectorAll(".sub-stop").forEach(btn => btn.addEventListener("click", async () => {
-    if (!confirm(t("svcStopConfirm"))) return;
-    await updateSub(btn, { status: "cancelled", cancelledAt: serverTimestamp() });
-  }));
-}
-
-async function updateSub(btn, payload) {
-  btn.disabled = true;
-  try {
-    await updateDoc(doc(db, "serviceSubscriptions", btn.dataset.id), payload);
-  } catch (err) {
-    console.error("Failed to update subscription:", err);
-    alert(err.message || String(err));
-    btn.disabled = false;
-  }
-}
-window.addEventListener("so-lang-changed", renderSubsList);
 
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
-  renderOpsOverview();
   renderOnsiteWorkerOptions();
 });
 
@@ -1216,86 +932,9 @@ document.getElementById("createOnsiteTaskBtn")?.addEventListener("click", async 
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
-  renderOpsOverview();
   renderMaintStats();
   recomputeQueuePositions();
-  backfillResidentNames();
 });
-
-// ---------- Operations overview: request counts + how many each worker has been given ----------
-function opsEsc(s) {
-  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-function renderOpsOverview() {
-  const tilesEl = document.getElementById("opsTiles");
-  const chartEl = document.getElementById("opsWorkerChart");
-  if (!tilesEl || !chartEl) return; // markup not present in an older admin.html
-  const docs = lastMaintDocs;
-  const count = (st) => docs.filter(m => m.status === st).length;
-
-  const tiles = [
-    { cls: "total",       n: docs.length,          label: t("opsTotal") },
-    { cls: "pending",     n: count("pending"),     label: t("opsWaiting") },
-    { cls: "accepted",    n: count("accepted"),    label: t("opsToDo") },
-    { cls: "in_progress", n: count("in_progress"), label: t("in_progress") },
-    { cls: "completed",   n: count("completed"),   label: t("completed") }
-  ];
-  tilesEl.innerHTML = tiles.map(x =>
-    `<div class="ops-tile ${x.cls}"><div class="n">${x.n}</div><div class="l">${x.label}</div></div>`).join("");
-
-  // Per-worker workload: everything currently or previously assigned to each worker.
-  const per = {};
-  docs.forEach(m => {
-    if (!m.assignedWorkerId) return;
-    const w = (per[m.assignedWorkerId] ||= { accepted: 0, in_progress: 0, completed: 0 });
-    if (w[m.status] !== undefined) w[m.status]++;
-  });
-  // Security guards don't take requests, so they only show up if they somehow have some.
-  const rows = workerOptionsCache
-    .filter(w => w.workerType !== "security" || per[w.id])
-    .map(w => {
-      const c = per[w.id] || { accepted: 0, in_progress: 0, completed: 0 };
-      return { w, c, open: c.accepted + c.in_progress, total: c.accepted + c.in_progress + c.completed };
-    })
-    .sort((a, b) => (b.open - a.open) || (b.total - a.total) || String(a.w.name || "").localeCompare(String(b.w.name || "")));
-
-  if (rows.length === 0) { chartEl.innerHTML = `<p class="empty-state">${t("opsNoWorkers")}</p>`; return; }
-
-  const maxTotal = Math.max(1, ...rows.map(r => r.total));
-  const seg = (n, cls, label) => n
-    ? `<div class="ops-seg ${cls}" style="width:${(n / maxTotal * 100).toFixed(1)}%" title="${opsEsc(label)}: ${n}">${n}</div>` : "";
-  chartEl.innerHTML = rows.map(r => `
-    <div class="ops-row">
-      <div class="ops-head">
-        <span class="ops-name">${opsEsc(r.w.name || r.w.email || r.w.id)} <small>· ${opsEsc(workerTypeLabel(r.w.workerType))}</small></span>
-        <span class="ops-count">${r.total}</span>
-      </div>
-      <div class="ops-track">
-        ${seg(r.c.accepted, "accepted", t("opsToDo"))}${seg(r.c.in_progress, "in_progress", t("in_progress"))}${seg(r.c.completed, "completed", t("completed"))}
-      </div>
-    </div>`).join("");
-}
-window.addEventListener("so-lang-changed", renderOpsOverview);
-
-// Requests created before names were stored on them: the admin can read resident profiles
-// (workers can't), so copy the resident's name onto the request so the assigned worker can
-// see who the job is for.
-function backfillResidentNames() {
-  try {
-    if (!residentsCache.length || !lastMaintDocs.length) return;
-    const inFlight = (window.__soNameBackfill ||= new Set());
-    lastMaintDocs.forEach(m => {
-      if (!m.residentId || m.residentName || inFlight.has(m.id)) return;
-      const r = residentsCache.find(x => x.id === m.residentId);
-      const name = r && (r.name || r.email);
-      if (!name) return;
-      inFlight.add(m.id);
-      updateDoc(doc(db, "maintenanceRequests", m.id), { residentName: name }).catch(() => inFlight.delete(m.id));
-    });
-  } catch { /* caches not ready yet */ }
-}
-
 
 // ---------- Maintenance stats: average resolution time per category ----------
 function renderMaintStats() {
