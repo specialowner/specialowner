@@ -11,6 +11,8 @@ A base residential-compound management app: resident interface + admin dashboard
 - Shops: browse partner shops and current points balance
 
 **Admin dashboard** (`admin.html`)
+- Property: register the buildings and every apartment inside them, each one assigned to its resident (an app account, or just a name + phone). A quick setup creates the whole compound at once (e.g. 30 buildings / 400 apartments) with automatic numbering; linking an apartment to an account keeps `users/{uid}.unit` in sync.
+- Areas: register the common parts of the compound (entrance, stairs, lift, garden, pool, garage, roads…), hand each one to a worker for routine cleaning/upkeep with a frequency, and send either a routine round or an extraordinary job — both join the normal work-order queue.
 - Overview: residents / active workers / pending requests / overdue payments, post announcements
 - Access: **live camera QR scanner** that validates an invitation and logs entry/exit
 - Workers: add/list workers
@@ -42,6 +44,9 @@ invitations/{id}       residentId, residentUnit, guestName, guestPhone, visitDat
 payments/{id}          residentId, unit, amount, dueDate, description, status(pending|paid|overdue), createdAt
 maintenanceRequests/{id} residentId, unit, category, description, status(pending|accepted|in_progress|completed), assignedWorkerId, estimatedHours, queueAhead, queueEtaHours, loggedBy, loggedByRole, createdAt
 announcements/{id}     title, body, audience, targetIds, mediaUrl, mediaType(image|video), mediaPath, createdBy, createdAt
+buildings/{id}         name, code, floors, unitsPerFloor, order, createdAt
+units/{id}             buildingId, buildingCode, buildingName, code, floor, number, residentId, residentName, residentPhone, status(occupied|vacant), createdAt, updatedAt
+commonAreas/{id}       name, type, scope(compound|building), buildingId, buildingName, workerId, workerName, category, frequency(daily|weekly|biweekly|monthly), task, lastServiceAt, lastServiceType, createdAt
 shops/{id}             name, category, description, offer
 workers/{id}           name, role, phone, status(active|inactive), createdAt
 accessLogs/{id}        type(entry|exit), personType, personName, invitationId, timestamp

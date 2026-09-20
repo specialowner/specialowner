@@ -30,15 +30,29 @@ function workerTypeLabel(wt) {
   return t(WORKER_TYPE_I18N_KEY[wt] || wt) || wt;
 }
 
+// ---------- Live state for the Property and Areas tabs ----------
+// Declared up here on purpose. Module evaluation pauses further down at
+// `await import("./announcement-media.js")`, and the Firestore listeners
+// registered above that point can fire during the pause — if these lived next
+// to the code that uses them (at the bottom of the file), a snapshot arriving
+// in that window would hit them before they were initialised and throw.
+let propBuildings = [];
+let propUnits = [];
+let propOpenBuildingId = null;   // which building's apartments are open
+let propEditUnitId = null;       // which apartment row is expanded for editing
+let areaDocs = [];
+let areaExtraOpenId = null;      // which area has its "extraordinary job" panel open
+let areaEditId = null;           // which area row is expanded
+
 // ---------- Dashboards (Residents / Operations) & tabs ----------
 // The admin panel is split into two dashboards: "res" (residents, finance, announcements)
 // and "ops" (access, personnel, maintenance). Each tab-btn/section carries a data-dashboard
 // attribute; switching dashboards just filters which tab buttons are visible and jumps to
 // a tab inside that dashboard (remembering the last one visited per dashboard).
-const ALL_TABS = ["residents", "announcements", "access", "workers", "finance", "maint"];
+const ALL_TABS = ["residents", "property", "announcements", "access", "workers", "finance", "maint", "areas"];
 const DASHBOARD_TABS = {
-  res: ["residents", "finance", "announcements"],
-  ops: ["access", "workers", "maint"]
+  res: ["residents", "property", "finance", "announcements"],
+  ops: ["access", "workers", "maint", "areas"]
 };
 const DASH_STORAGE_KEY = "so_admin_dashboard";
 const tabStorageKey = (dash) => `so_admin_tab_${dash}`;
@@ -96,6 +110,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
   const el = document.getElementById("residentsList");
   residentsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   backfillResidentNames();
+  renderUnitsList(); // the apartment rows carry a "link a resident account" dropdown
   if (document.getElementById("annAudience").value === "residents") renderAnnTargetList();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noResidentsYet")}</p>`; return; }
   el.innerHTML = "";
@@ -1154,6 +1169,8 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
   renderMaintList();
   renderOpsOverview();
   renderOnsiteWorkerOptions();
+  renderAreaWorkerOptions(); // the "add area" form picks the worker in charge from the same list
+  renderAreasList();
 });
 
 // ---------- Direct on-site task: admin sends a worker straight to a job, no resident involved ----------
@@ -1220,6 +1237,7 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
   renderMaintStats();
   recomputeQueuePositions();
   backfillResidentNames();
+  renderAreasList(); // each area shows how many of its jobs are still open
 });
 
 // ---------- Operations overview: request counts + how many each worker has been given ----------
@@ -1490,3 +1508,865 @@ function fmtTime(v) {
   if (v.toDate) return v.toDate().toLocaleString();
   return v;
 }
+
+// ==========================================================================
+// PROPERTY — buildings & apartments (Residents dashboard → Property tab)
+//
+// Data model added here:
+//   buildings/{id}  name, code, floors, unitsPerFloor, order, createdAt
+//   units/{id}      buildingId, buildingCode, buildingName, code, floor, number,
+//                   residentId|null, residentName, residentPhone,
+//                   status(occupied|vacant), createdAt, updatedAt
+//
+// An apartment can be filled in two ways: linked to a real app account
+// (residentId → the resident's own login), or just a name + phone for someone
+// who doesn't use the app yet. Linking an account also writes the apartment code
+// back onto users/{uid}.unit, so everything that already works by unit number
+// (payments, call center lookup, maintenance requests) keeps working unchanged.
+// ==========================================================================
+const PROP_UNITS_PAGE = 60; // how many apartment rows are drawn at once
+
+function propEsc(s) {
+  return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+function propIsEditing(container) {
+  const a = document.activeElement;
+  return !!(a && container.contains(a) && ["INPUT", "SELECT", "TEXTAREA"].includes(a.tagName));
+}
+
+function propPad(n, width) { return String(n).padStart(width, "0"); }
+function propBuildingById(id) { return propBuildings.find(b => b.id === id) || null; }
+function propUnitsOf(buildingId) {
+  return propUnits.filter(u => u.buildingId === buildingId)
+    .sort((a, b) => (a.floor - b.floor) || (a.number - b.number) || String(a.code).localeCompare(String(b.code)));
+}
+function propIsOccupied(u) { return !!(u.residentId || (u.residentName || "").trim()); }
+
+onSnapshot(collection(db, "buildings"), (snap) => {
+  propBuildings = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (a.order ?? 9999) - (b.order ?? 9999) || String(a.code || "").localeCompare(String(b.code || "")));
+  renderBuildingsList();
+  renderPropStats();
+  renderAreaBuildingOptions();
+  renderAreasList();
+}, (err) => console.error("Buildings listener failed:", err));
+
+onSnapshot(collection(db, "units"), (snap) => {
+  propUnits = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderBuildingsList();
+  renderUnitsList();
+  renderPropStats();
+}, (err) => console.error("Units listener failed:", err));
+
+function renderPropStats() {
+  const occupied = propUnits.filter(propIsOccupied).length;
+  const set = (id, v) => { const node = document.getElementById(id); if (node) node.textContent = v; };
+  set("statBuildings", propBuildings.length);
+  set("statUnits", propUnits.length);
+  set("statUnitsAssigned", occupied);
+  set("statUnitsVacant", propUnits.length - occupied);
+}
+
+// ---------- Quick setup: the whole compound in one go ----------
+// Spreads the total number of apartments over the buildings as evenly as possible
+// (e.g. 400 over 30 → 10 buildings of 14 and 20 of 13), so the totals the owner
+// gave are respected exactly instead of being rounded off.
+function propDistribute(totalUnits, nBuildings) {
+  const base = Math.floor(totalUnits / nBuildings);
+  const extra = totalUnits % nBuildings;
+  return Array.from({ length: nBuildings }, (_, i) => base + (i < extra ? 1 : 0));
+}
+
+function renderQsPreview() {
+  const out = document.getElementById("qsPreview");
+  if (!out) return;
+  const n = Number(document.getElementById("qsBuildings").value);
+  const total = Number(document.getElementById("qsUnitsTotal").value);
+  if (!(n > 0) || !(total > 0)) { out.textContent = ""; return; }
+  const split = propDistribute(total, n);
+  const min = Math.min(...split), max = Math.max(...split);
+  const per = min === max ? `${min}` : `${min}–${max}`;
+  out.textContent = `${t("qsPreviewLabel")}: ${n} × ${t("buildingUnitsCount")} ${per} = ${total}`;
+}
+["qsBuildings", "qsUnitsTotal"].forEach(id => document.getElementById(id)?.addEventListener("input", renderQsPreview));
+renderQsPreview();
+window.addEventListener("so-lang-changed", renderQsPreview);
+
+// Firestore caps a batch at 500 writes, so anything bigger is committed in chunks.
+async function propCommitOps(ops) {
+  const CHUNK = 400;
+  for (let i = 0; i < ops.length; i += CHUNK) {
+    const batch = writeBatch(db);
+    ops.slice(i, i + CHUNK).forEach(op => op(batch));
+    await batch.commit();
+  }
+}
+
+function propNewUnitOps(building, buildingId, startNumber, count, floors, perFloor) {
+  const ops = [];
+  for (let i = 0; i < count; i++) {
+    const seq = startNumber + i;
+    // With floors/apartments-per-floor the number reads like a real address
+    // (floor 3, apartment 2 → 302); without them it's a plain running number.
+    let floor = 0, number = seq, code;
+    if (floors > 0 && perFloor > 0) {
+      floor = Math.floor((seq - 1) / perFloor) + 1;
+      number = ((seq - 1) % perFloor) + 1;
+      code = `${building.code}-${floor}${propPad(number, 2)}`;
+    } else {
+      code = `${building.code}-${propPad(seq, 2)}`;
+    }
+    const ref = doc(collection(db, "units"));
+    ops.push((batch) => batch.set(ref, {
+      buildingId,
+      buildingCode: building.code,
+      buildingName: building.name,
+      code, floor, number,
+      residentId: null,
+      residentName: "",
+      residentPhone: "",
+      status: "vacant",
+      createdAt: serverTimestamp()
+    }));
+  }
+  return ops;
+}
+
+document.getElementById("qsGenerateBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("qsGenerateBtn");
+  const errEl = document.getElementById("qsError");
+  errEl.style.display = "none";
+  const n = Number(document.getElementById("qsBuildings").value);
+  const total = Number(document.getElementById("qsUnitsTotal").value);
+  const prefix = (document.getElementById("qsPrefix").value || "P").trim();
+  if (!(n > 0) || !(total > 0)) {
+    errEl.textContent = t("qsInvalid");
+    errEl.style.display = "block";
+    return;
+  }
+  if (!confirm(`${document.getElementById("qsPreview").textContent}\n\n${t("qsConfirmText")}`)) return;
+  const label = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = t("qsWorking");
+  try {
+    const split = propDistribute(total, n);
+    const offset = propBuildings.length; // new buildings are appended after existing ones
+    const ops = [];
+    split.forEach((count, i) => {
+      const index = offset + i + 1;
+      const code = `${prefix}${propPad(index, 2)}`;
+      // The name stays language-independent (just the code), so it reads the same
+      // in Arabic and English; it can be renamed per building afterwards.
+      const building = { name: code, code };
+      const bRef = doc(collection(db, "buildings"));
+      ops.push((batch) => batch.set(bRef, {
+        name: building.name, code, floors: 0, unitsPerFloor: 0,
+        order: index, createdAt: serverTimestamp()
+      }));
+      ops.push(...propNewUnitOps(building, bRef.id, 1, count, 0, 0));
+    });
+    await propCommitOps(ops);
+    alert(t("qsDone"));
+  } catch (err) {
+    console.error("Quick setup failed:", err);
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
+  }
+});
+
+// ---------- Add one building by hand ----------
+document.getElementById("addBuildingBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("addBuildingBtn");
+  const errEl = document.getElementById("bldError");
+  errEl.style.display = "none";
+  const name = document.getElementById("bldName").value.trim();
+  const code = document.getElementById("bldCode").value.trim();
+  const floors = Number(document.getElementById("bldFloors").value) || 0;
+  const perFloor = Number(document.getElementById("bldPerFloor").value) || 0;
+  if (!name || !code) {
+    errEl.textContent = t("fillBuildingFields");
+    errEl.style.display = "block";
+    return;
+  }
+  btn.disabled = true;
+  try {
+    const bRef = doc(collection(db, "buildings"));
+    const ops = [(batch) => batch.set(bRef, {
+      name, code, floors, unitsPerFloor: perFloor,
+      order: propBuildings.length + 1, createdAt: serverTimestamp()
+    })];
+    // Floors × apartments per floor is enough to lay the building out straight away.
+    if (floors > 0 && perFloor > 0) {
+      ops.push(...propNewUnitOps({ name, code }, bRef.id, 1, floors * perFloor, floors, perFloor));
+    }
+    await propCommitOps(ops);
+    ["bldName", "bldCode", "bldFloors", "bldPerFloor"].forEach(id => { document.getElementById(id).value = ""; });
+    alert(t("buildingAdded"));
+  } catch (err) {
+    console.error("Failed to add building:", err);
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Buildings list ----------
+document.getElementById("buildingSearch")?.addEventListener("input", renderBuildingsList);
+
+function renderBuildingsList() {
+  const el = document.getElementById("buildingsList");
+  if (!el) return;
+  const term = (document.getElementById("buildingSearch")?.value || "").trim().toLowerCase();
+  const rows = propBuildings.filter(b =>
+    !term || `${b.name || ""} ${b.code || ""}`.toLowerCase().includes(term));
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noBuildingsYet")}</p>`; return; }
+  el.innerHTML = rows.map(b => {
+    const units = propUnitsOf(b.id);
+    const occupied = units.filter(propIsOccupied).length;
+    const isOpen = propOpenBuildingId === b.id;
+    return `
+      <div class="list-item">
+        <div class="meta">
+          <div class="title">${propEsc(b.name || b.code)} <span style="font-size:11px;color:var(--muted)">${propEsc(b.code || "")}</span></div>
+          <div class="sub">${units.length} ${t("buildingUnitsCount")} · ${occupied} ${t("buildingOccupiedCount")}</div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm ${isOpen ? "btn-primary" : "btn-outline"} bld-open" data-id="${b.id}">${isOpen ? t("closeBuilding") : t("openBuilding")}</button>
+            <button type="button" class="btn btn-sm btn-outline bld-add-units" data-id="${b.id}">${t("addUnitsToBuilding")}</button>
+            <button type="button" class="btn btn-sm btn-danger bld-del" data-id="${b.id}">${t("deleteBuilding")}</button>
+          </div>
+        </div>
+      </div>`;
+  }).join("");
+
+  el.querySelectorAll(".bld-open").forEach(btn => btn.addEventListener("click", () => {
+    propOpenBuildingId = propOpenBuildingId === btn.dataset.id ? null : btn.dataset.id;
+    const search = document.getElementById("unitSearch");
+    if (search) search.value = "";
+    renderBuildingsList();
+    renderUnitsList();
+    if (propOpenBuildingId) document.getElementById("unitsCard")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }));
+
+  el.querySelectorAll(".bld-add-units").forEach(btn => btn.addEventListener("click", async () => {
+    const b = propBuildingById(btn.dataset.id);
+    if (!b) return;
+    const answer = prompt(t("addUnitsCount"), "10");
+    const count = Number(answer);
+    if (!(count > 0)) return;
+    btn.disabled = true;
+    try {
+      const existing = propUnitsOf(b.id);
+      const start = existing.length + 1;
+      await propCommitOps(propNewUnitOps(b, b.id, start, count, b.floors || 0, b.unitsPerFloor || 0));
+      alert(t("unitsGenerated"));
+    } catch (err) {
+      console.error("Failed to add apartments:", err);
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+  }));
+
+  el.querySelectorAll(".bld-del").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("deleteBuildingConfirm"))) return;
+    btn.disabled = true;
+    try {
+      const units = propUnitsOf(btn.dataset.id);
+      const ops = units.map(u => (batch) => batch.delete(doc(db, "units", u.id)));
+      ops.push((batch) => batch.delete(doc(db, "buildings", btn.dataset.id)));
+      await propCommitOps(ops);
+      if (propOpenBuildingId === btn.dataset.id) propOpenBuildingId = null;
+      renderUnitsList();
+    } catch (err) {
+      console.error("Failed to delete building:", err);
+      alert(err.message || String(err));
+      btn.disabled = false;
+    }
+  }));
+}
+
+// ---------- Apartments of the open building ----------
+document.getElementById("unitSearch")?.addEventListener("input", renderUnitsList);
+
+function renderUnitsList() {
+  const card = document.getElementById("unitsCard");
+  const el = document.getElementById("unitsList");
+  if (!card || !el) return;
+  const b = propOpenBuildingId ? propBuildingById(propOpenBuildingId) : null;
+  if (!b) { card.style.display = "none"; return; }
+  card.style.display = "block";
+  // These rows are redrawn by live listeners (a resident signing up, another admin
+  // saving). Redrawing while someone is typing a name into one of them would wipe
+  // what they wrote, so the redraw waits until the field loses focus. Buttons don't
+  // count — a click has to be allowed to redraw the list it came from.
+  if (propIsEditing(el)) return;
+
+  const term = (document.getElementById("unitSearch")?.value || "").trim().toLowerCase();
+  const all = propUnitsOf(b.id);
+  const filtered = all.filter(u =>
+    !term || `${u.code || ""} ${u.residentName || ""} ${u.residentPhone || ""}`.toLowerCase().includes(term));
+  const shown = filtered.slice(0, PROP_UNITS_PAGE);
+
+  const title = document.getElementById("unitsCardTitle");
+  if (title) {
+    title.textContent = `${t("unitsTitle")} · ${b.name || b.code} (${t("unitsShowing")} ${shown.length}/${all.length})`;
+  }
+  if (all.length === 0) { el.innerHTML = `<p class="empty-state">${t("noUnitsInBuilding")}</p>`; return; }
+
+  // Residents who already hold another apartment are still listed (moving one is
+  // allowed, with a confirmation) — hiding them would make a move impossible.
+  const residentOptions = (selectedId) => `
+    <option value="">${t("unitNoAccount")}</option>` +
+    residentsCache
+      .slice()
+      .sort((a, b2) => String(a.name || a.email || "").localeCompare(String(b2.name || b2.email || "")))
+      .map(r => `<option value="${r.id}" ${selectedId === r.id ? "selected" : ""}>${propEsc(r.name || r.email || r.id)}${r.unit ? ` · ${propEsc(r.unit)}` : ""}</option>`)
+      .join("");
+
+  // With hundreds of apartments the list has to stay scannable, so a row is just
+  // "number · status · who lives there" until the admin opens it for editing.
+  el.innerHTML = shown.map(u => {
+    const occupied = propIsOccupied(u);
+    const editing = propEditUnitId === u.id;
+    const who = (u.residentName || "").trim();
+    const form = !editing ? "" : `
+          <div class="field" style="margin:6px 0 0">
+            <label>${t("unitResidentAccount")}</label>
+            <select class="unit-acc">${residentOptions(u.residentId || "")}</select>
+          </div>
+          <div class="field" style="margin:6px 0 0">
+            <label>${t("unitResidentNameLabel")}</label>
+            <input type="text" class="unit-name" value="${propEsc(u.residentName || "")}" placeholder="${t("unitResidentNamePh")}">
+          </div>
+          <div class="field" style="margin:6px 0 0">
+            <label>${t("unitPhoneLabel")}</label>
+            <input type="text" class="unit-phone" value="${propEsc(u.residentPhone || "")}" placeholder="${t("unitPhonePh")}">
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-primary unit-save">${t("unitSave")}</button>
+            ${occupied ? `<button type="button" class="btn btn-sm btn-outline unit-clear">${t("unitClear")}</button>` : ""}
+          </div>`;
+    return `
+      <div class="list-item unit-row" data-id="${u.id}">
+        <div class="meta">
+          <div class="title">${propEsc(u.code)} <span class="badge ${occupied ? "active" : "pending"}">${occupied ? t("unitOccupied") : t("unitVacant")}</span></div>
+          <div class="sub">${u.floor ? `${t("unitFloorLabel")} ${u.floor} · ` : ""}${who ? `👤 ${propEsc(who)}` : "—"}${u.residentPhone ? ` · ${propEsc(u.residentPhone)}` : ""}</div>
+          ${form}
+        </div>
+        <button type="button" class="btn btn-sm ${editing ? "btn-primary" : "btn-outline"} unit-edit">${editing ? t("areaCancel") : t("unitEdit")}</button>
+      </div>`;
+  }).join("");
+
+  el.querySelectorAll(".unit-edit").forEach(btn => btn.addEventListener("click", () => {
+    const id = btn.closest(".unit-row").dataset.id;
+    propEditUnitId = propEditUnitId === id ? null : id;
+    renderUnitsList();
+  }));
+
+  // Picking an account fills the name box automatically, so the apartment always
+  // carries a readable name even when the list is read by someone else later.
+  el.querySelectorAll(".unit-acc").forEach(sel => sel.addEventListener("change", () => {
+    const row = sel.closest(".unit-row");
+    const r = residentsCache.find(x => x.id === sel.value);
+    if (r) row.querySelector(".unit-name").value = r.name || r.email || "";
+  }));
+
+  el.querySelectorAll(".unit-save").forEach(btn => btn.addEventListener("click", async () => {
+    const row = btn.closest(".unit-row");
+    const saved = await propSaveUnit(row.dataset.id, {
+      residentId: row.querySelector(".unit-acc").value || null,
+      residentName: row.querySelector(".unit-name").value.trim(),
+      residentPhone: row.querySelector(".unit-phone").value.trim()
+    }, btn);
+    if (saved) { propEditUnitId = null; renderUnitsList(); }
+  }));
+
+  el.querySelectorAll(".unit-clear").forEach(btn => btn.addEventListener("click", async () => {
+    const row = btn.closest(".unit-row");
+    const cleared = await propSaveUnit(row.dataset.id, { residentId: null, residentName: "", residentPhone: "" }, btn);
+    if (cleared) { propEditUnitId = null; renderUnitsList(); }
+  }));
+}
+
+// Returns true when the apartment was actually written, so the caller knows
+// whether to close the row (a cancelled move or a failed write keeps it open).
+async function propSaveUnit(unitId, data, btn) {
+  const u = propUnits.find(x => x.id === unitId);
+  if (!u) return false;
+  const previousResidentId = u.residentId || null;
+  // One account can only live in one apartment: if it already sits somewhere else,
+  // the admin is asked, and the old apartment is emptied rather than duplicated.
+  const clash = data.residentId ? propUnits.find(x => x.id !== unitId && x.residentId === data.residentId) : null;
+  if (clash && !confirm(`${t("unitMoveConfirm")}\n${clash.code}`)) return false;
+  btn.disabled = true;
+  try {
+    const ops = [];
+    ops.push((batch) => batch.update(doc(db, "units", unitId), {
+      residentId: data.residentId,
+      residentName: data.residentName,
+      residentPhone: data.residentPhone,
+      status: (data.residentId || data.residentName) ? "occupied" : "vacant",
+      updatedAt: serverTimestamp()
+    }));
+    if (clash) {
+      ops.push((batch) => batch.update(doc(db, "units", clash.id), {
+        residentId: null, residentName: "", residentPhone: "", status: "vacant", updatedAt: serverTimestamp()
+      }));
+    }
+    // Keep the resident's own profile in step: everything else in the app (payments,
+    // call center lookup, maintenance requests) is keyed on users/{uid}.unit.
+    if (data.residentId) {
+      ops.push((batch) => batch.update(doc(db, "users", data.residentId), {
+        unit: u.code, buildingId: u.buildingId, buildingName: u.buildingName || ""
+      }));
+    }
+    if (previousResidentId && previousResidentId !== data.residentId) {
+      const old = residentsCache.find(r => r.id === previousResidentId);
+      if (old && old.unit === u.code) {
+        ops.push((batch) => batch.update(doc(db, "users", previousResidentId), { unit: "", buildingId: null, buildingName: "" }));
+      }
+    }
+    await propCommitOps(ops);
+    return true;
+  } catch (err) {
+    console.error("Failed to save apartment:", err);
+    alert(err.message || t("propSaveFailed"));
+    return false;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+window.addEventListener("so-lang-changed", () => { renderBuildingsList(); renderUnitsList(); renderPropStats(); });
+
+// ==========================================================================
+// COMMON AREAS — the shared parts of the compound (Operations → Areas tab)
+//
+// Data model added here:
+//   commonAreas/{id}  name, type, scope(compound|building), buildingId, buildingName,
+//                     workerId|null, workerName, category, frequency(daily|weekly|biweekly|monthly),
+//                     task, lastServiceAt, lastServiceType(ordinary|extraordinary), createdAt
+//
+// An area is a *standing responsibility*: one worker keeps it clean and in order.
+// The actual work still travels through the existing queue — both the routine round
+// and a one-off extraordinary job create a normal maintenanceRequests document with
+// source "onsite", so the worker sees it on their own screen, the estimate/queue math
+// applies to it, and nothing about the worker app had to change.
+// ==========================================================================
+const AREA_TYPE_I18N = {
+  lobby: "areaTypeLobby", stairs: "areaTypeStairs", elevator: "areaTypeElevator",
+  garden: "areaTypeGarden", pool: "areaTypePool", garage: "areaTypeGarage",
+  gate: "areaTypeGate", street: "areaTypeStreet", gym: "areaTypeGym",
+  playground: "areaTypePlayground", roof: "areaTypeRoof", water: "areaTypeWater",
+  other: "areaTypeOther"
+};
+const AREA_FREQ_I18N = { daily: "freqDaily", weekly: "freqWeekly", biweekly: "freqBiweekly", monthly: "freqMonthly" };
+// Security staff guard the gates; they're never the ones assigned to clean or repair an area.
+const AREA_WORKER_TYPES = ["cleaning", "maintenance", "garden", "porter"];
+
+function areaTypeLabel(type) { return t(AREA_TYPE_I18N[type] || "areaTypeOther"); }
+function areaFreqLabel(f) { return t(AREA_FREQ_I18N[f] || "freqWeekly"); }
+function areaEligibleWorkers() {
+  return workerOptionsCache.filter(w =>
+    AREA_WORKER_TYPES.includes(w.workerType) && (w.accountStatus || "active") === "active");
+}
+function areaWorkerOptionsHtml(selectedId) {
+  return `<option value="">${t("selectWorkerOption")}</option>` +
+    areaEligibleWorkers().map(w =>
+      `<option value="${w.id}" ${selectedId === w.id ? "selected" : ""}>${opsEsc(w.name || w.email || w.id)} (${workerTypeLabel(w.workerType)})</option>`).join("");
+}
+function areaDisplayName(a) {
+  return a.nameKey ? t(a.nameKey) : a.name;
+}
+function areaPlaceLabel(a) {
+  const n = areaDisplayName(a);
+  return a.scope === "building" && a.buildingName ? `${n} · ${a.buildingName}` : n;
+}
+function areaOpenJobs(areaId) {
+  return lastMaintDocs.filter(m => m.areaId === areaId && m.status !== "completed").length;
+}
+
+onSnapshot(collection(db, "commonAreas"), (snap) => {
+  areaDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => String(areaPlaceLabel(a)).localeCompare(String(areaPlaceLabel(b))));
+  renderAreasList();
+}, (err) => console.error("Common areas listener failed:", err));
+
+// ---------- "Add a common area" form ----------
+function renderAreaWorkerOptions() {
+  const sel = document.getElementById("areaWorker");
+  if (!sel) return;
+  const previous = sel.value;
+  sel.innerHTML = areaWorkerOptionsHtml(previous);
+  if (areaEligibleWorkers().some(w => w.id === previous)) sel.value = previous;
+}
+
+// The bulk selector lists the area kinds actually in use, so it never offers a
+// choice that would match nothing.
+function renderAreaBulkOptions() {
+  const typeSel = document.getElementById("bulkAreaType");
+  const workerSel = document.getElementById("bulkAreaWorker");
+  if (!typeSel || !workerSel) return;
+  const prevType = typeSel.value, prevWorker = workerSel.value;
+  const used = [...new Set(areaDocs.map(a => a.type))];
+  typeSel.innerHTML = `<option value="__unassigned">${t("areaBulkAll")}</option>` +
+    used.map(ty => `<option value="${ty}">${areaTypeLabel(ty)}</option>`).join("");
+  if ([...typeSel.options].some(o => o.value === prevType)) typeSel.value = prevType;
+  workerSel.innerHTML = areaWorkerOptionsHtml(prevWorker);
+  if (areaEligibleWorkers().some(w => w.id === prevWorker)) workerSel.value = prevWorker;
+}
+
+document.getElementById("bulkAreaBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("bulkAreaBtn");
+  const type = document.getElementById("bulkAreaType").value;
+  const workerId = document.getElementById("bulkAreaWorker").value;
+  if (!workerId) { alert(t("areaPickWorker")); return; }
+  const targets = areaDocs.filter(a => type === "__unassigned" ? !a.workerId : a.type === type);
+  if (targets.length === 0) { alert(t("areaBulkNone")); return; }
+  if (!confirm(`${t("areaBulkConfirm")} (${targets.length})`)) return;
+  const w = workerOptionsCache.find(x => x.id === workerId);
+  btn.disabled = true;
+  try {
+    await propCommitOps(targets.map(a => (batch) => batch.update(doc(db, "commonAreas", a.id), {
+      workerId, workerName: w ? (w.name || w.email || "") : ""
+    })));
+    alert(`${t("areaBulkDone")} (${targets.length})`);
+  } catch (err) {
+    console.error("Bulk area assignment failed:", err);
+    alert(err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+function renderAreaBuildingOptions() {
+  const sel = document.getElementById("areaBuilding");
+  if (!sel) return;
+  const previous = sel.value;
+  sel.innerHTML = propBuildings.map(b => `<option value="${b.id}">${propEsc(b.name || b.code)}</option>`).join("");
+  if (propBuildings.some(b => b.id === previous)) sel.value = previous;
+}
+
+document.getElementById("areaScope")?.addEventListener("change", () => {
+  const isBuilding = document.getElementById("areaScope").value === "building";
+  document.getElementById("areaBuildingField").style.display = isBuilding ? "block" : "none";
+});
+
+document.getElementById("addAreaBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("addAreaBtn");
+  const errEl = document.getElementById("areaError");
+  errEl.style.display = "none";
+  const name = document.getElementById("areaName").value.trim();
+  if (!name) {
+    errEl.textContent = t("fillAreaFields");
+    errEl.style.display = "block";
+    return;
+  }
+  const scope = document.getElementById("areaScope").value;
+  const buildingId = scope === "building" ? (document.getElementById("areaBuilding").value || null) : null;
+  const building = buildingId ? propBuildingById(buildingId) : null;
+  const workerId = document.getElementById("areaWorker").value || null;
+  const worker = workerId ? workerOptionsCache.find(w => w.id === workerId) : null;
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "commonAreas"), {
+      name,
+      type: document.getElementById("areaType").value,
+      scope,
+      buildingId,
+      buildingName: building ? (building.name || building.code) : "",
+      workerId,
+      workerName: worker ? (worker.name || worker.email || "") : "",
+      category: document.getElementById("areaCategory").value,
+      frequency: document.getElementById("areaFrequency").value,
+      task: document.getElementById("areaTask").value.trim(),
+      lastServiceAt: null,
+      createdBy: user.uid,
+      createdAt: serverTimestamp()
+    });
+    document.getElementById("areaName").value = "";
+    document.getElementById("areaTask").value = "";
+    alert(t("areaAdded"));
+  } catch (err) {
+    console.error("Failed to add common area:", err);
+    errEl.textContent = err.message || String(err);
+    errEl.style.display = "block";
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Standard areas for every building ----------
+// Saves the owner from typing the same three entries 30 times over.
+const AREA_STANDARD_SET = [
+  { key: "lobby",    type: "lobby",    category: "Cleaning", frequency: "daily" },
+  { key: "stairs",   type: "stairs",   category: "Cleaning", frequency: "daily" },
+  { key: "elevator", type: "elevator", category: "Other",    frequency: "monthly" }
+];
+
+document.getElementById("areaStandardBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("areaStandardBtn");
+  if (propBuildings.length === 0) { alert(t("areaNoBuildings")); return; }
+  if (!confirm(t("areaStandardConfirm"))) return;
+  btn.disabled = true;
+  try {
+    const ops = [];
+    propBuildings.forEach(b => {
+      AREA_STANDARD_SET.forEach(std => {
+        // Skip anything already registered for this building, so the button is safe
+        // to press twice (after adding new buildings, for instance).
+        const exists = areaDocs.some(a => a.buildingId === b.id && a.type === std.type);
+        if (exists) return;
+        const ref = doc(collection(db, "commonAreas"));
+        ops.push((batch) => batch.set(ref, {
+          name: t(AREA_TYPE_I18N[std.type]),
+          // Auto-created areas keep the key they were named from, so their label
+          // follows the language switch instead of freezing in whichever language
+          // the admin happened to be using when the button was pressed.
+          nameKey: AREA_TYPE_I18N[std.type],
+          type: std.type,
+          scope: "building",
+          buildingId: b.id,
+          buildingName: b.name || b.code,
+          workerId: null,
+          workerName: "",
+          category: std.category,
+          frequency: std.frequency,
+          task: "",
+          lastServiceAt: null,
+          createdBy: user.uid,
+          createdAt: serverTimestamp()
+        }));
+      });
+    });
+    if (ops.length === 0) { alert(t("areaStandardDone")); return; }
+    await propCommitOps(ops);
+    alert(t("areaStandardDone"));
+  } catch (err) {
+    console.error("Failed to create standard areas:", err);
+    alert(err.message || String(err));
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+// ---------- Areas list ----------
+document.getElementById("areaSearch")?.addEventListener("input", renderAreasList);
+
+function renderAreaStats() {
+  const withWorker = areaDocs.filter(a => a.workerId).length;
+  const openJobs = lastMaintDocs.filter(m => m.areaId && m.status !== "completed").length;
+  const set = (id, v) => { const node = document.getElementById(id); if (node) node.textContent = v; };
+  set("statAreas", areaDocs.length);
+  set("statAreasAssigned", withWorker);
+  set("statAreasFree", areaDocs.length - withWorker);
+  set("statAreaJobs", openJobs);
+}
+
+function renderAreasList() {
+  renderAreaStats();
+  renderAreaBulkOptions();
+  const el = document.getElementById("areasList");
+  if (!el) return;
+  // Same reason as the apartment rows: never redraw under someone's fingers while
+  // they are typing an extraordinary job into the panel.
+  if (propIsEditing(el)) return;
+  const term = (document.getElementById("areaSearch")?.value || "").trim().toLowerCase();
+  const rows = areaDocs.filter(a =>
+    !term || `${areaDisplayName(a) || ""} ${a.buildingName || ""} ${a.workerName || ""}`.toLowerCase().includes(term));
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noAreasYet")}</p>`; return; }
+
+  // 30 buildings × their standard areas is a long list, so a row stays compact —
+  // name, where it is, who has it — until the admin opens it to act on it.
+  el.innerHTML = rows.map(a => {
+    const open = areaOpenJobs(a.id);
+    const editing = areaEditId === a.id;
+    const name = areaDisplayName(a);
+    const typeText = areaTypeLabel(a.type);
+    const place = a.scope === "building" && a.buildingName ? a.buildingName : t("scopeCompound");
+    const last = a.lastServiceAt?.seconds
+      ? new Date(a.lastServiceAt.seconds * 1000).toLocaleDateString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB",
+          { day: "numeric", month: "short", year: "numeric" })
+      : t("areaNever");
+    const extraPanel = areaExtraOpenId === a.id ? `
+      <div class="area-extra" style="margin-top:10px;padding:10px;border:1px dashed #cfdbd6;border-radius:10px">
+        <div style="font-size:12px;font-weight:700;margin-bottom:8px">${t("areaExtraTitle")}</div>
+        <div class="field" style="margin-bottom:8px">
+          <label>${t("areaCategoryLabel")}</label>
+          <select class="area-ex-cat">
+            ${Object.keys(CATEGORY_I18N_KEY).map(c => `<option value="${c}" ${a.category === c ? "selected" : ""}>${categoryLabel(c)}</option>`).join("")}
+          </select>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <label>${t("areaAssignTo")}</label>
+          <select class="area-ex-worker">${areaWorkerOptionsHtml(a.workerId || "")}</select>
+        </div>
+        <div class="field" style="margin-bottom:8px">
+          <textarea class="area-ex-desc" placeholder="${t("areaExtraDescPh")}"></textarea>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button type="button" class="btn btn-sm btn-primary area-ex-send" data-id="${a.id}">${t("areaCreateJob")}</button>
+          <button type="button" class="btn btn-sm btn-outline area-ex-cancel">${t("areaCancel")}</button>
+        </div>
+      </div>` : "";
+    const panel = !editing ? "" : `
+          ${a.task ? `<div class="sub" style="margin-top:6px">🧹 ${opsEsc(a.task)}</div>` : ""}
+          <div class="field" style="margin:8px 0 0">
+            <label>${t("areaWorkerLabel")}</label>
+            <select class="area-worker">${areaWorkerOptionsHtml(a.workerId || "")}</select>
+          </div>
+          <div class="field" style="margin:6px 0 0">
+            <label>${t("areaFrequencyLabel")}</label>
+            <select class="area-freq">
+              ${Object.keys(AREA_FREQ_I18N).map(f => `<option value="${f}" ${a.frequency === f ? "selected" : ""}>${areaFreqLabel(f)}</option>`).join("")}
+            </select>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <button type="button" class="btn btn-sm btn-primary area-ordinary" data-id="${a.id}">${t("areaSendOrdinary")}</button>
+            <button type="button" class="btn btn-sm btn-accent area-extra-open" data-id="${a.id}">${t("areaSendExtra")}</button>
+            <button type="button" class="btn btn-sm btn-danger area-del" data-id="${a.id}">${t("areaDelete")}</button>
+          </div>
+          ${extraPanel}`;
+    return `
+      <div class="list-item area-row" data-id="${a.id}">
+        <div class="meta">
+          <div class="title">${opsEsc(name)} <span style="font-size:11px;font-weight:400;color:var(--muted)">${opsEsc(place)}</span></div>
+          <div class="sub">${a.workerId ? `👷 ${opsEsc(a.workerName || "")}` : `<span class="badge pending">${t("areaUnassigned")}</span>`} · ${areaFreqLabel(a.frequency)}</div>
+          <div class="sub" style="font-size:11px;color:#7b8a85">${name === typeText ? "" : typeText + " · "}${t("areaLastService")}: ${last}${open ? ` · ${open} ${t("statAreaJobs").toLowerCase()}` : ""}</div>
+          ${panel}
+        </div>
+        <button type="button" class="btn btn-sm ${editing ? "btn-primary" : "btn-outline"} area-edit">${editing ? t("areaCancel") : t("unitEdit")}</button>
+      </div>`;
+  }).join("");
+
+  el.querySelectorAll(".area-edit").forEach(btn => btn.addEventListener("click", () => {
+    const id = btn.closest(".area-row").dataset.id;
+    areaEditId = areaEditId === id ? null : id;
+    if (areaEditId !== id) areaExtraOpenId = null;
+    renderAreasList();
+  }));
+
+  // Changing the worker or the frequency saves straight away — it's a standing
+  // responsibility, not a form the admin has to remember to submit.
+  el.querySelectorAll(".area-worker").forEach(sel => sel.addEventListener("change", async () => {
+    const id = sel.closest(".area-row").dataset.id;
+    const w = workerOptionsCache.find(x => x.id === sel.value);
+    try {
+      await updateDoc(doc(db, "commonAreas", id), {
+        workerId: sel.value || null,
+        workerName: w ? (w.name || w.email || "") : ""
+      });
+    } catch (err) {
+      console.error("Failed to assign area worker:", err);
+      alert(err.message || String(err));
+    }
+  }));
+
+  el.querySelectorAll(".area-freq").forEach(sel => sel.addEventListener("change", async () => {
+    const id = sel.closest(".area-row").dataset.id;
+    try {
+      await updateDoc(doc(db, "commonAreas", id), { frequency: sel.value });
+    } catch (err) {
+      console.error("Failed to change area frequency:", err);
+      alert(err.message || String(err));
+    }
+  }));
+
+  el.querySelectorAll(".area-ordinary").forEach(btn => btn.addEventListener("click", async () => {
+    const a = areaDocs.find(x => x.id === btn.dataset.id);
+    if (!a) return;
+    if (!a.workerId) { alert(t("areaPickWorker")); return; }
+    btn.disabled = true;
+    try {
+      await areaCreateJob(a, {
+        taskType: "ordinary",
+        category: a.category || "Cleaning",
+        workerId: a.workerId,
+        description: a.task || `${t("areaOrdinaryTag")} · ${areaFreqLabel(a.frequency)}`
+      });
+      alert(t("areaJobCreated"));
+    } catch (err) {
+      console.error("Failed to send routine job:", err);
+      alert(err.message || String(err));
+    } finally {
+      btn.disabled = false;
+    }
+  }));
+
+  el.querySelectorAll(".area-extra-open").forEach(btn => btn.addEventListener("click", () => {
+    areaExtraOpenId = areaExtraOpenId === btn.dataset.id ? null : btn.dataset.id;
+    renderAreasList();
+  }));
+  el.querySelectorAll(".area-ex-cancel").forEach(btn => btn.addEventListener("click", () => {
+    areaExtraOpenId = null;
+    renderAreasList();
+  }));
+
+  el.querySelectorAll(".area-ex-send").forEach(btn => btn.addEventListener("click", async () => {
+    const row = btn.closest(".area-row");
+    const a = areaDocs.find(x => x.id === btn.dataset.id);
+    if (!a) return;
+    const workerId = row.querySelector(".area-ex-worker").value;
+    const description = row.querySelector(".area-ex-desc").value.trim();
+    if (!workerId) { alert(t("areaPickWorker")); return; }
+    if (!description) { alert(t("areaDescribeJob")); return; }
+    btn.disabled = true;
+    try {
+      await areaCreateJob(a, {
+        taskType: "extraordinary",
+        category: row.querySelector(".area-ex-cat").value,
+        workerId,
+        description
+      });
+      areaExtraOpenId = null;
+      renderAreasList();
+      alert(t("areaJobCreated"));
+    } catch (err) {
+      console.error("Failed to send extraordinary job:", err);
+      alert(err.message || String(err));
+      btn.disabled = false;
+    }
+  }));
+
+  el.querySelectorAll(".area-del").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("areaDeleteConfirm"))) return;
+    btn.disabled = true;
+    try {
+      // Jobs already sent for this area stay in the request history — they carry
+      // their own copy of the area name, so deleting the area doesn't blank them.
+      await propCommitOps([(batch) => batch.delete(doc(db, "commonAreas", btn.dataset.id))]);
+    } catch (err) {
+      console.error("Failed to delete area:", err);
+      alert(err.message || String(err));
+      btn.disabled = false;
+    }
+  }));
+}
+
+// Both kinds of job land in the same queue the workers already use.
+async function areaCreateJob(area, { taskType, category, workerId, description }) {
+  await addDoc(collection(db, "maintenanceRequests"), {
+    source: "onsite",              // required by the Firestore rule for admin-created jobs
+    taskType,                      // ordinary | extraordinary
+    areaId: area.id,
+    areaName: areaDisplayName(area),
+    category,
+    description,
+    location: areaPlaceLabel(area),
+    assignedWorkerId: workerId,
+    status: "accepted",
+    statusSeenByResident: true,
+    createdBy: user.uid,
+    createdAt: serverTimestamp()
+  });
+  await updateDoc(doc(db, "commonAreas", area.id), {
+    lastServiceAt: serverTimestamp(),
+    lastServiceType: taskType
+  });
+}
+
+window.addEventListener("so-lang-changed", () => { renderAreasList(); renderAreaWorkerOptions(); renderAreaBulkOptions(); });

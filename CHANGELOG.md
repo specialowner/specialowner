@@ -1,8 +1,28 @@
 # Special Owner — Update archive
 
-Current version: **v1.4.0**
+Current version: **v1.5.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.5.0 — 2026-09-20
+
+**English**
+- New Property section in the admin panel: register every building and its apartments, each apartment assigned to the resident who lives there (either an app account, or just a name and phone).
+- Quick setup: enter how many buildings and how many apartments in total (e.g. 30 buildings, 400 apartments) and the whole structure is created with automatic numbering.
+- Linking an apartment to a resident account updates that resident's unit number automatically, so payments, the call center and maintenance requests keep working as before.
+- New Areas section in the Operations dashboard: register the common areas (entrance, stairs, lift, garden, pool, garage…) and put each one in the hands of a worker for routine cleaning and upkeep.
+- From each area you can send a routine job or an extraordinary one to a worker; it joins the same queue the workers already use.
+- Bulk assignment: hand every entrance, or every lift, to the same worker in one click.
+- Worker screen: a new card listing the areas they look after, the routine task and how often.
+
+**العربية**
+- قسم جديد «المباني» في لوحة الأدمن: تسجيل كل المباني وشققها، وكل شقة متخصصة للساكن بتاعها (حساب على التطبيق أو اسم وتليفون بس).
+- إنشاء سريع: تكتب عدد المباني وإجمالي الشقق (مثلاً 30 مبنى و400 شقة) والتطبيق بيعمل الهيكل كله بترقيم تلقائي.
+- ربط الشقة بحساب الساكن بيحدّث رقم الوحدة في ملف الساكن تلقائيًا، فالمدفوعات والكول سنتر والطلبات بتفضل شغالة زي ما هي.
+- قسم جديد «الأماكن» في لوحة التشغيل: تسجيل الأماكن المشتركة (مدخل، سلالم، أسانسير، حديقة، حمام سباحة، جراج…) وتسليم كل مكان لعامل مسؤول عن نضافته وصيانته الدورية.
+- من كل مكان تقدر تبعت مهمة دورية أو مهمة استثنائية لعامل، وبتدخل نفس طابور المهام اللي العمال شايفينه.
+- تكليف مجموعة أماكن مرة واحدة: كل المداخل أو كل الأسانسيرات لعامل واحد بضغطة زرار.
+- شاشة العامل: كارت جديد بالأماكن اللي هو مسؤول عنها والمهمة الدورية وكل قد إيه.
 
 ## v1.4.0 — 2026-09-19
 

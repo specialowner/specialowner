@@ -59,6 +59,53 @@
       </div>
     </section>
 
+    <!-- PROPERTY: BUILDINGS & APARTMENTS -->
+    <section id="tab-property" data-dashboard="res" style="display:none">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-box"><div class="num" id="statBuildings">0</div><div class="lbl" data-i18n="statBuildings">Buildings</div></div>
+        <div class="stat-box"><div class="num" id="statUnits">0</div><div class="lbl" data-i18n="statUnits">Apartments</div></div>
+        <div class="stat-box"><div class="num" id="statUnitsAssigned">0</div><div class="lbl" data-i18n="statAssigned">Assigned</div></div>
+        <div class="stat-box"><div class="num" id="statUnitsVacant">0</div><div class="lbl" data-i18n="statVacant">Vacant</div></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="quickSetupTitle">Quick setup</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="quickSetupDesc">Builds the whole compound in one go.</p>
+        <div class="grid-2" style="gap:10px">
+          <div class="field"><label data-i18n="qsBuildings">Number of buildings</label><input type="number" id="qsBuildings" min="1" value="30"></div>
+          <div class="field"><label data-i18n="qsUnitsTotal">Total apartments</label><input type="number" id="qsUnitsTotal" min="1" value="400"></div>
+        </div>
+        <div class="field"><label data-i18n="qsPrefix">Building code prefix</label><input type="text" id="qsPrefix" value="P"></div>
+        <p id="qsPreview" style="font-size:12px;color:var(--primary);font-weight:700;margin-bottom:10px"></p>
+        <p class="error-text" id="qsError" style="display:none"></p>
+        <button class="btn btn-primary" id="qsGenerateBtn" data-i18n="qsGenerate">Create structure</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="addBuildingTitle">Add a single building</h3>
+        <div class="field"><label data-i18n="buildingNameLabel">Building name</label><input type="text" id="bldName" data-i18n-placeholder="buildingNamePh" placeholder="e.g. Building 1"></div>
+        <div class="field"><label data-i18n="buildingCodeLabel">Code</label><input type="text" id="bldCode" data-i18n-placeholder="buildingCodePh" placeholder="e.g. P01"></div>
+        <div class="grid-2" style="gap:10px">
+          <div class="field"><label data-i18n="buildingFloorsLabel">Floors (optional)</label><input type="number" id="bldFloors" min="0" placeholder="0"></div>
+          <div class="field"><label data-i18n="buildingPerFloorLabel">Apartments per floor (optional)</label><input type="number" id="bldPerFloor" min="0" placeholder="0"></div>
+        </div>
+        <p class="error-text" id="bldError" style="display:none"></p>
+        <button class="btn btn-primary" id="addBuildingBtn" data-i18n="addBuildingBtn">Add building</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="buildingsListTitle">Buildings</h3>
+        <div class="field" style="margin-bottom:10px"><input type="text" id="buildingSearch" data-i18n-placeholder="buildingSearchPh" placeholder="Search a building"></div>
+        <div id="buildingsList"><p class="empty-state" data-i18n="noBuildingsYet">No buildings registered yet.</p></div>
+      </div>
+
+      <div class="card" id="unitsCard" style="display:none">
+        <h3 id="unitsCardTitle" data-i18n="unitsTitle">Apartments</h3>
+        <div class="field" style="margin-bottom:10px"><input type="text" id="unitSearch" data-i18n-placeholder="unitSearchPh" placeholder="Search apartment number or resident"></div>
+        <div id="unitsList"></div>
+      </div>
+    </section>
+
     <!-- ANNOUNCEMENTS -->
     <section id="tab-announcements" data-dashboard="res" style="display:none">
       <div class="card">
@@ -232,6 +279,109 @@
       </div>
     </section>
 
+    <!-- COMMON AREAS -->
+    <section id="tab-areas" data-dashboard="ops" style="display:none">
+      <div class="grid-2" style="margin-bottom:14px">
+        <div class="stat-box"><div class="num" id="statAreas">0</div><div class="lbl" data-i18n="statAreas">Areas</div></div>
+        <div class="stat-box"><div class="num" id="statAreasAssigned">0</div><div class="lbl" data-i18n="statAreasAssigned">With a worker</div></div>
+        <div class="stat-box"><div class="num" id="statAreasFree">0</div><div class="lbl" data-i18n="statAreasFree">Unassigned</div></div>
+        <div class="stat-box"><div class="num" id="statAreaJobs">0</div><div class="lbl" data-i18n="statAreaJobs">Open jobs</div></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="areasTitle">Common areas</h3>
+        <p style="font-size:12px;color:var(--muted)" data-i18n="areasDesc">Everything outside the apartments.</p>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="addAreaTitle">Add a common area</h3>
+        <div class="field"><label data-i18n="areaNameLabel">Area name</label><input type="text" id="areaName" data-i18n-placeholder="areaNamePh" placeholder="e.g. Swimming pool"></div>
+        <div class="field">
+          <label data-i18n="areaTypeLabel">Type</label>
+          <select id="areaType">
+            <option value="lobby" data-i18n="areaTypeLobby">Entrance / lobby</option>
+            <option value="stairs" data-i18n="areaTypeStairs">Stairs &amp; corridors</option>
+            <option value="elevator" data-i18n="areaTypeElevator">Lift</option>
+            <option value="garden" data-i18n="areaTypeGarden">Garden</option>
+            <option value="pool" data-i18n="areaTypePool">Pool</option>
+            <option value="garage" data-i18n="areaTypeGarage">Garage / parking</option>
+            <option value="gate" data-i18n="areaTypeGate">Gate</option>
+            <option value="street" data-i18n="areaTypeStreet">Roads &amp; walkways</option>
+            <option value="gym" data-i18n="areaTypeGym">Gym</option>
+            <option value="playground" data-i18n="areaTypePlayground">Playground</option>
+            <option value="roof" data-i18n="areaTypeRoof">Roof</option>
+            <option value="water" data-i18n="areaTypeWater">Water tanks</option>
+            <option value="other" data-i18n="areaTypeOther">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="areaScopeLabel">Belongs to</label>
+          <select id="areaScope">
+            <option value="compound" data-i18n="scopeCompound">Whole compound</option>
+            <option value="building" data-i18n="scopeBuilding">One building</option>
+          </select>
+        </div>
+        <div class="field" id="areaBuildingField" style="display:none">
+          <label data-i18n="areaBuildingLabel">Building</label>
+          <select id="areaBuilding"></select>
+        </div>
+        <div class="field">
+          <label data-i18n="areaWorkerLabel">Worker in charge (routine)</label>
+          <select id="areaWorker"><option value="" data-i18n="selectWorkerOption">Select a worker</option></select>
+        </div>
+        <div class="field">
+          <label data-i18n="areaCategoryLabel">Kind of work</label>
+          <select id="areaCategory">
+            <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
+            <option value="Garden" data-i18n="catGarden">Garden</option>
+            <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
+            <option value="Electrical" data-i18n="catElectrical">Electrical</option>
+            <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
+            <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
+            <option value="Other" data-i18n="catOther">Other</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="areaFrequencyLabel">How often</label>
+          <select id="areaFrequency">
+            <option value="daily" data-i18n="freqDaily">Daily</option>
+            <option value="weekly" data-i18n="freqWeekly">Weekly</option>
+            <option value="biweekly" data-i18n="freqBiweekly">Every two weeks</option>
+            <option value="monthly" data-i18n="freqMonthly">Monthly</option>
+          </select>
+        </div>
+        <div class="field"><label data-i18n="areaTaskLabel">Routine task</label><textarea id="areaTask" data-i18n-placeholder="areaTaskPh" placeholder="e.g. Sweep and mop, empty the bins"></textarea></div>
+        <p class="error-text" id="areaError" style="display:none"></p>
+        <button class="btn btn-primary" id="addAreaBtn" data-i18n="addAreaBtn">Add area</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="areaBulkTitle">Assign several areas at once</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="areaBulkDesc">Hand every area of one kind to the same worker.</p>
+        <div class="field">
+          <label data-i18n="areaBulkType">Which areas</label>
+          <select id="bulkAreaType"><option value="__unassigned" data-i18n="areaBulkAll">All areas without a worker</option></select>
+        </div>
+        <div class="field">
+          <label data-i18n="areaAssignTo">Assign to</label>
+          <select id="bulkAreaWorker"><option value="" data-i18n="selectWorkerOption">Select a worker</option></select>
+        </div>
+        <button class="btn btn-outline" id="bulkAreaBtn" data-i18n="areaBulkBtn">Assign them</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="areaStandardTitle">Standard areas per building</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="areaStandardDesc">Creates the usual shared spaces for every registered building.</p>
+        <button class="btn btn-outline" id="areaStandardBtn" data-i18n="areaStandardBtn">Create standard areas</button>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="areasListTitle">Areas &amp; assignments</h3>
+        <div class="field" style="margin-bottom:10px"><input type="text" id="areaSearch" data-i18n-placeholder="areaSearchPh" placeholder="Search an area"></div>
+        <div id="areasList"><p class="empty-state" data-i18n="noAreasYet">No common areas registered yet.</p></div>
+      </div>
+    </section>
+
     <!-- FINANCES -->
     <section id="tab-finance" data-dashboard="res" style="display:none">
       <div class="card">
@@ -315,11 +465,13 @@
 
   <div class="tabbar">
     <button class="tab-btn active" data-tab="residents" data-dashboard="res"><span class="tab-icon">👥</span><span data-i18n="tabResidents">Residents</span></button>
+    <button class="tab-btn" data-tab="property" data-dashboard="res"><span class="tab-icon">🏢</span><span data-i18n="tabProperty">Property</span></button>
     <button class="tab-btn" data-tab="finance" data-dashboard="res"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="announcements" data-dashboard="res"><span class="tab-icon">📢</span><span data-i18n="tabAnnouncements">Announce</span></button>
     <button class="tab-btn" data-tab="access" data-dashboard="ops" style="display:none"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
     <button class="tab-btn" data-tab="workers" data-dashboard="ops" style="display:none"><span class="tab-icon">👷</span><span data-i18n="tabWorkers">Workers</span></button>
     <button class="tab-btn" data-tab="maint" data-dashboard="ops" style="display:none"><span class="tab-icon">🛠️</span><span data-i18n="tabMaintShort">Maint.</span></button>
+    <button class="tab-btn" data-tab="areas" data-dashboard="ops" style="display:none"><span class="tab-icon">🌳</span><span data-i18n="tabAreas">Areas</span></button>
   </div>
 </div>
 

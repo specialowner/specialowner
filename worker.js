@@ -586,3 +586,51 @@ function fmtTime(v) {
   if (v.toDate) return v.toDate().toLocaleString();
   return v;
 }
+
+// ==========================================================================
+// Areas I look after — the common parts of the compound handed to this worker.
+// A standing responsibility, not a queue: the actual jobs (routine rounds and
+// extraordinary ones) still arrive as normal work orders above. This card is
+// there so the worker can see at a glance what is permanently theirs.
+// ==========================================================================
+const MY_AREA_TYPE_I18N = {
+  lobby: "areaTypeLobby", stairs: "areaTypeStairs", elevator: "areaTypeElevator",
+  garden: "areaTypeGarden", pool: "areaTypePool", garage: "areaTypeGarage",
+  gate: "areaTypeGate", street: "areaTypeStreet", gym: "areaTypeGym",
+  playground: "areaTypePlayground", roof: "areaTypeRoof", water: "areaTypeWater",
+  other: "areaTypeOther"
+};
+const MY_AREA_FREQ_I18N = { daily: "freqDaily", weekly: "freqWeekly", biweekly: "freqBiweekly", monthly: "freqMonthly" };
+let myAreaDocs = [];
+
+if (!isSecurity) {
+  onSnapshot(query(collection(db, "commonAreas"), where("workerId", "==", user.uid)), (snap) => {
+    myAreaDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    renderMyAreas();
+  }, (err) => console.error("My areas listener failed:", err));
+}
+
+function renderMyAreas() {
+  const el = document.getElementById("myAreasList");
+  if (!el) return;
+  if (myAreaDocs.length === 0) { el.innerHTML = `<p class="empty-state">${t("noMyAreas")}</p>`; return; }
+  el.innerHTML = myAreaDocs
+    .slice()
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")))
+    .map(a => {
+      const where2 = a.scope === "building" && a.buildingName ? a.buildingName : t("scopeCompound");
+      const last = a.lastServiceAt?.seconds
+        ? new Date(a.lastServiceAt.seconds * 1000).toLocaleDateString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB",
+            { day: "numeric", month: "short" })
+        : t("areaNever");
+      return `
+        <div class="list-item">
+          <div class="meta">
+            <div class="wo-row"><span class="wo-k">📍 ${t("woWhere")}</span><span class="wo-v">${woEsc(a.nameKey ? t(a.nameKey) : a.name)} · ${woEsc(where2)}</span></div>
+            <div class="wo-row"><span class="wo-k">🧹 ${t("myAreaRoutine")}</span><span class="wo-v">${woEsc(a.task || t(MY_AREA_TYPE_I18N[a.type] || "areaTypeOther"))} — ${t(MY_AREA_FREQ_I18N[a.frequency] || "freqWeekly")}</span></div>
+            <div class="sub" style="font-size:11px;color:#7b8a85;margin-top:4px">${t("areaLastService")}: ${last}</div>
+          </div>
+        </div>`;
+    }).join("");
+}
+window.addEventListener("so-lang-changed", renderMyAreas);

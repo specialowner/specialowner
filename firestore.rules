@@ -131,6 +131,33 @@ service cloud.firestore {
       allow read, write: if isAdmin();
     }
 
+    // The compound's own structure: the buildings, the apartments inside them, and
+    // the shared spaces outside them.
+    match /buildings/{buildingId} {
+      // Readable by anyone signed in (a worker's area card names its building);
+      // only the admin and the site manager maintain the list.
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isActiveManager();
+    }
+
+    match /units/{unitId} {
+      // The apartment register holds residents' names and phone numbers, so it is
+      // deliberately NOT readable by every signed-in account: the admin and site
+      // manager maintain it, the call center needs it to find a unit while taking a
+      // call, and a resident may read the apartment they are linked to.
+      allow read: if isAdmin() || isActiveManager() || isActiveCallCenter() ||
+        (isSignedIn() && resource.data.residentId == request.auth.uid);
+      // Only the admin assigns apartments — this write also touches users/{uid}.unit.
+      allow write: if isAdmin();
+    }
+
+    match /commonAreas/{areaId} {
+      // A worker queries this collection by workerId to see the areas handed to them,
+      // so every signed-in account may read it; nothing private lives here.
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isActiveManager();
+    }
+
     match /accessLogs/{logId} {
       allow read: if isAdmin() || isActiveSecurityWorker() || isActiveManager();
       allow create: if isAdmin() || isActiveSecurityWorker();
