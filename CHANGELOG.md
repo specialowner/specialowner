@@ -1,8 +1,22 @@
 # Special Owner — Update archive
 
-Current version: **v1.5.0**
+Current version: **v1.6.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.6.0 — 2026-09-28
+
+**English**
+- New walkthrough shown once, the first time you open the app after this update, explaining every function for your role (resident, admin, site manager, worker, call center).
+- You can leave the walkthrough at any time: the ✕ button, "Skip tour" or the Esc key.
+- New "?" button at the top of every screen, next to Logout, to replay the walkthrough whenever you want.
+- The walkthrough highlights the tab or button it is explaining, works in Arabic and English, and lets you switch the language from inside.
+
+**العربية**
+- جولة تعريفية جديدة بتظهر مرة واحدة أول ما تفتح التطبيق بعد التحديث، وبتشرح كل وظائف التطبيق حسب دورك (ساكن، أدمن، مدير موقع، عامل، كول سنتر).
+- تقدر تخرج من الجولة في أي وقت: زرار ✕ أو «تخطي الجولة» أو مفتاح Esc.
+- زرار جديد «؟» في أعلى كل شاشة جنب تسجيل الخروج لإعادة الجولة في أي وقت.
+- الجولة بتنوّر على التبويب أو الزرار اللي بتشرحه، وبتشتغل بالعربي والإنجليزي وتقدر تبدّل اللغة من جواها.
 
 ## v1.5.0 — 2026-09-20
 

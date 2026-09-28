@@ -13,9 +13,24 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.5.0";
+  var APP_VERSION = "1.6.0";
 
   var CHANGELOG = [
+    {
+      version: "1.6.0", date: "2026-09-28",
+      ar: [
+        "جولة تعريفية جديدة بتظهر مرة واحدة أول ما تفتح التطبيق بعد التحديث، وبتشرح كل وظائف التطبيق حسب دورك (ساكن، أدمن، مدير موقع، عامل، كول سنتر).",
+        "تقدر تخرج من الجولة في أي وقت: زرار ✕ أو «تخطي الجولة» أو مفتاح Esc.",
+        "زرار جديد «؟» في أعلى كل شاشة جنب تسجيل الخروج لإعادة الجولة في أي وقت.",
+        "الجولة بتنوّر على التبويب أو الزرار اللي بتشرحه، وبتشتغل بالعربي والإنجليزي وتقدر تبدّل اللغة من جواها."
+      ],
+      en: [
+        "New walkthrough shown once, the first time you open the app after this update, explaining every function for your role (resident, admin, site manager, worker, call center).",
+        "You can leave the walkthrough at any time: the ✕ button, \"Skip tour\" or the Esc key.",
+        "New \"?\" button at the top of every screen, next to Logout, to replay the walkthrough whenever you want.",
+        "The walkthrough highlights the tab or button it is explaining, works in Arabic and English, and lets you switch the language from inside."
+      ]
+    },
     {
       version: "1.5.0", date: "2026-09-20",
       ar: [

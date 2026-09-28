@@ -8,6 +8,7 @@ const APP_SHELL = [
   "style.css",
   "i18n.js",
   "version.js",
+  "tour.js",
   "qrcode.min.js",
   "html5-qrcode.min.js",
   "manifest.json"
