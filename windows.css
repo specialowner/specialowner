@@ -61,6 +61,7 @@
 @media (max-width:767px){
   .win{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0;border:0}
   .win:not(.focused){display:none!important}
+  .win-admin .dash-switch{margin-bottom:12px}
   .win-grip,.win-btns .wb-min,.win-btns .wb-max,.win-admin .tabbar .tb-tile{display:none}
 }
 
