@@ -68,3 +68,13 @@
 /* Version badge (injected by version.js): slim strip under the taskbar instead of the old 96px gap */
 .win-desk #soVersion{flex-shrink:0;width:100%;margin:0!important;padding:0 0 calc(4px + env(safe-area-inset-bottom))!important;
   background:#10201d!important;color:#7f948e!important;font-size:10px!important}
+
+/* Language switch lives inside the top bar (moved there by windows.js), never over the buttons */
+.win-desk .topbar{gap:10px}
+.win-desk .topbar .lang-toggle{position:static;inset:auto;flex-shrink:0;margin-inline-start:auto;z-index:auto}
+.win-desk .topbar > div:first-child{min-width:0;flex:0 1 auto}
+.win-desk .topbar > div:first-child > div{min-width:0}
+.win-desk .topbar h1,.win-desk .topbar .sub{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-desk .so-topbar-actions{flex-shrink:0}
+/* The 58px top padding in style.css made room for the floating language switch; it now sits in the bar */
+@media (max-width:520px){.win-desk .topbar{padding-top:18px}}

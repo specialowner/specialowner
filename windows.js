@@ -23,6 +23,15 @@
   var taskbar = document.querySelector(".tabbar");
   if (!desk || !taskbar) return;
 
+  // The language switch normally floats over the top corner, on top of the logout / guide
+  // buttons. Put it inside the top bar instead, right before those buttons.
+  var topbar = document.querySelector(".topbar");
+  var langToggle = document.querySelector(".lang-toggle");
+  if (topbar && langToggle) {
+    var logout = document.getElementById("logoutBtn");
+    topbar.insertBefore(langToggle, logout && logout.parentNode === topbar ? logout : null);
+  }
+
   var mq = window.matchMedia("(min-width: 768px)");
   var wins = {};        // name -> { el, open, min, max, free }
   var order = [];       // names of open windows, in opening order
