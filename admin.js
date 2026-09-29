@@ -550,7 +550,8 @@ onSnapshot(query(collection(db, "advanceRequests"), orderBy("createdAt", "desc")
           <span class="badge ${r.status}">${t(r.status)}</span>
           ${r.status === "pending" ? `
             <button class="btn btn-sm btn-primary" data-adv-action="approved" data-id="${d.id}">${t("approve")}</button>
-            <button class="btn btn-sm btn-danger" data-adv-action="rejected" data-id="${d.id}">${t("reject")}</button>` : ""}
+            <button class="btn btn-sm btn-danger" data-adv-action="rejected" data-id="${d.id}">${t("reject")}</button>`
+            : `<button class="btn btn-sm btn-outline" data-adv-action="pending" data-id="${d.id}">${t("undoDecision")}</button>`}
         </div>
       </div>`;
   });
@@ -604,13 +605,18 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
           ${r.status === "pending" ? `
             <button class="btn btn-sm btn-primary" data-leave-approve="${d.id}">${t("approve")}</button>
             <button class="btn btn-sm btn-danger" data-leave-reject="${d.id}">${t("reject")}</button>
-          ` : ""}
+          ` : `<button class="btn btn-sm btn-outline" data-leave-undo="${d.id}">${t("undoDecision")}</button>`}
         </div>
       </div>`;
   });
   el.querySelectorAll("button[data-leave-approve]").forEach(btn => {
     btn.addEventListener("click", async () => {
       await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveApprove), { status: "approved" });
+    });
+  });
+  el.querySelectorAll("button[data-leave-undo]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveUndo), { status: "pending" });
     });
   });
   el.querySelectorAll("button[data-leave-reject]").forEach(btn => {
@@ -875,6 +881,7 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
           <button class="btn btn-sm btn-primary proof-approve" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("approveProof")}</button>
           <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}">${t("rejectProof")}</button>
         </div>` : ""}
+        ${p.status === "rejected" ? `<div style="margin-top:8px"><button class="btn btn-sm btn-outline proof-reopen" data-id="${d.id}">${t("reopenProof")}</button></div>` : ""}
         ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
       </div>`;
   });
@@ -895,6 +902,20 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
           status: "paid", paidAt: serverTimestamp()
         });
         await batch.commit();
+      } catch (err) {
+        console.error(err);
+        alert(t("proofActionFailed"));
+        btn.disabled = false;
+      }
+    });
+  });
+  el.querySelectorAll(".proof-reopen").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      btn.disabled = true;
+      try {
+        await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
+          status: "pending_review", reviewNote: "", reviewedBy: null, reviewedAt: null
+        });
       } catch (err) {
         console.error(err);
         alert(t("proofActionFailed"));
@@ -1042,7 +1063,7 @@ function renderMaintList() {
         </div>
         <select data-id="${m.id}" class="maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
           <option value="pending" ${m.status === "pending" ? "selected" : ""} disabled>${t("pending")}</option>
-          <option value="accepted" ${m.status === "accepted" ? "selected" : ""} disabled>${t("accepted")}</option>
+          <option value="accepted" ${m.status === "accepted" ? "selected" : ""} ${m.assignedWorkerId ? "" : "disabled"}>${t("accepted")}</option>
           <option value="in_progress" ${m.status === "in_progress" ? "selected" : ""}>${t("in_progress")}</option>
           <option value="completed" ${m.status === "completed" ? "selected" : ""}>${t("completed")}</option>
         </select>
@@ -1055,7 +1076,9 @@ function renderMaintList() {
         statusSeenByResident: false,
         statusChangedAt: serverTimestamp()
       };
+      const prev = lastMaintDocs.find(x => x.id === sel.dataset.id);
       if (sel.value === "completed") payload.completedAt = serverTimestamp();
+      else if (prev?.status === "completed") payload.completedAt = null; // reopened
       try {
         await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
       } catch (err) {
@@ -1134,6 +1157,7 @@ function renderSubsList() {
             <button type="button" class="btn btn-sm btn-primary sub-approve" data-id="${s.id}">${t("svcApprove")}</button>
             <button type="button" class="btn btn-sm btn-outline sub-reject" data-id="${s.id}">${t("svcReject")}</button>
           </div>` : ""}
+        ${(s.status === "rejected" || s.status === "cancelled") ? `<button type="button" class="btn btn-sm btn-outline sub-reopen" data-id="${s.id}" style="margin-top:6px">${t("svcReactivate")}</button>` : ""}
         ${s.status === "active" ? `<button type="button" class="btn btn-sm btn-outline sub-stop" data-id="${s.id}" style="margin-top:6px">${t("svcStop")}</button>` : ""}
       </div>
       <span class="badge ${s.status}">${t(`sub_${s.status}`) || s.status}</span>
@@ -1145,6 +1169,9 @@ function renderSubsList() {
   }));
   el.querySelectorAll(".sub-reject").forEach(btn => btn.addEventListener("click", async () => {
     await updateSub(btn, { status: "rejected", reviewedAt: serverTimestamp() });
+  }));
+  el.querySelectorAll(".sub-reopen").forEach(btn => btn.addEventListener("click", async () => {
+    await updateSub(btn, { status: "requested", reviewedAt: null, cancelledAt: null });
   }));
   el.querySelectorAll(".sub-stop").forEach(btn => btn.addEventListener("click", async () => {
     if (!confirm(t("svcStopConfirm"))) return;
@@ -1435,7 +1462,13 @@ onSnapshot(query(collection(db, "invitations"), where("type", "==", "master")), 
         </div>
         <span class="badge ${status}">${status}</span>
         ${status === "active" ? `<button class="btn btn-sm btn-danger" data-revoke-id="${m.id}" style="margin-inline-start:6px">${t("revoke")}</button>` : ""}
+        ${m.status === "revoked" && !expired ? `<button class="btn btn-sm btn-outline" data-reactivate-id="${m.id}" style="margin-inline-start:6px">${t("reactivateInvite")}</button>` : ""}
       </div>`;
+  });
+  el.querySelectorAll("button[data-reactivate-id]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "invitations", btn.dataset.reactivateId), { status: "active" });
+    });
   });
   el.querySelectorAll("button[data-revoke-id]").forEach(btn => {
     btn.addEventListener("click", async () => {

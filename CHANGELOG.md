@@ -1,8 +1,28 @@
 # Special Owner — Update archive
 
-Current version: **v1.6.0**
+Current version: **v1.7.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.7.0 — 2026-09-29
+
+**English**
+- Leave and advance requests: an "Undo" button puts any approved or rejected request back to pending, for the admin and the site manager.
+- Service subscriptions: the admin can reopen any rejected or cancelled request.
+- Payment receipts: the admin can reopen a rejected receipt for review again.
+- Master access codes: a "Reactivate" button for a revoked code that has not expired yet.
+- Maintenance requests: a job in progress can be put back in the queue, and reopening a completed one clears the old completion time.
+- Site manager: new status menu for maintenance requests (in progress / completed / back to queue), same as the admin.
+- Fix: security rules were missing for service subscriptions and payment receipts; they were added so subscribing, uploading a receipt and reviewing them work.
+
+**العربية**
+- طلبات الإجازة والسلف: زرار «تراجع» بيرجّع أي طلب اتقبل أو اتفض لحالة الانتظار، عند الأدمن وعند مدير الموقع.
+- الاشتراكات في الخدمات: الأدمن يقدر يعيد فتح أي طلب مرفوض أو ملغي.
+- إثباتات الدفع: الأدمن يقدر يعيد فتح الإثبات المرفوض للمراجعة من جديد.
+- أكواد الدخول الرئيسية: زرار «إعادة تفعيل» للكود الملغي لو لسه ما انتهتش مدته.
+- طلبات الصيانة: تقدر ترجّع الطلب اللي جاري تنفيذه للطابور، وفتح طلب مكتمل تاني بيمسح وقت الإنجاز القديم.
+- مدير الموقع: قائمة جديدة لتغيير حالة طلبات الصيانة (جاري / مكتمل / رجوع للطابور) زي الأدمن.
+- إصلاح: قواعد الأمان كانت ناقصة لاشتراكات الخدمات وإثباتات الدفع، وتمت إضافتها عشان الاشتراك ورفع الإيصال والمراجعة يشتغلوا.
 
 ## v1.6.0 — 2026-09-28
 

@@ -114,6 +114,33 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    // Recurring services (car wash / cleaning / garden). A resident files a request for
+    // themselves (status must start as 'requested') and may only cancel their own.
+    // Admin approves, rejects, stops and reopens.
+    match /serviceSubscriptions/{subId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'requested';
+      allow update: if isAdmin() ||
+        (isActiveResident() && resource.data.residentId == request.auth.uid &&
+         request.resource.data.status == 'cancelled' &&
+         request.resource.data.diff(resource.data).affectedKeys()
+           .hasOnly(['status', 'cancelledAt']));
+      allow delete: if isAdmin();
+    }
+
+    // Payment receipts. A resident uploads their own (status must start as 'pending_review');
+    // only admin reviews (approve / reject / reopen).
+    match /paymentProofs/{proofId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'pending_review';
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
     match /announcements/{annId} {
       allow read: if isSignedIn();
       // Manager may post announcements too, but only ones aimed at residents (not staff-wide, not finance-related).

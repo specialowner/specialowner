@@ -323,8 +323,31 @@ function renderMaintList() {
           </select>
           ${!m.assignedWorkerId ? `<button type="button" class="btn btn-sm btn-outline mgr-maint-auto" data-id="${m.id}" style="margin-top:6px">${t("autoAssign")}</button>` : ""}
         </div>
-        <span class="badge ${m.status}">${t(m.status) || m.status}</span>
+        <select data-id="${m.id}" class="mgr-maint-status" style="border-radius:8px;border:1px solid #dfe6e3;padding:6px;font-size:12px">
+          <option value="pending" ${m.status === "pending" ? "selected" : ""} disabled>${t("pending")}</option>
+          <option value="accepted" ${m.status === "accepted" ? "selected" : ""} ${m.assignedWorkerId ? "" : "disabled"}>${t("accepted")}</option>
+          <option value="in_progress" ${m.status === "in_progress" ? "selected" : ""}>${t("in_progress")}</option>
+          <option value="completed" ${m.status === "completed" ? "selected" : ""}>${t("completed")}</option>
+        </select>
       </div>`;
+  });
+  el.querySelectorAll(".mgr-maint-status").forEach(sel => {
+    sel.addEventListener("change", async () => {
+      const prev = lastMaintDocs.find(x => x.id === sel.dataset.id);
+      const payload = {
+        status: sel.value,
+        statusSeenByResident: false,
+        statusChangedAt: serverTimestamp()
+      };
+      if (sel.value === "completed") payload.completedAt = serverTimestamp();
+      else if (prev?.status === "completed") payload.completedAt = null; // reopened
+      try {
+        await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
+      } catch (err) {
+        console.error("Failed to update request status:", err);
+        alert(err.message || String(err));
+      }
+    });
   });
   el.querySelectorAll(".mgr-maint-assign").forEach(sel => {
     sel.addEventListener("change", async () => {
@@ -498,13 +521,18 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
           ${r.status === "pending" ? `
             <button class="btn btn-sm btn-primary" data-leave-approve="${d.id}">${t("approve")}</button>
             <button class="btn btn-sm btn-danger" data-leave-reject="${d.id}">${t("reject")}</button>
-          ` : ""}
+          ` : (r.workerId !== user.uid ? `<button class="btn btn-sm btn-outline" data-leave-undo="${d.id}">${t("undoDecision")}</button>` : "")}
         </div>
       </div>`;
   });
   el.querySelectorAll("button[data-leave-approve]").forEach(btn => {
     btn.addEventListener("click", async () => {
       await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveApprove), { status: "approved" });
+    });
+  });
+  el.querySelectorAll("button[data-leave-undo]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveUndo), { status: "pending" });
     });
   });
   el.querySelectorAll("button[data-leave-reject]").forEach(btn => {
