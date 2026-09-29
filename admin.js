@@ -61,14 +61,21 @@ const tabs = document.querySelectorAll(".tab-btn");
 const dashButtons = document.querySelectorAll(".dash-switch [data-dash]");
 
 function showTab(tabName) {
-  tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
-  ALL_TABS.forEach(t => {
-    document.getElementById(`tab-${t}`).style.display = (t === tabName) ? "block" : "none";
-  });
+  const win = window.soWindows;
+  if (win) {
+    // Windowed desktop: open (or focus / restore) this section's window. It refuses
+    // when 4 windows are already open, in which case nothing else should happen.
+    if (!win.open(tabName)) return;
+  } else {
+    tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
+    ALL_TABS.forEach(t => {
+      document.getElementById(`tab-${t}`).style.display = (t === tabName) ? "block" : "none";
+    });
+  }
   if (tabName === "access") startScanner();
 }
 
-function activateDashboard(dash) {
+function activateDashboard(dash, isInit) {
   if (!DASHBOARD_TABS[dash]) dash = "res";
   dashButtons.forEach(b => b.classList.toggle("active", b.dataset.dash === dash));
   tabs.forEach(b => {
@@ -77,19 +84,29 @@ function activateDashboard(dash) {
   localStorage.setItem(DASH_STORAGE_KEY, dash);
   const remembered = localStorage.getItem(tabStorageKey(dash));
   const targetTab = DASHBOARD_TABS[dash].includes(remembered) ? remembered : DASHBOARD_TABS[dash][0];
+  // On the desktop the taskbar lists every section and open windows are restored by
+  // admin-windows.js, so only open a first window when nothing is open yet.
+  const win = window.soWindows;
+  if (win && win.isDesktop()) {
+    if (isInit && !win.count()) showTab(targetTab);
+    return;
+  }
   showTab(targetTab);
 }
 
 dashButtons.forEach(btn => btn.addEventListener("click", () => activateDashboard(btn.dataset.dash)));
 
 tabs.forEach(btn => btn.addEventListener("click", () => {
+  // Clicking the taskbar button of the window that is already in front minimizes it.
+  const win = window.soWindows;
+  if (win && win.isFocused(btn.dataset.tab)) { win.minimize(btn.dataset.tab); return; }
   showTab(btn.dataset.tab);
   if (btn.dataset.dashboard) localStorage.setItem(tabStorageKey(btn.dataset.dashboard), btn.dataset.tab);
 }));
 
 // Restore whichever dashboard the admin was last on (defaults to "res", matching the
 // panel's previous single-dashboard behavior for anyone who hasn't used the switch yet).
-activateDashboard(localStorage.getItem(DASH_STORAGE_KEY) || "res");
+activateDashboard(localStorage.getItem(DASH_STORAGE_KEY) || "res", true);
 
 // ---------- Stats (shown at the top of the Residents tab) ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {

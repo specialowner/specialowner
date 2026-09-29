@@ -1,0 +1,69 @@
+/* ==========================================================================
+   Admin panel — Windows-style desktop (max 4 windows open at once)
+   Loaded by admin.html only. Every rule is scoped under body.win-admin.
+   ========================================================================== */
+
+.win-admin .app-shell{max-width:none;height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.win-admin .content{flex:1;position:relative;overflow:hidden;padding:0;
+  background:linear-gradient(135deg,#dbe8e4 0%,#c3d8d1 100%)}
+
+/* Taskbar (re-uses the existing .tabbar / .tab-btn elements) */
+.win-admin .tabbar{position:static;max-width:none;margin:0;width:100%;flex-shrink:0;
+  background:#10201d;border-top:1px solid #000;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
+.win-admin .tabbar button{color:#b9c9c4;background:rgba(255,255,255,.05);border-radius:8px;
+  position:relative;transition:background .15s}
+.win-admin .tabbar button:hover{background:rgba(255,255,255,.14)}
+.win-admin .tabbar button.is-open::after{content:"";position:absolute;bottom:2px;left:30%;right:30%;
+  height:3px;border-radius:3px;background:#7fbfb2}
+.win-admin .tabbar button.active{background:rgba(255,255,255,.2);color:#fff}
+.win-admin .tabbar button.active::after{background:var(--accent)}
+.win-admin .tabbar .tb-tile{flex:0 0 46px;font-size:18px;color:#fff}
+
+/* Window */
+.win{position:absolute;display:none;flex-direction:column;background:var(--bg);
+  border:1px solid #7d948e;border-radius:10px;overflow:hidden;
+  box-shadow:0 8px 28px rgba(0,0,0,.28)}
+.win.focused{border-color:var(--primary);box-shadow:0 10px 34px rgba(10,79,69,.45)}
+.win.max{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0}
+
+.win-title{flex-shrink:0;display:flex;align-items:center;gap:8px;padding:6px 8px 6px 12px;
+  background:#8aa39c;color:#fff;font-size:13px;font-weight:700;cursor:default;user-select:none;
+  -webkit-user-select:none;touch-action:none}
+.win.focused .win-title{background:var(--primary)}
+.win-ico{font-size:15px}
+.win-name{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.win-btns{display:flex;gap:4px}
+.win-btns button{width:28px;height:24px;border-radius:6px;background:rgba(255,255,255,.18);
+  color:#fff;font-size:13px;line-height:1;display:flex;align-items:center;justify-content:center}
+.win-btns button:hover{background:rgba(255,255,255,.34)}
+.win-btns .wb-close:hover{background:var(--danger)}
+
+.win-body{flex:1;overflow:auto;padding:16px;-webkit-overflow-scrolling:touch}
+.win-grip{position:absolute;bottom:0;right:0;width:18px;height:18px;cursor:nwse-resize;touch-action:none;
+  background:linear-gradient(135deg,transparent 55%,#7d948e 55%,#7d948e 62%,transparent 62%,transparent 74%,#7d948e 74%,#7d948e 81%,transparent 81%)}
+[dir="rtl"] .win-grip{right:auto;left:0;cursor:nesw-resize;transform:scaleX(-1)}
+[dir="rtl"] .win-title{padding:6px 12px 6px 8px}
+.win.max .win-grip{display:none}
+
+/* Toast (limit reached) */
+.win-toast{position:absolute;left:50%;bottom:16px;transform:translateX(-50%);z-index:9999;
+  background:#10201d;color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;
+  box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:90%;text-align:center;pointer-events:none}
+
+/* Desktop only */
+@media (min-width:768px){
+  .win-admin .dash-switch{display:none}
+  .win-admin .tabbar button{display:flex!important;flex-direction:row;justify-content:center;gap:8px;
+    font-size:12px;padding:9px 6px}
+}
+
+/* Phone: one full-screen window at a time, the taskbar works like tabs */
+@media (max-width:767px){
+  .win{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0;border:0}
+  .win:not(.focused){display:none!important}
+  .win-grip,.win-btns .wb-min,.win-btns .wb-max,.win-admin .tabbar .tb-tile{display:none}
+}
+
+/* Version badge (injected by version.js): slim strip under the taskbar instead of the old 96px gap */
+.win-admin #soVersion{flex-shrink:0;width:100%;margin:0!important;padding:0 0 calc(4px + env(safe-area-inset-bottom))!important;
+  background:#10201d!important;color:#7f948e!important;font-size:10px!important}
