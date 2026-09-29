@@ -129,6 +129,11 @@ img.ann-media{background:#eef2f0}
 /* On phones the language switch sits in its own row above the header content,
    so it never covers the logout button. */
 @media (max-width:520px){.topbar{padding-top:58px}}
+/* Once the switch is docked inside the top bar (lang-dock.js) it no longer needs its own row */
+.topbar.has-lang{gap:10px}
+.topbar.has-lang .lang-toggle{position:static;inset:auto;flex-shrink:0;margin-inline-start:auto;z-index:auto}
+.topbar.has-lang > div:first-child{min-width:0;flex:0 1 auto}
+@media (max-width:520px){.topbar.has-lang{padding-top:18px}}
 
 /* Operations overview (admin) + work-order summary/detail (worker) */
 .ops-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:8px;margin:8px 0 14px}

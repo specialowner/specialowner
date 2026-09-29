@@ -13,9 +13,18 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.8.0";
+  var APP_VERSION = "1.8.1";
 
   var CHANGELOG = [
+    {
+      version: "1.8.1", date: "2026-09-29",
+      ar: [
+        "زرار اللغة بقى جوه الشريط العلوي جنب زرار الخروج في كل الصفحات (ساكن، عامل، كول سنتر، أدمن، مدير موقع)، ومبقاش فوق الخروج."
+      ],
+      en: [
+        "The language switch now sits inside the top bar next to the logout button on every page (resident, worker, call center, admin, site manager) instead of floating above it."
+      ]
+    },
     {
       version: "1.8.0", date: "2026-09-29",
       ar: [

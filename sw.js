@@ -8,6 +8,7 @@ const APP_SHELL = [
   "style.css",
   "windows.css",
   "windows.js",
+  "lang-dock.js",
   "i18n.js",
   "version.js",
   "tour.js",

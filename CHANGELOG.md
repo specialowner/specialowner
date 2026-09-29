@@ -1,8 +1,16 @@
 # Special Owner — Update archive
 
-Current version: **v1.8.0**
+Current version: **v1.8.1**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.8.1 — 2026-09-29
+
+**English**
+- The language switch now sits inside the top bar next to the logout button on every page (resident, worker, call center, admin, site manager) instead of floating above it.
+
+**العربية**
+- زرار اللغة بقى جوه الشريط العلوي جنب زرار الخروج في كل الصفحات (ساكن، عامل، كول سنتر، أدمن، مدير موقع)، ومبقاش فوق الخروج.
 
 ## v1.8.0 — 2026-09-29
 
