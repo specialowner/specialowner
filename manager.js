@@ -35,13 +35,22 @@ window.addEventListener("so-lang-changed", renderGreeting);
 
 // ---------- Tabs ----------
 const tabs = document.querySelectorAll(".tab-btn");
+const win = window.soWindows;   // window manager (windows.js); null-safe fallback below
 tabs.forEach(btn => btn.addEventListener("click", () => {
+  const name = btn.dataset.tab;
+  if (win) {
+    // Front window's button minimizes it; otherwise open / focus / restore. Refuses at 4.
+    if (win.isFocused(name)) win.minimize(name); else win.open(name);
+    return;
+  }
   tabs.forEach(b => b.classList.remove("active"));
   btn.classList.add("active");
   ["home", "workers", "security", "visits", "leaves", "maint", "announcements"].forEach(tab => {
-    document.getElementById(`tab-${tab}`).style.display = (tab === btn.dataset.tab) ? "block" : "none";
+    document.getElementById(`tab-${tab}`).style.display = (tab === name) ? "block" : "none";
   });
 }));
+// First visit (nothing restored): start with the Home window open.
+if (win && !win.count()) win.open("home");
 
 // ---------- Today's date, in the app's current language ----------
 function renderTodayDate() {

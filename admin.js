@@ -85,7 +85,7 @@ function activateDashboard(dash, isInit) {
   const remembered = localStorage.getItem(tabStorageKey(dash));
   const targetTab = DASHBOARD_TABS[dash].includes(remembered) ? remembered : DASHBOARD_TABS[dash][0];
   // On the desktop the taskbar lists every section and open windows are restored by
-  // admin-windows.js, so only open a first window when nothing is open yet.
+  // windows.js, so only open a first window when nothing is open yet.
   const win = window.soWindows;
   if (win && win.isDesktop()) {
     if (isInit && !win.count()) showTab(targetTab);

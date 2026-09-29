@@ -7,7 +7,7 @@ const APP_SHELL = [
   "worker.html",
   "style.css",
   "windows.css",
-  "admin-windows.js",
+  "windows.js",
   "i18n.js",
   "version.js",
   "tour.js",

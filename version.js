@@ -19,14 +19,14 @@
     {
       version: "1.8.0", date: "2026-09-29",
       ar: [
-        "لوحة الأدمن بقت بشكل نوافذ زي ويندوز: كل قسم بيتفتح في نافذته الخاصة.",
+        "لوحة الأدمن ولوحة مدير الموقع بقوا بشكل نوافذ زي ويندوز: كل قسم بيتفتح في نافذته الخاصة.",
         "تقدر تفتح لحد ٤ نوافذ مع بعض للاطلاع والإدخال، وتشوف قايمة وتكتب في نموذج في نفس الوقت.",
         "النوافذ بتترتب لوحدها جنب بعض، وتقدر تسحبها من العنوان وتكبّرها أو تصغّرها أو تقفلها.",
         "شريط المهام تحت فيه كل الأقسام، وزرار ⊞ بيرتب النوافذ من جديد. النوافذ المفتوحة بتتفتح تاني في الزيارة الجاية.",
         "على الموبايل النافذة بتملى الشاشة وشريط المهام بيشتغل كتبويبات."
       ],
       en: [
-        "The admin panel is now a Windows-style desktop: every section opens in its own window.",
+        "The admin panel and the site manager panel are now a Windows-style desktop: every section opens in its own window.",
         "Up to 4 windows can be open at the same time, for consultation and data entry side by side.",
         "Windows tile automatically; drag them by the title bar, resize, maximize, minimize or close them.",
         "A taskbar at the bottom lists every section, and the \u229E button re-tiles the windows. Open windows are restored on the next visit.",

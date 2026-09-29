@@ -1,23 +1,23 @@
 /* ==========================================================================
-   Admin panel — Windows-style desktop (max 4 windows open at once)
-   Loaded by admin.html only. Every rule is scoped under body.win-admin.
+   Admin + site manager panels — Windows-style desktop (max 4 windows open at once)
+   Loaded by admin.html and manager.html. Every rule is scoped under body.win-desk.
    ========================================================================== */
 
-.win-admin .app-shell{max-width:none;height:100vh;height:100dvh;min-height:0;overflow:hidden}
-.win-admin .content{flex:1;position:relative;overflow:hidden;padding:0;
+.win-desk .app-shell{max-width:none;height:100vh;height:100dvh;min-height:0;overflow:hidden}
+.win-desk .content{flex:1;position:relative;overflow:hidden;padding:0;
   background:linear-gradient(135deg,#dbe8e4 0%,#c3d8d1 100%)}
 
 /* Taskbar (re-uses the existing .tabbar / .tab-btn elements) */
-.win-admin .tabbar{position:static;max-width:none;margin:0;width:100%;flex-shrink:0;
+.win-desk .tabbar{position:static;max-width:none;margin:0;width:100%;flex-shrink:0;
   background:#10201d;border-top:1px solid #000;gap:4px;padding:6px 8px calc(6px + env(safe-area-inset-bottom))}
-.win-admin .tabbar button{color:#b9c9c4;background:rgba(255,255,255,.05);border-radius:8px;
+.win-desk .tabbar button{color:#b9c9c4;background:rgba(255,255,255,.05);border-radius:8px;
   position:relative;transition:background .15s}
-.win-admin .tabbar button:hover{background:rgba(255,255,255,.14)}
-.win-admin .tabbar button.is-open::after{content:"";position:absolute;bottom:2px;left:30%;right:30%;
+.win-desk .tabbar button:hover{background:rgba(255,255,255,.14)}
+.win-desk .tabbar button.is-open::after{content:"";position:absolute;bottom:2px;left:30%;right:30%;
   height:3px;border-radius:3px;background:#7fbfb2}
-.win-admin .tabbar button.active{background:rgba(255,255,255,.2);color:#fff}
-.win-admin .tabbar button.active::after{background:var(--accent)}
-.win-admin .tabbar .tb-tile{flex:0 0 46px;font-size:18px;color:#fff}
+.win-desk .tabbar button.active{background:rgba(255,255,255,.2);color:#fff}
+.win-desk .tabbar button.active::after{background:var(--accent)}
+.win-desk .tabbar .tb-tile{flex:0 0 46px;font-size:18px;color:#fff}
 
 /* Window */
 .win{position:absolute;display:none;flex-direction:column;background:var(--bg);
@@ -52,8 +52,8 @@
 
 /* Desktop only */
 @media (min-width:768px){
-  .win-admin .dash-switch{display:none}
-  .win-admin .tabbar button{display:flex!important;flex-direction:row;justify-content:center;gap:8px;
+  .win-desk .dash-switch{display:none}
+  .win-desk .tabbar button{display:flex!important;flex-direction:row;justify-content:center;gap:8px;
     font-size:12px;padding:9px 6px}
 }
 
@@ -61,10 +61,10 @@
 @media (max-width:767px){
   .win{left:0!important;top:0!important;width:100%!important;height:100%!important;border-radius:0;border:0}
   .win:not(.focused){display:none!important}
-  .win-admin .dash-switch{margin-bottom:12px}
-  .win-grip,.win-btns .wb-min,.win-btns .wb-max,.win-admin .tabbar .tb-tile{display:none}
+  .win-desk .dash-switch{margin-bottom:12px}
+  .win-grip,.win-btns .wb-min,.win-btns .wb-max,.win-desk .tabbar .tb-tile{display:none}
 }
 
 /* Version badge (injected by version.js): slim strip under the taskbar instead of the old 96px gap */
-.win-admin #soVersion{flex-shrink:0;width:100%;margin:0!important;padding:0 0 calc(4px + env(safe-area-inset-bottom))!important;
+.win-desk #soVersion{flex-shrink:0;width:100%;margin:0!important;padding:0 0 calc(4px + env(safe-area-inset-bottom))!important;
   background:#10201d!important;color:#7f948e!important;font-size:10px!important}
