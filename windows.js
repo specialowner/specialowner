@@ -73,13 +73,134 @@
     wire(name);
   });
 
-  // Tile button in the taskbar
-  var tileBtn = document.createElement("button");
-  tileBtn.type = "button";
-  tileBtn.className = "tb-tile";
-  tileBtn.textContent = "\u229E";
+  // ---------- Bottom bar: Start menu + the open windows ----------
+  // Desktop layout: the section buttons (.tabbar) become a side rail, and this bar lists
+  // only the windows that are open (click = focus / minimize), with a Start menu, a
+  // "windows open" counter, a Show-desktop button and the tile button.
+  var BAR = {
+    ar: {
+      start: "\u0627\u0628\u062F\u0623",
+      desktop: "\u0633\u0637\u062D \u0627\u0644\u0645\u0643\u062A\u0628",
+      count: function (n) {
+        return n === 0 ? "\u0644\u0627 \u0646\u0648\u0627\u0641\u0630 \u0645\u0641\u062A\u0648\u062D\u0629"
+          : n === 1 ? "\u0646\u0627\u0641\u0630\u0629 \u0648\u0627\u062D\u062F\u0629 \u0645\u0641\u062A\u0648\u062D\u0629"
+          : n === 2 ? "\u0646\u0627\u0641\u0630\u062A\u0627\u0646 \u0645\u0641\u062A\u0648\u062D\u062A\u0627\u0646"
+          : n + " \u0646\u0648\u0627\u0641\u0630 \u0645\u0641\u062A\u0648\u062D\u0629";
+      }
+    },
+    en: {
+      start: "Start",
+      desktop: "Desktop",
+      count: function (n) { return n === 0 ? "No windows open" : n + (n === 1 ? " window open" : " windows open"); }
+    }
+  };
+
+  var winbar = document.createElement("div");
+  winbar.className = "winbar";
+  winbar.innerHTML =
+    '<button type="button" class="bar-start" aria-haspopup="true"><span class="bar-start-ico">\u229E</span><span class="bar-start-txt"></span></button>' +
+    '<div class="bar-chips"></div>' +
+    '<span class="bar-count"></span>' +
+    '<button type="button" class="bar-desktop"></button>' +
+    '<button type="button" class="bar-tile">\u25A6</button>' +
+    '<div class="bar-menu" hidden></div>';
+  taskbar.parentNode.insertBefore(winbar, taskbar.nextSibling);
+  var startBtn = winbar.querySelector(".bar-start");
+  var startTxt = winbar.querySelector(".bar-start-txt");
+  var chipsEl = winbar.querySelector(".bar-chips");
+  var countEl = winbar.querySelector(".bar-count");
+  var deskBtn = winbar.querySelector(".bar-desktop");
+  var tileBtn = winbar.querySelector(".bar-tile");
+  var menuEl = winbar.querySelector(".bar-menu");
+  var hiddenByDesktop = [];
+
+  function iconOf(name) { var b = taskBtn(name); return (b && b.querySelector(".tab-icon") || {}).textContent || ""; }
+  function labelOf(name) { return wins[name] ? wins[name].el.querySelector(".win-name").textContent : name; }
+
+  function buildMenu() {
+    menuEl.innerHTML = "";
+    TABS.forEach(function (name) {
+      if (!wins[name]) return;
+      var it = document.createElement("button");
+      it.type = "button";
+      it.dataset.win = name;
+      var ic = document.createElement("span"); ic.className = "bar-ico"; ic.textContent = iconOf(name);
+      var tx = document.createElement("span"); tx.textContent = labelOf(name);
+      it.appendChild(ic); it.appendChild(tx);
+      menuEl.appendChild(it);
+    });
+  }
+
+  function renderBar() {
+    var L = BAR[lang()];
+    startTxt.textContent = L.start;
+    deskBtn.textContent = L.desktop;
+    countEl.textContent = L.count(order.length);
+    chipsEl.innerHTML = "";
+    order.forEach(function (name) {
+      var w = wins[name];
+      if (!w) return;
+      var chip = document.createElement("button");
+      chip.type = "button";
+      chip.dataset.win = name;
+      chip.className = "bar-chip" + (w.min ? " min" : "") + (focused === name && !w.min ? " on" : "");
+      var ic = document.createElement("span"); ic.className = "bar-ico"; ic.textContent = iconOf(name);
+      var tx = document.createElement("span"); tx.className = "bar-name"; tx.textContent = labelOf(name);
+      var dash = document.createElement("span"); dash.className = "bar-dash";
+      chip.appendChild(ic); chip.appendChild(tx); chip.appendChild(dash);
+      chipsEl.appendChild(chip);
+    });
+  }
+
+  function openFromBar(name) {
+    // Go through the section's own button so any per-section start-up work (e.g. the access
+    // scanner) still runs; skip it when that window is already in front.
+    var b = taskBtn(name);
+    if (b && !(focused === name && wins[name].open && !wins[name].min)) b.click();
+    else if (!b) open(name);
+  }
+
+  chipsEl.addEventListener("click", function (e) {
+    var chip = e.target.closest(".bar-chip");
+    if (!chip) return;
+    var name = chip.dataset.win, w = wins[name];
+    if (w && focused === name && !w.min) minimize(name);
+    else openFromBar(name);
+  });
+
+  startBtn.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (menuEl.hidden) buildMenu();
+    menuEl.hidden = !menuEl.hidden;
+    startBtn.classList.toggle("on", !menuEl.hidden);
+  });
+  menuEl.addEventListener("click", function (e) {
+    var it = e.target.closest("button[data-win]");
+    if (!it) return;
+    menuEl.hidden = true;
+    startBtn.classList.remove("on");
+    openFromBar(it.dataset.win);
+  });
+  function closeMenu() { menuEl.hidden = true; startBtn.classList.remove("on"); }
+  document.addEventListener("click", function (e) { if (!menuEl.hidden && !winbar.contains(e.target)) closeMenu(); });
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeMenu(); });
+
+  // Show desktop: minimize everything; press again to bring the same windows back.
+  deskBtn.addEventListener("click", function () {
+    var visible = order.filter(function (n) { return !wins[n].min; });
+    if (visible.length) {
+      hiddenByDesktop = visible;
+      visible.forEach(function (n) { wins[n].min = true; render(n); });
+    } else {
+      var back = hiddenByDesktop.filter(function (n) { return wins[n] && wins[n].open; });
+      (back.length ? back : order).forEach(function (n) { wins[n].min = false; render(n); });
+      hiddenByDesktop = [];
+    }
+    tile();
+    focusTopmost();
+  });
   tileBtn.addEventListener("click", function () { tile(true); });
-  taskbar.appendChild(tileBtn);
+  window.addEventListener("so-lang-changed", function () { refreshTitles(); });
 
   function refreshTitles() {
     TABS.forEach(function (name) {
@@ -90,6 +211,9 @@
       w.el.querySelector(".win-name").textContent = label ? label.textContent : name;
     });
     tileBtn.title = TILE_TITLE[lang()];
+    deskBtn.title = BAR[lang()].desktop;
+    if (!menuEl.hidden) buildMenu();
+    renderBar();
   }
   refreshTitles();
   new MutationObserver(refreshTitles).observe(taskbar, { childList: true, characterData: true, subtree: true });
@@ -140,6 +264,7 @@
       b.classList.toggle("is-open", w.open);
       b.classList.toggle("active", w.open && !w.min && focused === name);
     });
+    renderBar();
   }
 
   function render(name) {

@@ -38,11 +38,12 @@
 
     <!-- RESIDENTS -->
     <section id="tab-residents" data-dashboard="res">
+      <div id="resMain">
       <div class="grid-2" style="margin-bottom:14px">
-        <div class="stat-box"><div class="num" id="statResidents">0</div><div class="lbl" data-i18n="residents">Residents</div></div>
-        <div class="stat-box"><div class="num" id="statWorkers">0</div><div class="lbl" data-i18n="activeWorkers">Active workers</div></div>
-        <div class="stat-box"><div class="num" id="statPending">0</div><div class="lbl" data-i18n="pendingRequests">Pending requests</div></div>
-        <div class="stat-box"><div class="num" id="statOverdue">0</div><div class="lbl" data-i18n="overduePayments">Overdue payments</div></div>
+        <div class="stat-box clickable" role="button" tabindex="0" data-drill="residents"><div class="num" id="statResidents">0</div><div class="lbl" data-i18n="residents">Residents</div></div>
+        <div class="stat-box clickable" role="button" tabindex="0" data-drill="workers"><div class="num" id="statWorkers">0</div><div class="lbl" data-i18n="activeWorkers">Active workers</div></div>
+        <div class="stat-box clickable" role="button" tabindex="0" data-drill="pending"><div class="num" id="statPending">0</div><div class="lbl" data-i18n="pendingRequests">Pending requests</div></div>
+        <div class="stat-box clickable" role="button" tabindex="0" data-drill="overdue"><div class="num" id="statOverdue">0</div><div class="lbl" data-i18n="overduePayments">Overdue payments</div></div>
       </div>
       <div class="card">
         <h3 data-i18n="residentsAndRequests">Residents & activation requests</h3>
@@ -58,6 +59,8 @@
         <p class="error-text" id="residentAccError" style="display:none"></p>
         <button class="btn btn-primary" id="addResidentAccBtn" data-i18n="addResidentAccount">Add resident</button>
       </div>
+      </div>
+      <div id="resDrill" style="display:none"></div>
     </section>
 
     <!-- PROPERTY: BUILDINGS & APARTMENTS -->

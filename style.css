@@ -161,3 +161,25 @@ img.ann-media{background:#eef2f0}
 .wo-k{color:var(--muted);min-width:78px;font-size:12px}
 .wo-v{flex:1;font-weight:600}
 .wo-card.completed{opacity:.7}
+
+/* ---- Clickable stat boxes + drill-down screens (Residents window) ---- */
+.stat-box.clickable{cursor:pointer;border:1.5px solid transparent;transition:transform .12s,border-color .12s,box-shadow .12s;user-select:none;-webkit-user-select:none}
+.stat-box.clickable:hover{border-color:var(--primary);transform:translateY(-1px)}
+.stat-box.clickable:active{transform:translateY(0)}
+.stat-box.clickable:focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+.stat-box.clickable .lbl::after{content:" \203A"}
+[dir="rtl"] .stat-box.clickable .lbl::after{content:" \2039"}
+.drill-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.drill-head h2{flex:1;font-size:16px;font-weight:800;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.drill-head .btn{flex-shrink:0}
+.drill-row{cursor:pointer;border-radius:8px;padding-inline:6px;margin-inline:-6px}
+.drill-row:hover,.drill-row:focus-visible{background:#f0f6f4;outline:none}
+.drill-row .chev{color:var(--muted);font-size:20px;line-height:1;flex-shrink:0}
+.drill-kv{display:grid;grid-template-columns:minmax(90px,130px) 1fr;gap:8px 12px;font-size:13px;margin:8px 0 4px}
+.drill-kv .k{color:var(--muted)}
+.drill-kv .v{font-weight:600;word-break:break-word}
+.drill-link{background:none;border:none;padding:0;font:inherit;font-weight:700;color:var(--primary);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+.drill-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.drill-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.drill-title h3{font-size:18px;margin:0}
+.drill-photo{max-width:100%;max-height:260px;border-radius:10px;margin-top:10px}

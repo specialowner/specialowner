@@ -50,11 +50,63 @@
   background:#10201d;color:#fff;font-size:13px;font-weight:600;padding:10px 16px;border-radius:10px;
   box-shadow:0 4px 16px rgba(0,0,0,.3);max-width:90%;text-align:center;pointer-events:none}
 
-/* Desktop only */
+/* Bottom bar (open windows). Hidden on phones, where the section buttons stay as bottom tabs. */
+.winbar{display:none}
+
+/* Desktop only: side rail (sections) + bottom bar (open windows) */
 @media (min-width:768px){
   .win-desk .dash-switch{display:none}
-  .win-desk .tabbar button{display:flex!important;flex-direction:row;justify-content:center;gap:8px;
-    font-size:12px;padding:9px 6px}
+
+  .win-desk .app-shell{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto auto}
+  .win-desk .topbar{grid-column:1/-1;grid-row:1}
+  .win-desk .content{grid-column:2;grid-row:2;min-width:0;min-height:0}
+  .win-desk .tabbar{grid-column:1;grid-row:2}
+  .win-desk .winbar{grid-column:1/-1;grid-row:3}
+  .win-desk #soVersion{grid-column:1/-1;grid-row:4}
+
+  /* Side rail: icon above label, one section per button (first grid column = right side in Arabic) */
+  .win-desk .tabbar{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;
+    width:92px;padding:10px 6px;overflow-y:auto;overflow-x:hidden;
+    border-top:0;border-inline-end:1px solid #000}
+  .win-desk .tabbar button{display:flex!important;flex:0 0 auto;flex-direction:column;align-items:center;justify-content:center;
+    gap:5px;padding:12px 4px;font-size:11px;line-height:1.25;text-align:center;border-radius:10px}
+  .win-desk .tabbar .tab-icon{font-size:20px}
+  .win-desk .tabbar button.is-open::after{left:auto;right:auto;bottom:auto;top:22%;height:56%;width:3px;
+    border-radius:3px;background:#7fbfb2;inset-inline-start:0}
+  .win-desk .tabbar button.active::after{background:var(--accent)}
+
+  /* Bottom bar: Start · open windows · counter · Desktop · tile */
+  .win-desk .winbar{display:flex;align-items:center;gap:8px;position:relative;
+    padding:7px 10px calc(7px + env(safe-area-inset-bottom));background:#fff;border-top:1px solid #d5dfdb}
+  .bar-start{display:flex;align-items:center;gap:8px;flex-shrink:0;padding:9px 16px;border-radius:10px;
+    background:var(--primary);color:#fff;font-size:13px;font-weight:700}
+  .bar-start:hover,.bar-start.on{background:var(--primary-dark)}
+  .bar-start-ico{font-size:16px;line-height:1}
+  .bar-chips{flex:1;min-width:0;display:flex;align-items:center;gap:8px;overflow-x:auto}
+  .bar-chip{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:9px 14px;border-radius:10px;
+    background:#fff;border:1px solid #d5dfdb;color:var(--text);font-size:13px;font-weight:600;white-space:nowrap}
+  .bar-chip:hover{background:#f1f6f4}
+  .bar-chip.on{background:#e9f1ee;border-color:#a9c2ba;box-shadow:0 1px 4px rgba(0,0,0,.12)}
+  .bar-chip .bar-dash{width:16px;height:3px;border-radius:3px;background:#8ab98f}
+  .bar-chip.min .bar-dash{background:#b9c4c0}
+  .bar-chip.min{color:var(--muted)}
+  .bar-ico{font-size:15px;line-height:1}
+  .bar-count{flex-shrink:0;font-size:12px;color:var(--muted);white-space:nowrap}
+  .bar-desktop{flex-shrink:0;padding:9px 14px;border-radius:10px;border:1px solid #d5dfdb;background:#fff;
+    color:var(--text);font-size:13px;font-weight:600;white-space:nowrap}
+  .bar-desktop:hover{background:#f1f6f4}
+  .bar-tile{flex-shrink:0;width:38px;height:38px;border-radius:10px;border:1px solid #d5dfdb;background:#fff;
+    color:var(--text);font-size:16px}
+  .bar-tile:hover{background:#f1f6f4}
+
+  /* Start menu: every section, opens above the Start button */
+  .bar-menu{position:absolute;bottom:calc(100% + 6px);inset-inline-start:10px;z-index:10000;min-width:240px;
+    display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:8px;background:#fff;border:1px solid #cfdad6;
+    border-radius:14px;box-shadow:0 10px 30px rgba(0,0,0,.25)}
+  .bar-menu[hidden]{display:none}
+  .bar-menu button{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:10px;background:none;
+    color:var(--text);font-size:13px;font-weight:600;text-align:start}
+  .bar-menu button:hover{background:#eaf3f0}
 }
 
 /* Phone: one full-screen window at a time, the taskbar works like tabs */

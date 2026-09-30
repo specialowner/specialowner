@@ -13,9 +13,39 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.8.1";
+  var APP_VERSION = "1.10.0";
 
   var CHANGELOG = [
+    {
+      version: "1.10.0", date: "2026-09-30",
+      ar: [
+        "على الكمبيوتر: أقسام لوحة الأدمن ولوحة مدير الموقع بقت في شريط جانبي (أيقونة فوق الاسم)، والنوافذ المفتوحة بس ظاهرة في الشريط السفلي.",
+        "الشريط السفلي فيه: زرار «ابدأ» (قايمة بكل الأقسام)، زرار لكل نافذة مفتوحة (ضغطة تفتحها أو تصغّرها)، عدّاد «N نوافذ مفتوحة»، زرار «سطح المكتب» يصغّر كل النوافذ وضغطة تانية ترجّعها، وزرار ترتيب النوافذ.",
+        "على الموبايل مفيش تغيير: الأقسام لسه تبويبات تحت."
+      ],
+      en: [
+        "On desktop, the admin and site manager sections now live in a side rail (icon above the name), and only the open windows appear in the bottom bar.",
+        "The bottom bar has: a Start button (menu with every section), one button per open window (click to focus or minimize), an \"N windows open\" counter, a Desktop button that minimizes every window (press again to bring them back), and the tile button.",
+        "Phones are unchanged: the sections are still bottom tabs."
+      ]
+    },
+    {
+      version: "1.9.0", date: "2026-09-30",
+      ar: [
+        "في نافذة السكان، الأرقام الأربعة في الأعلى (السكان، العمال النشطين، الطلبات المعلقة، المدفوعات المتأخرة) بقت بتتضغط، وكل رقم بيفتح شاشة فيها قايمة النتايج.",
+        "كل عنصر في القايمة بيتضغط: الضغط على اسم الساكن بيفتح ملفه (بياناته، شقته، مدفوعاته وطلبات الصيانة بتاعته) ومنه تقدر توقف الحساب أو توافق عليه.",
+        "الطلب المعلق بيفتح تفاصيله (المكان، التصنيف، الوصف، الصورة، العامل) واسم الساكن فيه رابط لملفه، وزرار للانتقال لإدارة الطلب في الصيانة.",
+        "الدفعة المتأخرة بتفتح تفاصيلها مع رابط للساكن وزرار «تحديد كمدفوع». العامل النشط بيفتح ملفه.",
+        "زرار «رجوع» بيرجعك خطوة، وزرار ⌂ بيرجعك للرئيسية، والقوايم بتتحدّث لحظيًا لو فيه تغيير."
+      ],
+      en: [
+        "In the Residents window the four counters at the top (Residents, Active workers, Pending requests, Overdue payments) are now clickable; each opens a screen listing the records behind the number.",
+        "Every item in those lists is clickable too: tapping a resident opens their profile (details, apartment, payments and maintenance requests) with Suspend / Approve right there.",
+        "A pending request opens its details (place, category, description, photo, worker); the resident's name links to their profile, and a button jumps to managing the request in Maintenance.",
+        "An overdue payment opens its details with a link to the resident and a \"Mark as paid\" button. An active worker opens their profile.",
+        "\"Back\" goes one step back, the \u2302 button returns to the overview, and the lists update live when data changes."
+      ]
+    },
     {
       version: "1.8.1", date: "2026-09-29",
       ar: [

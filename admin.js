@@ -44,6 +44,11 @@ let areaDocs = [];
 let areaExtraOpenId = null;      // which area has its "extraordinary job" panel open
 let areaEditId = null;           // which area row is expanded
 
+// Drill-down screens opened from the four counters at the top of the Residents window.
+// Declared up here for the same reason as the state above (snapshots can arrive early).
+const drillCache = { workers: [], pending: [], overdue: [], allPayments: [] };
+let drillStack = [];             // navigation stack: [{type, id?}, ...] — empty = overview
+
 // ---------- Dashboards (Residents / Operations) & tabs ----------
 // The admin panel is split into two dashboards: "res" (residents, finance, announcements)
 // and "ops" (access, personnel, maintenance). Each tab-btn/section carries a data-dashboard
@@ -109,23 +114,32 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 activateDashboard(localStorage.getItem(DASH_STORAGE_KEY) || "res", true);
 
 // ---------- Stats (shown at the top of the Residents tab) ----------
+// Each counter is also clickable: the docs behind it are cached so the drill-down
+// screens show exactly the records that were counted.
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   document.getElementById("statResidents").textContent = snap.size;
 });
 onSnapshot(query(collection(db, "workers"), where("status", "==", "active")), (snap) => {
   document.getElementById("statWorkers").textContent = snap.size;
+  drillCache.workers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
 });
 onSnapshot(query(collection(db, "maintenanceRequests"), where("status", "==", "pending")), (snap) => {
   document.getElementById("statPending").textContent = snap.size;
+  drillCache.pending = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
 });
 onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), (snap) => {
   document.getElementById("statOverdue").textContent = snap.size;
+  drillCache.overdue = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
 });
 
 // ---------- Residents & activation requests ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (snap) => {
   const el = document.getElementById("residentsList");
   residentsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
   backfillResidentNames();
   renderUnitsList(); // the apartment rows carry a "link a resident account" dropdown
   if (document.getElementById("annAudience").value === "residents") renderAnnTargetList();
@@ -167,6 +181,238 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
     });
   });
 });
+
+// ---------- Residents window: clickable counters → result lists → detail cards ----------
+// Tap a counter (e.g. "5 Residents") to get the list behind it; tap a row to open its card;
+// inside a card, names are links to the related card (request → resident, payment → resident…).
+function drillDate(ts) {
+  try {
+    const d = ts && ts.toDate ? ts.toDate() : (ts ? new Date(ts) : null);
+    if (!d || isNaN(d)) return "";
+    return d.toLocaleDateString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : undefined);
+  } catch (e) { return ""; }
+}
+const drillTs = (x) => (x && x.toDate ? x.toDate().getTime() : 0);
+const drillUnitsOf = (residentId) => propUnits.filter(u => u.residentId === residentId);
+const drillResidentById = (id) => residentsCache.find(r => r.id === id);
+
+function drillGo(view, reset) {
+  drillStack = reset ? [view] : drillStack.concat([view]);
+  renderDrill(true);
+}
+function drillBack() {
+  drillStack = drillStack.slice(0, -1);
+  renderDrill(true);
+}
+function refreshDrill() {
+  if (!drillStack.length) return;   // overview showing: nothing to refresh (keeps early snapshots safe)
+  renderDrill(false);
+}
+
+function drillHeader(title, canHome) {
+  const rtl = document.documentElement.dir === "rtl";
+  return `<div class="drill-head">
+    <button type="button" class="btn btn-sm btn-outline" data-drill-back>${rtl ? "→" : "←"} ${t("drillBack")}</button>
+    <h2>${opsEsc(title)}</h2>
+    ${canHome ? `<button type="button" class="btn btn-sm btn-outline" data-drill-home title="${opsEsc(t("drillOverview"))}">⌂</button>` : ""}
+  </div>`;
+}
+function drillRow(type, id, title, sub, badge) {
+  return `<div class="list-item drill-row" tabindex="0" role="button" data-drill-open="${type}" data-id="${opsEsc(id)}">
+    <div class="meta"><div class="title">${title}</div>${sub ? `<div class="sub">${sub}</div>` : ""}</div>
+    ${badge || ""}<span class="chev">${document.documentElement.dir === "rtl" ? "‹" : "›"}</span>
+  </div>`;
+}
+const drillKv = (k, v) => (v === "" || v == null) ? "" : `<div class="k">${opsEsc(k)}</div><div class="v">${v}</div>`;
+const drillStatusBadge = (st) => `<span class="badge ${opsEsc(st)}">${opsEsc(t(st) || st)}</span>`;
+function drillResidentLink(residentId, fallbackName) {
+  const r = residentId && drillResidentById(residentId);
+  if (r) return `<button type="button" class="drill-link" data-drill-open="resident" data-id="${opsEsc(r.id)}">${opsEsc(r.name || r.email || r.id)}</button>`;
+  return opsEsc(fallbackName || "");
+}
+
+function renderDrill(scrollTop) {
+  const main = document.getElementById("resMain");
+  const box = document.getElementById("resDrill");
+  if (!main || !box) return;
+  if (!drillStack.length) { box.style.display = "none"; box.innerHTML = ""; main.style.display = ""; return; }
+  main.style.display = "none";
+  box.style.display = "block";
+  const view = drillStack[drillStack.length - 1];
+  const canHome = drillStack.length > 1;
+  let html = "";
+
+  if (view.type === "residents") {
+    const rows = residentsCache.slice().sort((a, b) =>
+      (a.activationRequestStatus === "pending" ? 0 : 1) - (b.activationRequestStatus === "pending" ? 0 : 1));
+    html = drillHeader(`${t("residents")} (${rows.length})`, canHome) + `<div class="card">` + (rows.length
+      ? rows.map(r => drillRow("resident", r.id,
+          `${opsEsc(r.name || r.email)} ${r.activationRequestStatus === "pending" ? "🔔" : ""}`,
+          `${t("unitLabel")} ${opsEsc(r.unit || "—")} · ${opsEsc(r.email || "")}`,
+          drillStatusBadge(r.accountStatus || "active"))).join("")
+      : `<p class="empty-state">${t("noResidentsYet")}</p>`) + `</div>`;
+
+  } else if (view.type === "workers") {
+    const rows = drillCache.workers.slice().sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+    html = drillHeader(`${t("activeWorkers")} (${rows.length})`, canHome) + `<div class="card">` + (rows.length
+      ? rows.map(w => drillRow("worker", w.id, opsEsc(w.name || "—"),
+          `${opsEsc(w.role || "")}${w.phone ? " · " + opsEsc(w.phone) : ""}`, drillStatusBadge(w.status || "active"))).join("")
+      : `<p class="empty-state">${t("drillNoResults")}</p>`) + `</div>`;
+
+  } else if (view.type === "pending") {
+    const rows = drillCache.pending.slice().sort((a, b) => drillTs(b.createdAt) - drillTs(a.createdAt));
+    html = drillHeader(`${t("pendingRequests")} (${rows.length})`, canHome) + `<div class="card">` + (rows.length
+      ? rows.map(m => drillRow("request", m.id,
+          `${opsEsc(placeLabel(m))} · ${opsEsc(categoryLabel(m.category))}`,
+          `${m.residentName ? "👤 " + opsEsc(m.residentName) + " · " : ""}${opsEsc(String(m.description || "").slice(0, 80))}`,
+          drillStatusBadge(m.status || "pending"))).join("")
+      : `<p class="empty-state">${t("drillNoResults")}</p>`) + `</div>`;
+
+  } else if (view.type === "overdue") {
+    const rows = drillCache.overdue.slice().sort((a, b) => String(a.dueDate || "").localeCompare(String(b.dueDate || "")));
+    html = drillHeader(`${t("overduePayments")} (${rows.length})`, canHome) + `<div class="card">` + (rows.length
+      ? rows.map(p => {
+          const r = drillResidentById(p.residentId);
+          return drillRow("payment", p.id, `${opsEsc(p.unit || "—")} · EGP ${opsEsc(p.amount)}`,
+            `${r ? "👤 " + opsEsc(r.name || r.email) + " · " : ""}${opsEsc(p.description || "")} · ${opsEsc(p.dueDate || "")}`,
+            drillStatusBadge("overdue"));
+        }).join("")
+      : `<p class="empty-state">${t("drillNoResults")}</p>`) + `</div>`;
+
+  } else if (view.type === "resident") {
+    const r = drillResidentById(view.id);
+    if (!r) html = drillHeader(t("drillResidentProfile"), canHome) + `<div class="card"><p class="empty-state">${t("drillNotFound")}</p></div>`;
+    else {
+      const status = r.accountStatus || "active";
+      const units = drillUnitsOf(r.id);
+      const phone = (units.find(u => u.residentPhone) || {}).residentPhone || "";
+      const pays = drillCache.allPayments.filter(p => p.residentId === r.id);
+      const reqs = lastMaintDocs.filter(m => m.residentId === r.id);
+      html = drillHeader(t("drillResidentProfile"), canHome) + `
+        <div class="card">
+          <div class="drill-title"><h3>${opsEsc(r.name || r.email)}</h3>${drillStatusBadge(status)}${r.activationRequestStatus === "pending" ? `<span class="badge pending">🔔 ${t("drillActivationPending")}</span>` : ""}</div>
+          <div class="drill-kv">
+            ${drillKv(t("drillEmail"), opsEsc(r.email || ""))}
+            ${drillKv(t("drillPhone"), opsEsc(phone))}
+            ${drillKv(t("unitLabel"), opsEsc(r.unit || ""))}
+            ${drillKv(t("drillBuilding"), opsEsc(r.buildingName || (units[0] && units[0].buildingName) || ""))}
+            ${drillKv(t("drillApartment"), units.map(u => opsEsc(u.code || u.number || "")).filter(Boolean).join(", "))}
+            ${drillKv(t("drillAdded"), opsEsc(drillDate(r.createdAt)))}
+          </div>
+          <div class="drill-actions">
+            ${status === "active"
+              ? `<button type="button" class="btn btn-sm btn-danger" data-drill-act="suspend" data-id="${opsEsc(r.id)}">${t("suspend")}</button>`
+              : `<button type="button" class="btn btn-sm btn-primary" data-drill-act="approve" data-id="${opsEsc(r.id)}">${t("approve")}</button>`}
+          </div>
+        </div>
+        <div class="card"><h3>${t("drillPayments")} (${pays.length})</h3>${pays.length
+          ? pays.map(p => drillRow("payment", p.id, `EGP ${opsEsc(p.amount)} · ${opsEsc(p.description || "")}`,
+              opsEsc(p.dueDate || ""), drillStatusBadge(p.status || "pending"))).join("")
+          : `<p class="empty-state">${t("drillNoResults")}</p>`}</div>
+        <div class="card"><h3>${t("drillRequests")} (${reqs.length})</h3>${reqs.length
+          ? reqs.map(m => drillRow("request", m.id, `${opsEsc(placeLabel(m))} · ${opsEsc(categoryLabel(m.category))}`,
+              opsEsc(String(m.description || "").slice(0, 80)), drillStatusBadge(m.status || "pending"))).join("")
+          : `<p class="empty-state">${t("drillNoResults")}</p>`}</div>`;
+    }
+
+  } else if (view.type === "worker") {
+    const w = drillCache.workers.find(x => x.id === view.id);
+    if (!w) html = drillHeader(t("drillWorkerProfile"), canHome) + `<div class="card"><p class="empty-state">${t("drillNotFound")}</p></div>`;
+    else html = drillHeader(t("drillWorkerProfile"), canHome) + `
+      <div class="card">
+        <div class="drill-title"><h3>${opsEsc(w.name || "—")}</h3>${drillStatusBadge(w.status || "active")}</div>
+        <div class="drill-kv">
+          ${drillKv(t("drillRole"), opsEsc(w.role || ""))}
+          ${drillKv(t("drillPhone"), opsEsc(w.phone || ""))}
+          ${drillKv(t("drillAdded"), opsEsc(drillDate(w.createdAt)))}
+        </div>
+      </div>`;
+
+  } else if (view.type === "request") {
+    const m = lastMaintDocs.find(x => x.id === view.id) || drillCache.pending.find(x => x.id === view.id);
+    if (!m) html = drillHeader(t("drillRequestDetails"), canHome) + `<div class="card"><p class="empty-state">${t("drillNotFound")}</p></div>`;
+    else {
+      const worker = m.assignedWorkerId ? workerOptionsCache.find(w => w.id === m.assignedWorkerId) : null;
+      html = drillHeader(t("drillRequestDetails"), canHome) + `
+        <div class="card">
+          <div class="drill-title"><h3>${opsEsc(placeLabel(m))} · ${opsEsc(categoryLabel(m.category))}</h3>${drillStatusBadge(m.status || "pending")}</div>
+          <div class="drill-kv">
+            ${drillKv(t("drillResident"), drillResidentLink(m.residentId, m.residentName))}
+            ${drillKv(t("unitLabel"), opsEsc(m.unit || ""))}
+            ${drillKv(t("drillPlace"), opsEsc(m.location || ""))}
+            ${drillKv(t("drillOrigin"), opsEsc(originLabel(m)))}
+            ${drillKv(t("drillDescription"), opsEsc(m.description || ""))}
+            ${drillKv(t("drillAssignedTo"), worker ? opsEsc(worker.name || worker.email) : opsEsc(t("drillUnassigned")))}
+            ${drillKv(t("drillSent"), opsEsc(drillDate(m.createdAt)))}
+          </div>
+          ${m.photoData ? `<img class="drill-photo" src="${m.photoData}" alt="">` : ""}
+          <div class="drill-actions"><button type="button" class="btn btn-sm btn-outline" data-drill-act="maint">${t("drillManageMaint")}</button></div>
+        </div>`;
+    }
+
+  } else if (view.type === "payment") {
+    const p = drillCache.allPayments.find(x => x.id === view.id) || drillCache.overdue.find(x => x.id === view.id);
+    if (!p) html = drillHeader(t("drillPaymentDetails"), canHome) + `<div class="card"><p class="empty-state">${t("drillNotFound")}</p></div>`;
+    else html = drillHeader(t("drillPaymentDetails"), canHome) + `
+      <div class="card">
+        <div class="drill-title"><h3>${opsEsc(p.unit || "—")} · EGP ${opsEsc(p.amount)}</h3>${drillStatusBadge(p.status || "pending")}</div>
+        <div class="drill-kv">
+          ${drillKv(t("drillResident"), drillResidentLink(p.residentId, ""))}
+          ${drillKv(t("unitLabel"), opsEsc(p.unit || ""))}
+          ${drillKv(t("drillAmount"), "EGP " + opsEsc(p.amount))}
+          ${drillKv(t("drillDescription"), opsEsc(p.description || ""))}
+          ${drillKv(t("drillDue"), opsEsc(p.dueDate || ""))}
+          ${drillKv(t("drillPaidOn"), opsEsc(drillDate(p.paidAt)))}
+        </div>
+        ${p.status !== "paid" ? `<div class="drill-actions"><button type="button" class="btn btn-sm btn-primary" data-drill-act="pay" data-id="${opsEsc(p.id)}">${t("markAsPaid")}</button></div>` : ""}
+      </div>`;
+  }
+
+  box.innerHTML = html;
+  if (scrollTop) {
+    const body = document.getElementById("tab-residents").closest(".win-body");
+    if (body) body.scrollTop = 0;
+  }
+}
+
+// One delegated handler for everything inside the drill-down area.
+document.getElementById("resDrill").addEventListener("click", async (e) => {
+  const back = e.target.closest("[data-drill-back]");
+  if (back) { drillBack(); return; }
+  if (e.target.closest("[data-drill-home]")) { drillStack = []; renderDrill(true); return; }
+  const open = e.target.closest("[data-drill-open]");
+  if (open) { drillGo({ type: open.dataset.drillOpen, id: open.dataset.id }); return; }
+  const act = e.target.closest("[data-drill-act]");
+  if (!act) return;
+  const kind = act.dataset.drillAct;
+  if (kind === "maint") { showTab("maint"); return; }
+  act.disabled = true;
+  try {
+    if (kind === "suspend" || kind === "approve") {
+      await updateDoc(doc(db, "users", act.dataset.id), {
+        accountStatus: kind === "approve" ? "active" : "suspended",
+        activationRequestStatus: "none"
+      });
+    } else if (kind === "pay") {
+      await updateDoc(doc(db, "payments", act.dataset.id), { status: "paid", paidAt: serverTimestamp() });
+    }
+  } catch (err) {
+    console.error("Drill action failed:", err);
+    alert(err.message || String(err));
+    act.disabled = false;
+  }
+});
+document.getElementById("resDrill").addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".drill-row")) { e.preventDefault(); e.target.click(); }
+});
+
+// The four counters open their list.
+document.querySelectorAll(".stat-box[data-drill]").forEach(box => {
+  const go = () => drillGo({ type: box.dataset.drill }, true);
+  box.addEventListener("click", go);
+  box.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } });
+});
+window.addEventListener("so-lang-changed", () => renderDrill(false));
 
 // ---------- Announcements ----------
 let residentsCache = [];
@@ -814,6 +1060,8 @@ document.getElementById("addPayBtn").addEventListener("click", async () => {
 });
 
 onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (snap) => {
+  drillCache.allPayments = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
   const el = document.getElementById("financeList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noPaymentRecords")}</p>`; return; }
   el.innerHTML = "";
@@ -1276,6 +1524,7 @@ document.getElementById("createOnsiteTaskBtn")?.addEventListener("click", async 
 
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  refreshDrill();
   renderMaintList();
   renderOpsOverview();
   renderMaintStats();
