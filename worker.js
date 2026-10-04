@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
+import { computeLeave } from "./leave-accrual.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp, Timestamp
@@ -72,6 +73,15 @@ function renderTodayDate() {
 renderTodayDate();
 window.addEventListener("so-lang-changed", renderTodayDate);
 
+function renderLeaveBalance() {
+  const data = window.__userData || {};
+  const el = document.getElementById("leaveBalanceAmount");
+  if (!(data.leaveBalance || data.leaveBalance === 0)) { el.textContent = "—"; return; }
+  const c = computeLeave(data, window.__leaveRows || []);
+  el.textContent = `${c.available} ${t("daysShort") || ""}`;
+  el.title = `${t("leaveOpening")}: ${c.opening} · ${t("leaveAccrued")}: +${c.accrued} · ${t("leaveUsed")}: -${c.used}`;
+}
+
 // ---------- Account status (pending / active / suspended) + salary ----------
 let currentAccountStatus = "active";
 let activationRequestPending = false;
@@ -81,8 +91,8 @@ onSnapshot(userDocRef, (snap) => {
   currentAccountStatus = data.accountStatus || "active";
   activationRequestPending = data.activationRequestStatus === "pending";
 
-  document.getElementById("leaveBalanceAmount").textContent =
-    (data.leaveBalance || data.leaveBalance === 0) ? `${data.leaveBalance} ${t("daysShort") || ""}` : "—";
+  window.__userData = data;
+  renderLeaveBalance();
 
   const basic = data.salaryBasic || 0;
   const allowances = data.salaryAllowances || 0;
@@ -246,6 +256,8 @@ document.getElementById("submitLeaveBtn").addEventListener("click", async () => 
 
 const leaveQ = query(collection(db, "leaveRequests"), where("workerId", "==", user.uid));
 onSnapshot(leaveQ, (snap) => {
+  window.__leaveRows = snap.docs.map(d => d.data());
+  renderLeaveBalance();
   const el = document.getElementById("leaveList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noLeaveRequests")}</p>`; return; }
   el.innerHTML = "";

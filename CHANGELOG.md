@@ -1,8 +1,28 @@
 # Special Owner — Update archive
 
-Current version: **v1.11.0**
+Current version: **v1.12.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.12.0 — 2026-10-05
+
+**English**
+- A worker's leave balance is now calculated automatically: the opening balance the admin enters + 1.75 days per full month (21 days a year) − approved leave days.
+- When the admin changes the balance, the change date is recorded and accrual starts from it. Existing balances start from 2026-10-01 so they do not jump.
+- The worker sees the current balance; hovering or long-pressing it shows opening, accrued and taken.
+
+**العربية**
+- رصيد إجازات العامل بقى بيتحسب تلقائيًا: الرصيد الافتتاحي اللي الأدمن بيكتبه + 1.75 يوم عن كل شهر كامل (21 يوم في السنة) − أيام الإجازات الموافق عليها.
+- الأدمن لما يغيّر رقم الرصيد بيتسجل تاريخ التغيير، والاستحقاق الشهري بيبدأ منه. الأرصدة القديمة بتبدأ من 2026-10-01 عشان ما تزيدش فجأة.
+- العامل بيشوف الرصيد الحالي، وبالضغط المطوّل/المرور على الرقم بيظهر الافتتاحي والمستحق والمأخوذ.
+
+## v1.11.1 — 2026-10-05
+
+**English**
+- Fix: the version number was hard to see in the admin and site manager panels on desktop (a tiny dark strip under the bottom bar). It now sits in the bottom bar next to the windows counter, and clicking it opens the update archive.
+
+**العربية**
+- إصلاح: رقم النسخة ماكانش واضح في لوحة الأدمن ومدير الموقع على الكمبيوتر (شريط صغير غامق تحت الشريط السفلي). دلوقتي ظاهر في الشريط السفلي جنب عدّاد النوافذ، والضغط عليه يفتح أرشيف التحديثات.
 
 ## v1.11.0 — 2026-10-05
 

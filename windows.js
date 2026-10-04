@@ -100,6 +100,7 @@
   winbar.innerHTML =
     '<button type="button" class="bar-start" aria-haspopup="true"><span class="bar-start-ico">\u229E</span><span class="bar-start-txt"></span></button>' +
     '<div class="bar-chips"></div>' +
+    '<button type="button" class="bar-ver"></button>' +
     '<span class="bar-count"></span>' +
     '<button type="button" class="bar-desktop"></button>' +
     '<button type="button" class="bar-tile">\u25A6</button>' +
@@ -113,6 +114,9 @@
   var tileBtn = winbar.querySelector(".bar-tile");
   var menuEl = winbar.querySelector(".bar-menu");
   var hiddenByDesktop = [];
+  var verBtn = winbar.querySelector(".bar-ver");
+  verBtn.textContent = "v" + (window.SO_VERSION || "");
+  verBtn.addEventListener("click", function () { if (window.SO_OPEN_ARCHIVE) window.SO_OPEN_ARCHIVE(); });
 
   function iconOf(name) { var b = taskBtn(name); return (b && b.querySelector(".tab-icon") || {}).textContent || ""; }
   function labelOf(name) { return wins[name] ? wins[name].el.querySelector(".win-name").textContent : name; }

@@ -748,7 +748,7 @@ function renderSalaryManageList() {
           <input type="number" class="wm-incentives" data-id="${w.id}" value="${w.salaryIncentives || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
         <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryDeductions">Deductions</label>
           <input type="number" class="wm-deductions" data-id="${w.id}" value="${w.salaryDeductions || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="leaveBalance">Leave balance</label>
+        <div><label style="font-size:11px;color:var(--muted)" data-i18n="leaveBalanceOpening">Leave balance (opening)</label>
           <input type="number" class="wm-leave" data-id="${w.id}" value="${w.leaveBalance ?? 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
       </div>
       <div style="display:flex;gap:6px">
@@ -760,12 +760,14 @@ function renderSalaryManageList() {
   el.querySelectorAll("button[data-save-worker]").forEach(btn => {
     btn.addEventListener("click", async () => {
       const id = btn.dataset.saveWorker;
+      const leaveInp = el.querySelector(`.wm-leave[data-id="${id}"]`);
       await updateDoc(doc(db, "users", id), {
         salaryBasic: Number(el.querySelector(`.wm-basic[data-id="${id}"]`).value) || 0,
         salaryAllowances: Number(el.querySelector(`.wm-allowances[data-id="${id}"]`).value) || 0,
         salaryIncentives: Number(el.querySelector(`.wm-incentives[data-id="${id}"]`).value) || 0,
         salaryDeductions: Number(el.querySelector(`.wm-deductions[data-id="${id}"]`).value) || 0,
-        leaveBalance: Number(el.querySelector(`.wm-leave[data-id="${id}"]`).value) || 0
+        leaveBalance: Number(leaveInp.value) || 0,
+        ...(Number(leaveInp.value) !== Number(leaveInp.defaultValue) ? { leaveBalanceAsOf: new Date().toISOString().slice(0, 10) } : {})
       });
       alert(t("saved") || "Saved.");
     });

@@ -62,7 +62,9 @@
   .win-desk .content{grid-column:2;grid-row:2;min-width:0;min-height:0}
   .win-desk .tabbar{grid-column:1;grid-row:2}
   .win-desk .winbar{grid-column:1/-1;grid-row:3}
-  .win-desk #soVersion{grid-column:1/-1;grid-row:4}
+  .win-desk #soVersion{display:none!important}
+  .bar-ver{flex-shrink:0;font-size:12px;font-weight:700;color:var(--primary);padding:6px 10px;border-radius:8px;
+    background:#e8f3ef;border:1px solid #cfe4d8;cursor:pointer}
 
   /* Side rail: icon above label, one section per button (first grid column = right side in Arabic) */
   .win-desk .tabbar{flex-direction:column;align-items:stretch;justify-content:flex-start;gap:4px;

@@ -13,9 +13,31 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.11.0";
+  var APP_VERSION = "1.12.0";
 
   var CHANGELOG = [
+    {
+      version: "1.12.0", date: "2026-10-05",
+      ar: [
+        "رصيد إجازات العامل بقى بيتحسب تلقائيًا: الرصيد الافتتاحي اللي الأدمن بيكتبه + 1.75 يوم عن كل شهر كامل (21 يوم في السنة) − أيام الإجازات الموافق عليها.",
+        "الأدمن لما يغيّر رقم الرصيد بيتسجل تاريخ التغيير، والاستحقاق الشهري بيبدأ منه. الأرصدة القديمة بتبدأ من 2026-10-01 عشان ما تزيدش فجأة.",
+        "العامل بيشوف الرصيد الحالي، وبالضغط المطوّل/المرور على الرقم بيظهر الافتتاحي والمستحق والمأخوذ."
+      ],
+      en: [
+        "A worker's leave balance is now calculated automatically: the opening balance the admin enters + 1.75 days per full month (21 days a year) − approved leave days.",
+        "When the admin changes the balance, the change date is recorded and accrual starts from it. Existing balances start from 2026-10-01 so they do not jump.",
+        "The worker sees the current balance; hovering or long-pressing it shows opening, accrued and taken."
+      ]
+    },
+    {
+      version: "1.11.1", date: "2026-10-05",
+      ar: [
+        "إصلاح: رقم النسخة ماكانش واضح في لوحة الأدمن ومدير الموقع على الكمبيوتر (شريط صغير غامق تحت الشريط السفلي). دلوقتي ظاهر في الشريط السفلي جنب عدّاد النوافذ، والضغط عليه يفتح أرشيف التحديثات."
+      ],
+      en: [
+        "Fix: the version number was hard to see in the admin and site manager panels on desktop (a tiny dark strip under the bottom bar). It now sits in the bottom bar next to the windows counter, and clicking it opens the update archive."
+      ]
+    },
     {
       version: "1.11.0", date: "2026-10-05",
       ar: [
@@ -250,6 +272,8 @@
     document.body.appendChild(overlay);
     overlay.addEventListener("click", function (e) { if (e.target === overlay || e.target.id === "soChangelogClose") overlay.remove(); });
   }
+
+  g.SO_OPEN_ARCHIVE = openArchive;
 
   function mountBadge() {
     if (document.getElementById("soVersion")) return;
