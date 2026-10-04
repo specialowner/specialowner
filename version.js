@@ -13,9 +13,29 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.12.0";
+  var APP_VERSION = "1.13.0";
 
   var CHANGELOG = [
+    {
+      version: "1.13.0", date: "2026-10-05",
+      ar: [
+        "شاشة العامل: في تاريخ المرتبات، زرار «قسيمة المرتب (PDF)» لكل شهر بيفتح قسيمة جاهزة للطباعة أو الحفظ كـ PDF (من نافذة الطباعة).",
+        "القسيمة فيها الأساسي والبدلات والحوافز والخصومات وصافي المرتب، وأيام الحضور وصافي ساعات العمل لنفس الشهر من سجل الحضور."
+      ],
+      en: [
+        "Worker screen: each month in the salary history has a \"Payslip (PDF)\" button that opens a printable payslip, which can be saved as PDF from the print dialog.",
+        "The payslip shows basic, allowances, incentives, deductions and net salary, plus days attended and net working hours for that month from the attendance log."
+      ]
+    },
+    {
+      version: "1.12.1", date: "2026-10-05",
+      ar: [
+        "إصلاح: عناوين خانات المرتب ورصيد الإجازات (الأساسي، البدلات، الحوافز، الخصومات، رصيد الإجازات) كانت بتظهر بالإنجليزي في الواجهة العربية. دلوقتي بتتترجم."
+      ],
+      en: [
+        "Fix: the labels of the salary and leave-balance fields (Basic, Allowances, Incentives, Deductions, Leave balance) showed in English in the Arabic interface. They are now translated."
+      ]
+    },
     {
       version: "1.12.0", date: "2026-10-05",
       ar: [

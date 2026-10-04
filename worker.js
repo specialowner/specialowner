@@ -2,6 +2,7 @@ import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
 import { computeLeave } from "./leave-accrual.js";
+import { openPayslip } from "./payslip.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp, Timestamp
@@ -281,14 +282,35 @@ onSnapshot(salaryHistoryQ, (snap) => {
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noSalaryHistory")}</p>`; return; }
   el.innerHTML = "";
   const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.month || "").localeCompare(a.month || ""));
-  rows.forEach(r => {
+  rows.forEach((r, i) => {
     el.innerHTML += `
       <div class="list-item">
         <div class="meta">
           <div class="title">${r.month || ""}</div>
           <div class="sub">${t("netSalary")}: EGP ${r.net ?? 0}</div>
         </div>
+        <button class="btn btn-sm btn-outline" data-payslip="${i}">${t("payslip")}</button>
       </div>`;
+  });
+  el.querySelectorAll("button[data-payslip]").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const r = rows[Number(btn.dataset.payslip)];
+      let att = null;
+      try {
+        const as = await getDocs(query(collection(db, "attendance"), where("workerId", "==", user.uid)));
+        const days = new Set(); let sec = 0;
+        as.docs.forEach(d => {
+          const a = d.data(), ci = a.clockIn?.toDate ? a.clockIn.toDate() : null, co = a.clockOut?.toDate ? a.clockOut.toDate() : null;
+          if (!ci || !co) return;
+          const m = `${ci.getFullYear()}-${String(ci.getMonth() + 1).padStart(2, "0")}`;
+          if (m !== r.month) return;
+          days.add(ci.toDateString());
+          sec += Math.max(0, (co - ci) / 1000 - (a.totalBreakSeconds || 0));
+        });
+        att = { days: days.size, hours: sec / 3600 };
+      } catch (e) { console.error(e); }
+      openPayslip(r, window.SO_I18N ? window.SO_I18N.getLang() : "ar", att);
+    });
   });
 });
 

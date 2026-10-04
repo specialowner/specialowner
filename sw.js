@@ -9,6 +9,7 @@ const APP_SHELL = [
   "windows.css",
   "windows.js",
   "leave-accrual.js",
+  "payslip.js",
   "lang-dock.js",
   "i18n.js",
   "version.js",

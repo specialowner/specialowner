@@ -740,15 +740,15 @@ function renderSalaryManageList() {
         <div class="sub">${w.workerType ? workerTypeLabel(w.workerType) : t("siteManager")}</div>
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px">
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryBasic">Basic</label>
+        <div><label style="font-size:11px;color:var(--muted)">${t("salaryBasic")}</label>
           <input type="number" class="wm-basic" data-id="${w.id}" value="${w.salaryBasic || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryAllowances">Allowances</label>
+        <div><label style="font-size:11px;color:var(--muted)">${t("salaryAllowances")}</label>
           <input type="number" class="wm-allowances" data-id="${w.id}" value="${w.salaryAllowances || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryIncentives">Incentives</label>
+        <div><label style="font-size:11px;color:var(--muted)">${t("salaryIncentives")}</label>
           <input type="number" class="wm-incentives" data-id="${w.id}" value="${w.salaryIncentives || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="salaryDeductions">Deductions</label>
+        <div><label style="font-size:11px;color:var(--muted)">${t("salaryDeductions")}</label>
           <input type="number" class="wm-deductions" data-id="${w.id}" value="${w.salaryDeductions || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
-        <div><label style="font-size:11px;color:var(--muted)" data-i18n="leaveBalanceOpening">Leave balance (opening)</label>
+        <div><label style="font-size:11px;color:var(--muted)">${t("leaveBalanceOpening")}</label>
           <input type="number" class="wm-leave" data-id="${w.id}" value="${w.leaveBalance ?? 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
       </div>
       <div style="display:flex;gap:6px">

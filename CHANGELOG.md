@@ -1,8 +1,26 @@
 # Special Owner — Update archive
 
-Current version: **v1.12.0**
+Current version: **v1.13.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.13.0 — 2026-10-05
+
+**English**
+- Worker screen: each month in the salary history has a "Payslip (PDF)" button that opens a printable payslip, which can be saved as PDF from the print dialog.
+- The payslip shows basic, allowances, incentives, deductions and net salary, plus days attended and net working hours for that month from the attendance log.
+
+**العربية**
+- شاشة العامل: في تاريخ المرتبات، زرار «قسيمة المرتب (PDF)» لكل شهر بيفتح قسيمة جاهزة للطباعة أو الحفظ كـ PDF (من نافذة الطباعة).
+- القسيمة فيها الأساسي والبدلات والحوافز والخصومات وصافي المرتب، وأيام الحضور وصافي ساعات العمل لنفس الشهر من سجل الحضور.
+
+## v1.12.1 — 2026-10-05
+
+**English**
+- Fix: the labels of the salary and leave-balance fields (Basic, Allowances, Incentives, Deductions, Leave balance) showed in English in the Arabic interface. They are now translated.
+
+**العربية**
+- إصلاح: عناوين خانات المرتب ورصيد الإجازات (الأساسي، البدلات، الحوافز، الخصومات، رصيد الإجازات) كانت بتظهر بالإنجليزي في الواجهة العربية. دلوقتي بتتترجم.
 
 ## v1.12.0 — 2026-10-05
 
