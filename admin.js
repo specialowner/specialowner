@@ -825,9 +825,46 @@ onSnapshot(query(collection(db, "advanceRequests"), orderBy("createdAt", "desc")
   });
 });
 
+// ---------- Worker attendance stats (current month) ----------
+function renderShiftStats() {
+  const box = document.getElementById("shiftStats");
+  if (!box) return;
+  const inp = document.getElementById("lateAfterTime");
+  let limit = "09:00";
+  try { limit = localStorage.getItem("so_lateAfter") || limit; } catch (e) {}
+  if (inp && !inp.dataset.bound) {
+    inp.value = limit; inp.dataset.bound = "1";
+    inp.addEventListener("change", () => { try { localStorage.setItem("so_lateAfter", inp.value); } catch (e) {} renderShiftStats(); });
+  }
+  limit = (inp && inp.value) || limit;
+  const [lh, lm] = limit.split(":").map(Number);
+  const now = new Date(), per = {};
+  (window.__shiftDocs || []).forEach(s => {
+    const ci = s.clockIn?.toDate ? s.clockIn.toDate() : null;
+    if (!ci || ci.getMonth() !== now.getMonth() || ci.getFullYear() !== now.getFullYear()) return;
+    const key = s.workerId || s.workerName || "?";
+    const w = per[key] || (per[key] = { name: s.workerName || "—", shifts: 0, sec: 0, brk: 0, late: 0 });
+    w.shifts++;
+    const co = s.clockOut?.toDate ? s.clockOut.toDate() : null;
+    const brk = s.totalBreakSeconds || 0;
+    if (co) w.sec += Math.max(0, (co - ci) / 1000 - brk);
+    w.brk += brk;
+    if (ci.getHours() * 60 + ci.getMinutes() > lh * 60 + lm) w.late++;
+  });
+  const rows = Object.values(per).sort((a, b) => b.sec - a.sec);
+  if (!rows.length) { box.innerHTML = `<p class="empty-state">${t("noShiftsYet")}</p>`; return; }
+  box.innerHTML = rows.map(w => `
+    <div class="list-item"><div class="meta">
+      <div class="title">${w.name}</div>
+      <div class="sub">${t("shiftsCount")}: ${w.shifts} · ${t("totalHours")}: ${(w.sec / 3600).toFixed(1)} ${t("hoursShort")} · ${t("totalBreak")}: ${Math.round(w.brk / 60)} ${t("minutesShort")} · ${t("lateCount")}: ${w.late}</div>
+    </div></div>`).join("");
+}
+
 // ---------- Worker shifts (attendance) ----------
 onSnapshot(query(collection(db, "attendance"), orderBy("clockIn", "desc")), (snap) => {
   const el = document.getElementById("shiftsList");
+  window.__shiftDocs = snap.docs.map(d => d.data());
+  renderShiftStats();
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noShiftsYet")}</p>`; return; }
   el.innerHTML = "";
   snap.docs.slice(0, 50).forEach(d => {

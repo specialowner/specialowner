@@ -13,9 +13,20 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.10.0";
+  var APP_VERSION = "1.11.0";
 
   var CHANGELOG = [
+    {
+      version: "1.11.0", date: "2026-10-05",
+      ar: [
+        "قسم الموظفين: إحصائيات الحضور للشهر الحالي لكل عامل: عدد الشيفتات، صافي ساعات العمل (بعد خصم الاستراحات)، إجمالي الاستراحات، وأيام التأخير.",
+        "التأخير بيتحسب لو الدخول بعد ساعة تقدر تحددها (الافتراضي 09:00) وبتتحفظ على الجهاز."
+      ],
+      en: [
+        "Workers section: attendance stats for the current month per worker: number of shifts, net working hours (breaks deducted), total break time, and late days.",
+        "A day counts as late when the clock-in is after a time you set (default 09:00), remembered on the device."
+      ]
+    },
     {
       version: "1.10.0", date: "2026-09-30",
       ar: [

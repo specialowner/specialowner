@@ -1,8 +1,18 @@
 # Special Owner — Update archive
 
-Current version: **v1.10.0**
+Current version: **v1.11.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.11.0 — 2026-10-05
+
+**English**
+- Workers section: attendance stats for the current month per worker: number of shifts, net working hours (breaks deducted), total break time, and late days.
+- A day counts as late when the clock-in is after a time you set (default 09:00), remembered on the device.
+
+**العربية**
+- قسم الموظفين: إحصائيات الحضور للشهر الحالي لكل عامل: عدد الشيفتات، صافي ساعات العمل (بعد خصم الاستراحات)، إجمالي الاستراحات، وأيام التأخير.
+- التأخير بيتحسب لو الدخول بعد ساعة تقدر تحددها (الافتراضي 09:00) وبتتحفظ على الجهاز.
 
 ## v1.10.0 — 2026-09-30
 
