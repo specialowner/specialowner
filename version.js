@@ -13,9 +13,24 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.13.0";
+  var APP_VERSION = "1.13.1";
 
   var CHANGELOG = [
+    {
+      version: "1.13.1", date: "2026-10-05",
+      ar: [
+        "رصيد الإجازات: تفاصيل الرصيد (الافتتاحي، المستحق، المأخوذ) بقت سطر ظاهر تحت الرقم على الموبايل والكمبيوتر، مش بس بالمرور بالماوس.",
+        "مدير الموقع بقى رصيده بيتحسب تلقائيًا زي العامل.",
+        "الأدمن بيشوف تحت خانة الرصيد الافتتاحي سطر «الرصيد الحالي» بيتحدّث لحظيًا مع الموافقة على الإجازات.",
+        "أيام الإجازة بتتحسب أيام عمل بس: الجمعة والسبت مش بيتخصموا (العطلات الرسمية لسه بتتحسب)."
+      ],
+      en: [
+        "Leave balance: the breakdown (opening, accrued, taken) is now a visible line under the number on phones and desktop, not only on mouse hover.",
+        "The site manager's balance is now calculated automatically like the workers'.",
+        "Under the opening-balance field the admin now sees a \"Current balance\" line that updates live as leave is approved.",
+        "Leave days now count working days only: Friday and Saturday are not deducted (public holidays still count)."
+      ]
+    },
     {
       version: "1.13.0", date: "2026-10-05",
       ar: [
@@ -41,12 +56,12 @@
       ar: [
         "رصيد إجازات العامل بقى بيتحسب تلقائيًا: الرصيد الافتتاحي اللي الأدمن بيكتبه + 1.75 يوم عن كل شهر كامل (21 يوم في السنة) − أيام الإجازات الموافق عليها.",
         "الأدمن لما يغيّر رقم الرصيد بيتسجل تاريخ التغيير، والاستحقاق الشهري بيبدأ منه. الأرصدة القديمة بتبدأ من 2026-10-01 عشان ما تزيدش فجأة.",
-        "العامل بيشوف الرصيد الحالي، وبالضغط المطوّل/المرور على الرقم بيظهر الافتتاحي والمستحق والمأخوذ."
+        "العامل بيشوف الرصيد الحالي، وبالمرور بالماوس على الرقم (على الكمبيوتر) بيظهر الافتتاحي والمستحق والمأخوذ."
       ],
       en: [
         "A worker's leave balance is now calculated automatically: the opening balance the admin enters + 1.75 days per full month (21 days a year) − approved leave days.",
         "When the admin changes the balance, the change date is recorded and accrual starts from it. Existing balances start from 2026-10-01 so they do not jump.",
-        "The worker sees the current balance; hovering or long-pressing it shows opening, accrued and taken."
+        "The worker sees the current balance; hovering over it with a mouse (desktop) shows opening, accrued and taken."
       ]
     },
     {

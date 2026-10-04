@@ -1,7 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
-import { computeLeave } from "./leave-accrual.js";
+import { renderLeaveBalanceInto } from "./leave-accrual.js";
 import { openPayslip } from "./payslip.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
@@ -75,12 +75,7 @@ renderTodayDate();
 window.addEventListener("so-lang-changed", renderTodayDate);
 
 function renderLeaveBalance() {
-  const data = window.__userData || {};
-  const el = document.getElementById("leaveBalanceAmount");
-  if (!(data.leaveBalance || data.leaveBalance === 0)) { el.textContent = "—"; return; }
-  const c = computeLeave(data, window.__leaveRows || []);
-  el.textContent = `${c.available} ${t("daysShort") || ""}`;
-  el.title = `${t("leaveOpening")}: ${c.opening} · ${t("leaveAccrued")}: +${c.accrued} · ${t("leaveUsed")}: -${c.used}`;
+  renderLeaveBalanceInto(document.getElementById("leaveBalanceAmount"), window.__userData || {}, window.__leaveRows || [], t);
 }
 
 // ---------- Account status (pending / active / suspended) + salary ----------

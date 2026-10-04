@@ -1,5 +1,6 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
+import { renderLeaveBalanceInto } from "./leave-accrual.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy,
@@ -64,14 +65,17 @@ window.addEventListener("so-lang-changed", renderTodayDate);
 // ---------- Account status (pending / active / suspended) + own salary ----------
 let currentAccountStatus = "active";
 let activationRequestPending = false;
+function renderMgrLeave() {
+  renderLeaveBalanceInto(document.getElementById("leaveBalanceAmount"), window.__userData || {}, window.__leaveRows || [], t);
+}
 const userDocRef = doc(db, "users", user.uid);
 onSnapshot(userDocRef, (snap) => {
   const data = snap.data() || {};
   currentAccountStatus = data.accountStatus || "active";
   activationRequestPending = data.activationRequestStatus === "pending";
 
-  document.getElementById("leaveBalanceAmount").textContent =
-    (data.leaveBalance || data.leaveBalance === 0) ? `${data.leaveBalance} ${t("daysShort") || ""}` : "—";
+  window.__userData = data;
+  renderMgrLeave();
 
   const basic = data.salaryBasic || 0;
   const allowances = data.salaryAllowances || 0;
@@ -139,6 +143,8 @@ document.getElementById("submitLeaveBtn").addEventListener("click", async () => 
 
 const myLeaveQ = query(collection(db, "leaveRequests"), where("workerId", "==", user.uid));
 onSnapshot(myLeaveQ, (snap) => {
+  window.__leaveRows = snap.docs.map(d => d.data());
+  renderMgrLeave();
   const el = document.getElementById("leaveList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noLeaveRequests")}</p>`; return; }
   el.innerHTML = "";

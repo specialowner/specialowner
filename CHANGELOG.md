@@ -1,8 +1,22 @@
 # Special Owner — Update archive
 
-Current version: **v1.13.0**
+Current version: **v1.13.1**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.13.1 — 2026-10-05
+
+**English**
+- Leave balance: the breakdown (opening, accrued, taken) is now a visible line under the number on phones and desktop, not only on mouse hover.
+- The site manager's balance is now calculated automatically like the workers'.
+- Under the opening-balance field the admin now sees a "Current balance" line that updates live as leave is approved.
+- Leave days now count working days only: Friday and Saturday are not deducted (public holidays still count).
+
+**العربية**
+- رصيد الإجازات: تفاصيل الرصيد (الافتتاحي، المستحق، المأخوذ) بقت سطر ظاهر تحت الرقم على الموبايل والكمبيوتر، مش بس بالمرور بالماوس.
+- مدير الموقع بقى رصيده بيتحسب تلقائيًا زي العامل.
+- الأدمن بيشوف تحت خانة الرصيد الافتتاحي سطر «الرصيد الحالي» بيتحدّث لحظيًا مع الموافقة على الإجازات.
+- أيام الإجازة بتتحسب أيام عمل بس: الجمعة والسبت مش بيتخصموا (العطلات الرسمية لسه بتتحسب).
 
 ## v1.13.0 — 2026-10-05
 
@@ -27,12 +41,12 @@ _Generated from `version.js` — do not edit by hand. Newest first; each entry l
 **English**
 - A worker's leave balance is now calculated automatically: the opening balance the admin enters + 1.75 days per full month (21 days a year) − approved leave days.
 - When the admin changes the balance, the change date is recorded and accrual starts from it. Existing balances start from 2026-10-01 so they do not jump.
-- The worker sees the current balance; hovering or long-pressing it shows opening, accrued and taken.
+- The worker sees the current balance; hovering over it with a mouse (desktop) shows opening, accrued and taken.
 
 **العربية**
 - رصيد إجازات العامل بقى بيتحسب تلقائيًا: الرصيد الافتتاحي اللي الأدمن بيكتبه + 1.75 يوم عن كل شهر كامل (21 يوم في السنة) − أيام الإجازات الموافق عليها.
 - الأدمن لما يغيّر رقم الرصيد بيتسجل تاريخ التغيير، والاستحقاق الشهري بيبدأ منه. الأرصدة القديمة بتبدأ من 2026-10-01 عشان ما تزيدش فجأة.
-- العامل بيشوف الرصيد الحالي، وبالضغط المطوّل/المرور على الرقم بيظهر الافتتاحي والمستحق والمأخوذ.
+- العامل بيشوف الرصيد الحالي، وبالمرور بالماوس على الرقم (على الكمبيوتر) بيظهر الافتتاحي والمستحق والمأخوذ.
 
 ## v1.11.1 — 2026-10-05
 

@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
+import { computeLeave } from "./leave-accrual.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
@@ -726,6 +727,17 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "callcenter")), (s
 });
 
 // ---------- Salary breakdown & leave balance management ----------
+function leaveNowText(w) {
+  if (!(w.leaveBalance || w.leaveBalance === 0)) return "";
+  const c = computeLeave(w, (window.__adminLeaveRows || []).filter(r => r.workerId === w.id));
+  return `${t("leaveCurrent")}: ${c.available} ${t("daysShort")}`;
+}
+function updateLeaveHints() {
+  [...workersCache, ...managersCache].forEach(w => {
+    const h = document.querySelector(`.wm-leave-now[data-id="${w.id}"]`);
+    if (h) h.textContent = leaveNowText(w);
+  });
+}
 function renderSalaryManageList() {
   const el = document.getElementById("salaryManageList");
   if (!el) return;
@@ -749,7 +761,8 @@ function renderSalaryManageList() {
         <div><label style="font-size:11px;color:var(--muted)">${t("salaryDeductions")}</label>
           <input type="number" class="wm-deductions" data-id="${w.id}" value="${w.salaryDeductions || 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
         <div><label style="font-size:11px;color:var(--muted)">${t("leaveBalanceOpening")}</label>
-          <input type="number" class="wm-leave" data-id="${w.id}" value="${w.leaveBalance ?? 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px"></div>
+          <input type="number" class="wm-leave" data-id="${w.id}" value="${w.leaveBalance ?? 0}" style="width:100%;border-radius:8px;border:1px solid #dfe6e3;padding:5px;font-size:12px">
+          <div class="wm-leave-now" data-id="${w.id}" style="font-size:11px;color:var(--primary);margin-top:3px;font-weight:600">${leaveNowText(w)}</div></div>
       </div>
       <div style="display:flex;gap:6px">
         <button class="btn btn-sm btn-outline" data-save-worker="${w.id}">${t("save")}</button>
@@ -891,6 +904,8 @@ onSnapshot(query(collection(db, "attendance"), orderBy("clockIn", "desc")), (sna
 
 // ---------- Leave requests review ----------
 onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")), (snap) => {
+  window.__adminLeaveRows = snap.docs.map(d => d.data());
+  updateLeaveHints();
   const el = document.getElementById("leaveRequestsList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noLeaveRequests")}</p>`; return; }
   el.innerHTML = "";
