@@ -1,8 +1,22 @@
 # Special Owner — Update archive
 
-Current version: **v1.13.1**
+Current version: **v1.14.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.14.0 — 2026-10-05
+
+**English**
+- Access section: a "Scan mode: Entry / Exit" selector above the scanner (admin and security worker). In exit mode a guest's or master-code holder's exit is recorded.
+- Exit is never blocked by an expired or revoked invitation (someone inside must be able to leave), but it is rejected if the pass never entered or already exited.
+- The admin's movements log now filters by movement type (entry/exit) and person type and shows up to 100 movements. The same entered/exited label was added to the security worker's and site manager's logs.
+- Scanning the same code twice within 5 seconds is ignored, so a master code no longer logs duplicate entries.
+
+**العربية**
+- قسم الدخول: فوق الماسح اختيار «وضع المسح: دخول / خروج» (للأدمن وعامل الأمن). في وضع الخروج بيتسجل خروج الزائر أو صاحب الكود الرئيسي.
+- الخروج مش بيتمنع لو الدعوة انتهت أو اتلغت (اللي جوه لازم يعرف يخرج)، لكن بيترفض لو التصريح ما دخلش أصلًا أو خرج بالفعل.
+- سجل الحركات عند الأدمن بقى فيه فلتر بنوع الحركة (دخول/خروج) ونوع الشخص، ويعرض لحد 100 حركة. نفس توضيح دخل/خرج اتضاف في سجل عامل الأمن ومدير الموقع.
+- نفس الكود لو الكاميرا قرأته مرتين في أقل من 5 ثواني بيتتجاهل، فالكود الرئيسي مابقاش بيتسجل دخول مكرر.
 
 ## v1.13.1 — 2026-10-05
 

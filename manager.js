@@ -493,7 +493,7 @@ onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (s
       <div class="list-item">
         <div class="meta">
           <div class="title">${a.personName || ""} (${a.personType || ""})</div>
-          <div class="sub">${timeStr}</div>
+          <div class="sub">${a.type === "exit" ? "🚪 " + t("accessExit") : "➡️ " + t("accessEntry")} · ${timeStr}</div>
         </div>
       </div>`;
   });

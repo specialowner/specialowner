@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
+import { handleAccessScan } from "./access-flow.js";
 import { computeLeave } from "./leave-accrual.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
@@ -1693,23 +1694,32 @@ function renderMaintStats() {
   }).join("");
 }
 
-// ---------- Access log ----------
-onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (snap) => {
+// ---------- Access log / movements (filterable) ----------
+function renderAccessLog() {
   const el = document.getElementById("accessList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
-  el.innerHTML = "";
-  let count = 0;
-  snap.forEach(d => {
-    if (count++ >= 25) return;
-    const a = d.data();
-    el.innerHTML += `
+  const rows = window.__accessRows || [];
+  const fType = document.getElementById("accessFilterType")?.value || "";
+  const pSel = document.getElementById("accessFilterPerson");
+  if (pSel) {
+    const cur = pSel.value, types = [...new Set(rows.map(a => a.personType).filter(Boolean))];
+    pSel.innerHTML = `<option value="">${t("allPersonTypes")}</option>` + types.map(p => `<option value="${p}">${p}</option>`).join("");
+    pSel.value = types.includes(cur) ? cur : "";
+  }
+  const fPerson = pSel?.value || "";
+  const list = rows.filter(a => (!fType || a.type === fType) && (!fPerson || a.personType === fPerson));
+  if (!list.length) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
+  el.innerHTML = list.slice(0, 100).map(a => `
       <div class="list-item">
         <div class="meta">
           <div class="title">${a.personName} (${a.personType})</div>
-          <div class="sub">${a.type === "entry" ? "Entered" : "Exited"} · ${fmtTime(a.timestamp)}</div>
+          <div class="sub">${a.type === "exit" ? "🚪 " + t("accessExit") : "➡️ " + t("accessEntry")} · ${fmtTime(a.timestamp)}</div>
         </div>
-      </div>`;
-  });
+      </div>`).join("");
+}
+["accessFilterType", "accessFilterPerson"].forEach(id => document.getElementById(id)?.addEventListener("change", renderAccessLog));
+onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (snap) => {
+  window.__accessRows = snap.docs.map(d => d.data());
+  renderAccessLog();
 });
 
 // ---------- QR scanner ----------
@@ -1805,51 +1815,7 @@ function startScanner() {
   reader.start(
     { facingMode: "environment" },
     { fps: 10, qrbox: 220 },
-    async (decodedText) => {
-      try {
-        const payload = JSON.parse(decodedText);
-        const inviteRef = doc(db, "invitations", payload.inviteId);
-        const inviteSnap = await getDoc(inviteRef);
-        const resultEl = document.getElementById("scanResult");
-        if (!inviteSnap.exists() || inviteSnap.data().token !== payload.token) {
-          resultEl.textContent = "❌ Invalid or unknown invitation.";
-          return;
-        }
-        const invite = inviteSnap.data();
-        const isMaster = invite.type === "master";
-        const displayName = isMaster ? (invite.label || "Master access") : invite.guestName;
-
-        if (invite.expiresAt && invite.expiresAt.toDate() < new Date()) {
-          resultEl.textContent = `⛔ ${t("expired")}: ${displayName}`;
-          return;
-        }
-        if (invite.status === "revoked") {
-          resultEl.textContent = `⛔ ${t("revoked")}: ${displayName}`;
-          return;
-        }
-        // Guest invitations are single-use; master access codes stay valid until expiry/revocation.
-        if (!isMaster) {
-          if (invite.status === "used") {
-            resultEl.textContent = `⚠️ This invitation was already used (${invite.guestName}).`;
-            return;
-          }
-          await updateDoc(inviteRef, { status: "used" });
-        }
-        await addDoc(collection(db, "accessLogs"), {
-          type: "entry",
-          personType: invite.type || "guest",
-          personName: displayName,
-          invitationId: payload.inviteId,
-          zones: invite.accessZones || null,
-          timestamp: serverTimestamp()
-        });
-        resultEl.textContent = isMaster
-          ? `✅ ${t("masterAccessGranted")}: ${displayName} — ${(invite.accessZones || []).map(z => t(z)).join("، ")}`
-          : `✅ Access granted: ${invite.guestName} (unit ${invite.residentUnit || "—"})`;
-      } catch (e) {
-        document.getElementById("scanResult").textContent = "❌ Could not read this QR code.";
-      }
-    },
+    (decodedText) => handleAccessScan(db, decodedText, (document.getElementById("scanMode") || {}).value || "entry", t, document.getElementById("scanResult")),
     () => {} // ignore per-frame scan failures
   ).catch(() => {
     document.getElementById("scanResult").textContent = "❌ " + t("cameraUnavailable");

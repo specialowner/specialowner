@@ -193,11 +193,13 @@
 
       <div class="card">
         <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
+        <select id="scanMode" style="width:100%;margin-bottom:8px"><option value="entry" data-i18n="scanModeEntry">Scan mode: Entry</option><option value="exit" data-i18n="scanModeExit">Scan mode: Exit</option></select>
         <div id="qrReader" style="border-radius:10px;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px" data-i18n="cameraLoading">Loading camera…</div>
         <p id="scanResult" style="margin-top:10px;font-size:13px"></p>
       </div>
       <div class="card">
         <h3 data-i18n="recentAccessLog">Recent access log</h3>
+        <div style="display:flex;gap:8px;margin-bottom:8px"><select id="accessFilterType" style="flex:1"><option value="" data-i18n="allMovements">All movements</option><option value="entry" data-i18n="accessEntry">Entered</option><option value="exit" data-i18n="accessExit">Exited</option></select><select id="accessFilterPerson" style="flex:1"><option value="">All</option></select></div>
         <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
       </div>
     </section>
