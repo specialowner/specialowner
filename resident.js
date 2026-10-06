@@ -306,7 +306,8 @@ onSnapshot(invitesQ, (snap) => {
   const el = document.getElementById("invitesList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noInvitations")}</p>`; return; }
   el.innerHTML = "";
-  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const INVITE_KEYS = { pending: "pending", used: "statusUsed", revoked: "revoked", expired: "expired" };
   rows.forEach(i => {
     el.innerHTML += `
       <div class="list-item">
@@ -314,9 +315,19 @@ onSnapshot(invitesQ, (snap) => {
           <div class="title">${i.guestName}</div>
           <div class="sub">${t("visitDate")}: ${fmtVisitDateTime(i.visitDate)}</div>
         </div>
-        <span class="badge ${i.status}">${i.status}</span>
+        <div style="display:flex;gap:6px;align-items:center">
+          <span class="badge ${i.status}">${(INVITE_KEYS[i.status] && t(INVITE_KEYS[i.status])) || i.status}</span>
+          ${i.status === "pending" ? `<button class="btn btn-sm btn-danger" data-cancel-invite="${i.id}" data-name="${String(i.guestName || "").replace(/"/g, "&quot;")}">${t("cancelInvite")}</button>` : ""}
+        </div>
       </div>`;
   });
+  el.querySelectorAll("button[data-cancel-invite]").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(`${t("cancelInviteConfirm")}: ${btn.dataset.name}`)) return;
+    btn.disabled = true;
+    try {
+      await updateDoc(doc(db, "invitations", btn.dataset.cancelInvite), { status: "revoked", revokedAt: serverTimestamp(), revokedBy: user.uid });
+    } catch (e) { console.error(e); alert(t("cancelInviteFailed")); btn.disabled = false; }
+  }));
 });
 
 // ---------- WhatsApp share ----------

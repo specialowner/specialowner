@@ -13,9 +13,22 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.15.0";
+  var APP_VERSION = "1.16.0";
 
   var CHANGELOG = [
+    {
+      version: "1.16.0", date: "2026-10-06",
+      ar: [
+        "تطبيق الساكن: زرار «إلغاء» جنب كل دعوة زائر لسه «معلقة». بعد التأكيد الدعوة بتبقى «ملغي» ورمز الـ QR بيبطّل يشتغل عند البوابة. الدعوة اللي الزائر دخل بيها بالفعل مابتتلغيش.",
+        "تطبيق الساكن: حالة الدعوة (معلق، مستخدم، ملغي) بقت بتظهر بالعربي بدل الإنجليزي.",
+        "مهم: التحديث ده محتاج نشر ملف القواعد `firestore.rules` الجديد على Firebase، وإلا زرار الإلغاء هيرجّع رسالة خطأ."
+      ],
+      en: [
+        "Resident app: a \"Cancel\" button next to every guest invitation that is still pending. After confirmation the invitation becomes \"Revoked\" and its QR code stops working at the gate. An invitation the guest already entered with cannot be cancelled.",
+        "Resident app: the invitation status (pending, used, revoked) is now shown in the app language instead of English.",
+        "Important: this update needs the new `firestore.rules` file published to Firebase, otherwise the Cancel button returns an error."
+      ]
+    },
     {
       version: "1.15.0", date: "2026-10-06",
       ar: [

@@ -73,7 +73,14 @@ service cloud.firestore {
       allow read: if isSignedIn(); // security/admin/manager need to read any invite to validate a scan or view visits
       allow create: if isAdmin() ||
         (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
-      allow update: if isAdmin() || isActiveSecurityWorker(); // admin or security staff mark an invite as used
+      // Admin or security staff mark an invite as used. A resident may cancel (revoke) their own
+      // invitation only while it is still pending, and may change nothing except its status.
+      allow update: if isAdmin() || isActiveSecurityWorker() ||
+        (isActiveResident() && resource.data.residentId == request.auth.uid &&
+         resource.data.status == 'pending' &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'revokedBy']) &&
+         request.resource.data.get('revokedBy', request.auth.uid) == request.auth.uid);
       allow delete: if isAdmin();
     }
 

@@ -1,8 +1,20 @@
 # Special Owner — Update archive
 
-Current version: **v1.15.0**
+Current version: **v1.16.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.16.0 — 2026-10-06
+
+**English**
+- Resident app: a "Cancel" button next to every guest invitation that is still pending. After confirmation the invitation becomes "Revoked" and its QR code stops working at the gate. An invitation the guest already entered with cannot be cancelled.
+- Resident app: the invitation status (pending, used, revoked) is now shown in the app language instead of English.
+- Important: this update needs the new `firestore.rules` file published to Firebase, otherwise the Cancel button returns an error.
+
+**العربية**
+- تطبيق الساكن: زرار «إلغاء» جنب كل دعوة زائر لسه «معلقة». بعد التأكيد الدعوة بتبقى «ملغي» ورمز الـ QR بيبطّل يشتغل عند البوابة. الدعوة اللي الزائر دخل بيها بالفعل مابتتلغيش.
+- تطبيق الساكن: حالة الدعوة (معلق، مستخدم، ملغي) بقت بتظهر بالعربي بدل الإنجليزي.
+- مهم: التحديث ده محتاج نشر ملف القواعد `firestore.rules` الجديد على Firebase، وإلا زرار الإلغاء هيرجّع رسالة خطأ.
 
 ## v1.15.0 — 2026-10-06
 
