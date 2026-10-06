@@ -1,8 +1,30 @@
 # Special Owner — Update archive
 
-Current version: **v1.14.0**
+Current version: **v1.15.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.15.0 — 2026-10-06
+
+**English**
+- Admin panel, Staff section: an "Admin accounts" card lists current admins, with a "Promote a user to admin" box by email (the account must already exist) and a confirmation prompt. "Remove admin" turns the account into a suspended resident, and you cannot remove yourself.
+- Admin panel, Maintenance tab (operations overview): an "Export data (CSV)" card downloads a file that opens in Excel with Arabic intact for: residents, workers, payments, maintenance requests, worker shifts, access log. Proof images and very large fields are left out.
+- Push notifications for announcements are still not done (they need Firebase Blaze).
+
+**العربية**
+- لوحة الأدمن، قسم الموظفين: كارت «حسابات الأدمن» فيه قايمة الأدمن الحاليين، وخانة «ترقية مستخدم لأدمن» بالإيميل (لازم له حساب) مع رسالة تأكيد. زرار «إزالة الأدمن» بيحوّل الحساب لساكن موقوف، وماينفعش تشيل نفسك.
+- لوحة الأدمن، تبويب الصيانة (نظرة العمليات): كارت «تصدير البيانات (CSV)» لتحميل ملف يفتح في Excel بالعربي لـ: السكان، العمال، المدفوعات، طلبات الصيانة، شيفتات العمال، سجل الدخول. صور الإثبات والحقول الكبيرة بتتستبعد.
+- إشعارات push للإعلانات لسه ما اتعملتش (محتاجة Firebase Blaze).
+
+## v1.14.1 — 2026-10-06
+
+**English**
+- Fix: account and code statuses (revoked, active, suspended, used, pending, expired) showed in English in some admin lists, such as "revoked" in the master codes. They are now translated.
+- Movements log: with a filter on and no results, the message now says no movements match this filter instead of "no entries yet", and the two filter boxes no longer overflow the screen edge.
+
+**العربية**
+- إصلاح: حالات الحسابات والرموز (ملغي، نشط، موقوف، مستخدم، معلق، منتهي) كانت بتظهر بالإنجليزي في بعض قوايم لوحة الأدمن، زي «revoked» في الرموز الرئيسية. دلوقتي بتتترجم.
+- سجل الحركات: لو الفلتر مفعّل ومفيش نتائج بتظهر رسالة «مفيش حركات بالفلتر ده» بدل «لا توجد سجلات بعد»، وخانتين الفلتر مابقوش بيطلعوا برّه حافة الشاشة.
 
 ## v1.14.0 — 2026-10-05
 

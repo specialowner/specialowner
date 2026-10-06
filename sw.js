@@ -11,6 +11,7 @@ const APP_SHELL = [
   "leave-accrual.js",
   "payslip.js",
   "access-flow.js",
+  "csv-export.js",
   "lang-dock.js",
   "i18n.js",
   "version.js",

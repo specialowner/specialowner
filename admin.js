@@ -3,6 +3,7 @@ import { requireAuth, logout } from "./guard.js";
 import { openDataUrl } from "./proof-file.js";
 import { handleAccessScan } from "./access-flow.js";
 import { computeLeave } from "./leave-accrual.js";
+import { exportDataset } from "./csv-export.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
@@ -12,6 +13,8 @@ import {
 const { user, profile } = await requireAuth("admin");
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
+const STATUS_KEYS = { active: "statusActive", suspended: "statusSuspended", used: "statusUsed", pending: "pending", revoked: "revoked", expired: "expired" };
+function stLabel(st) { return (STATUS_KEYS[st] && t(STATUS_KEYS[st])) || st; }
 function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
@@ -164,7 +167,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "resident")), (sna
           <div class="sub">${t("unitLabel")} ${r.unit || "—"} · ${r.email || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${stLabel(status)}</span>
           ${status === "active"
             ? `<button class="btn btn-sm btn-danger" data-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
             : `<button class="btn btn-sm btn-primary" data-action="approve" data-id="${r.id}">${t("approve")}</button>`
@@ -636,7 +639,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
           <div class="sub">${workerTypeLabel(r.workerType)} · ${r.email || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${stLabel(status)}</span>
           ${status === "active"
             ? `<button class="btn btn-sm btn-danger" data-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
             : `<button class="btn btn-sm btn-primary" data-action="approve" data-id="${r.id}">${t("approve")}</button>`
@@ -678,7 +681,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap
           <div class="sub">${r.email || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${status}</span>
+          <span class="badge ${status === "active" ? "active" : status === "suspended" ? "overdue" : "pending"}">${stLabel(status)}</span>
           ${status === "active"
             ? `<button class="btn btn-sm btn-danger" data-mgr-action="suspend" data-id="${r.id}">${t("suspend")}</button>`
             : `<button class="btn btn-sm btn-primary" data-mgr-action="approve" data-id="${r.id}">${t("approve")}</button>`
@@ -696,6 +699,53 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap
   });
 });
 
+// ---------- Admin accounts: promote / remove ----------
+onSnapshot(query(collection(db, "users"), where("role", "==", "admin")), (snap) => {
+  const el = document.getElementById("adminAccountsList");
+  if (!el) return;
+  el.innerHTML = snap.docs.map(d => {
+    const r = { id: d.id, ...d.data() }, me = d.id === user.uid;
+    return `<div class="list-item"><div class="meta"><div class="title">${opsEsc(r.name || r.email || "")}${me ? " ⭐" : ""}</div><div class="sub">${opsEsc(r.email || "")}</div></div>
+      ${me ? "" : `<button class="btn btn-sm btn-danger" data-demote="${r.id}" data-name="${opsEsc(r.name || r.email || "")}">${t("removeAdmin")}</button>`}</div>`;
+  }).join("") || `<p class="empty-state">${t("noEntries")}</p>`;
+  el.querySelectorAll("button[data-demote]").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(`${t("removeAdminConfirm")}: ${btn.dataset.name}`)) return;
+    // Back to a suspended resident: no admin rights and no access until re-approved.
+    await updateDoc(doc(db, "users", btn.dataset.demote), { role: "resident", accountStatus: "suspended", demotedBy: user.uid, demotedAt: serverTimestamp() });
+  }));
+});
+document.getElementById("promoteBtn")?.addEventListener("click", async () => {
+  const msg = document.getElementById("promoteMsg"), input = document.getElementById("promoteEmail");
+  const show = (txt, ok) => { msg.textContent = txt; msg.style.display = "block"; msg.style.color = ok ? "var(--primary)" : ""; };
+  const email = input.value.trim();
+  if (!email) { show(t("promoteNoEmail")); return; }
+  try {
+    let found = null;
+    for (const e of [...new Set([email, email.toLowerCase()])]) {
+      const snap = await getDocs(query(collection(db, "users"), where("email", "==", e)));
+      if (!snap.empty) { found = snap.docs[0]; break; }
+    }
+    if (!found) { show(t("promoteNotFound")); return; }
+    const u = found.data();
+    if (u.role === "admin") { show(t("promoteAlready")); return; }
+    if (!confirm(`${t("promoteConfirm")}\n${u.name || ""} (${u.email})`)) return;
+    await updateDoc(doc(db, "users", found.id), { role: "admin", accountStatus: "active", promotedBy: user.uid, promotedAt: serverTimestamp() });
+    input.value = "";
+    show(`${t("promoteDone")}: ${u.name || u.email}`, true);
+  } catch (e) { console.error(e); show(t("promoteFailed")); }
+});
+
+// ---------- CSV export ----------
+document.getElementById("exportBtn")?.addEventListener("click", async () => {
+  const btn = document.getElementById("exportBtn"), msg = document.getElementById("exportMsg");
+  btn.disabled = true;
+  try {
+    const n = await exportDataset(db, document.getElementById("exportSet").value);
+    msg.textContent = `${t("exportDone")}: ${n}`;
+  } catch (e) { console.error(e); msg.textContent = t("exportFailed"); }
+  msg.style.display = "block"; btn.disabled = false;
+});
+
 // ---------- Call center accounts ----------
 onSnapshot(query(collection(db, "users"), where("role", "==", "callcenter")), (snap) => {
   const el = document.getElementById("callCenterAccountsList");
@@ -711,7 +761,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "callcenter")), (s
           <div class="sub">${r.email || ""}</div>
         </div>
         <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${status === "active" ? "active" : "overdue"}">${status}</span>
+          <span class="badge ${status === "active" ? "active" : "overdue"}">${stLabel(status)}</span>
           <button class="btn btn-sm ${status === "active" ? "btn-danger" : "btn-primary"}" data-cc-action="${status === "active" ? "suspend" : "approve"}" data-id="${r.id}">
             ${status === "active" ? t("suspend") : t("approve")}
           </button>
@@ -1085,7 +1135,7 @@ onSnapshot(query(collection(db, "workers"), orderBy("createdAt", "desc")), (snap
           <div class="title">${w.name}</div>
           <div class="sub">${w.role} · ${w.phone || "no phone"}</div>
         </div>
-        <span class="badge ${w.status}">${w.status}</span>
+        <span class="badge ${w.status}">${stLabel(w.status)}</span>
       </div>`;
   });
 });
@@ -1707,7 +1757,7 @@ function renderAccessLog() {
   }
   const fPerson = pSel?.value || "";
   const list = rows.filter(a => (!fType || a.type === fType) && (!fPerson || a.personType === fPerson));
-  if (!list.length) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
+  if (!list.length) { el.innerHTML = `<p class="empty-state">${t(fType || fPerson ? "noMovementsFilter" : "noEntries")}</p>`; return; }
   el.innerHTML = list.slice(0, 100).map(a => `
       <div class="list-item">
         <div class="meta">
@@ -1790,7 +1840,7 @@ onSnapshot(query(collection(db, "invitations"), where("type", "==", "master")), 
           <div class="title">${m.label}</div>
           <div class="sub">${(m.accessZones || []).map(z => t(z)).join("، ")}</div>
         </div>
-        <span class="badge ${status}">${status}</span>
+        <span class="badge ${status}">${stLabel(status)}</span>
         ${status === "active" ? `<button class="btn btn-sm btn-danger" data-revoke-id="${m.id}" style="margin-inline-start:6px">${t("revoke")}</button>` : ""}
         ${m.status === "revoked" && !expired ? `<button class="btn btn-sm btn-outline" data-reactivate-id="${m.id}" style="margin-inline-start:6px">${t("reactivateInvite")}</button>` : ""}
       </div>`;

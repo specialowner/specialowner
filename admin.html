@@ -199,7 +199,7 @@
       </div>
       <div class="card">
         <h3 data-i18n="recentAccessLog">Recent access log</h3>
-        <div style="display:flex;gap:8px;margin-bottom:8px"><select id="accessFilterType" style="flex:1"><option value="" data-i18n="allMovements">All movements</option><option value="entry" data-i18n="accessEntry">Entered</option><option value="exit" data-i18n="accessExit">Exited</option></select><select id="accessFilterPerson" style="flex:1"><option value="">All</option></select></div>
+        <div style="display:flex;gap:8px;margin-bottom:8px"><select id="accessFilterType" style="flex:1;min-width:0"><option value="" data-i18n="allMovements">All movements</option><option value="entry" data-i18n="accessEntry">Entered</option><option value="exit" data-i18n="accessExit">Exited</option></select><select id="accessFilterPerson" style="flex:1;min-width:0"><option value="">All</option></select></div>
         <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
       </div>
     </section>
@@ -209,6 +209,15 @@
       <div class="card">
         <h3 data-i18n="staffAccountsAndRequests">Staff accounts & activation requests</h3>
         <div id="staffAccountsList"><p class="empty-state" data-i18n="noStaffYet">No staff accounts yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="adminAccounts">Admin accounts</h3>
+        <div id="adminAccountsList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+        <h4 class="ops-subtitle" data-i18n="promoteToAdmin">Promote a user to admin</h4>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="promoteNote">The person must already have an account. Admins can see everything, including finance.</p>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="promoteEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <p class="error-text" id="promoteMsg" style="display:none"></p>
+        <button class="btn btn-primary" id="promoteBtn" data-i18n="promoteToAdmin">Promote a user to admin</button>
       </div>
       <div class="card">
         <h3 data-i18n="siteManagerAccounts">Site manager accounts</h3>
@@ -466,6 +475,21 @@
       <div class="card">
         <h3 data-i18n="maintStatsTitle">Average resolution time by category</h3>
         <div id="maintStats"><p class="empty-state" data-i18n="noMaintStats">No resolved requests with timing yet.</p></div>
+      </div>
+          <div class="card">
+        <h3 data-i18n="exportTitle">Export data (CSV)</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap">
+          <select id="exportSet" style="flex:1;min-width:0">
+            <option value="residents" data-i18n="exResidents">Residents</option>
+            <option value="workers" data-i18n="exWorkers">Workers</option>
+            <option value="payments" data-i18n="exPayments">Payments</option>
+            <option value="maintenance" data-i18n="exMaintenance">Maintenance requests</option>
+            <option value="attendance" data-i18n="exAttendance">Worker shifts</option>
+            <option value="access" data-i18n="exAccess">Access log</option>
+          </select>
+          <button class="btn btn-primary" id="exportBtn" data-i18n="exportBtn">Download CSV</button>
+        </div>
+        <p class="empty-state" id="exportMsg" style="display:none"></p>
       </div>
     </section>
 
