@@ -1,6 +1,6 @@
 import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
-import { openDataUrl } from "./proof-file.js";
+import { openDataUrl, preparePhotoFile } from "./proof-file.js";
 import { renderLeaveBalanceInto } from "./leave-accrual.js";
 import { openPayslip } from "./payslip.js";
 import { handleAccessScan } from "./access-flow.js";
@@ -421,6 +421,12 @@ function estimateLabel(h) {
   if (h === 0.5) return t("estHalfHour");
   return `${h} ${h === 1 ? t("estHour") : t("estHours")}`;
 }
+let lastOrderRows = [];
+// The next job in the queue: the oldest assigned job that has not been started yet.
+function nextQueuedOrder(exceptId) {
+  return lastOrderRows.filter(o => o.status === "accepted" && o.id !== exceptId)
+    .sort((a, b) => (a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0))[0] || null;
+}
 if (!isSecurity) {
   const ordersQ = query(collection(db, "maintenanceRequests"), where("assignedWorkerId", "==", user.uid));
   onSnapshot(ordersQ, (snap) => {
@@ -428,6 +434,7 @@ if (!isSecurity) {
     if (snap.empty) { renderOrdersSummary([]); el.innerHTML = `<p class="empty-state">${t("noWorkOrders")}</p>`; return; }
     el.innerHTML = "";
     const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    lastOrderRows = rows;
     renderOrdersSummary(rows);
     // Jobs still to do come first: the one already in progress, then the rest in the order
     // they were created (oldest first = the queue order). Finished jobs go below.
@@ -464,14 +471,31 @@ if (!isSecurity) {
         ? new Date(o.createdAt.seconds * 1000).toLocaleString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB",
             { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })
         : "";
+      // Before / after photos: proof of the job. The "before" shot can be taken until the job is
+      // done, the "after" shot while it is in progress (right before marking it complete).
+      const photoBtn = (field, labelKey, replaceKey, has) => `
+            <label class="btn btn-sm btn-accent" style="display:inline-block;margin:6px 6px 0 0;cursor:pointer">
+              📷 ${t(has ? replaceKey : labelKey)}
+              <input type="file" accept="image/*" capture="environment" class="order-photo-input" data-id="${o.id}" data-field="${field}" style="display:none">
+            </label>`;
+      const proofThumb = (src, labelKey) => src
+        ? `<div style="display:inline-block;margin:6px 8px 0 0;text-align:center"><div style="font-size:10px;color:#7b8a85">${t(labelKey)}</div><img class="photo-thumb order-photo" src="${src}" alt=""></div>` : "";
+      const proofBlock = `
+            <div>${proofThumb(o.beforePhoto, "woPhotoBefore")}${proofThumb(o.afterPhoto, "woPhotoAfter")}</div>
+            ${o.status === "completed" ? "" : `<div>
+              ${photoBtn("beforePhoto", "woPhotoBefore", "woPhotoBeforeRetake", !!o.beforePhoto)}
+              ${o.status === "in_progress" ? photoBtn("afterPhoto", "woPhotoAfter", "woPhotoAfterRetake", !!o.afterPhoto) : ""}
+            </div>`}`;
       return `
-        <div class="list-item wo-card ${o.status}">
+        <div class="list-item wo-card ${o.status}"${nextQueuedOrder() && nextQueuedOrder().id === o.id ? ' style="border:2px solid var(--primary)"' : ""}>
           <div class="meta">
+            ${nextQueuedOrder() && nextQueuedOrder().id === o.id ? `<div style="font-size:11px;font-weight:700;color:var(--primary)">⏭ ${t("woNextUp")}</div>` : ""}
             <div class="wo-row"><span class="wo-k">👤 ${t("woWho")}</span><span class="wo-v">${woEsc(whoText)}</span></div>
             <div class="wo-row"><span class="wo-k">📍 ${t("woWhere")}</span><span class="wo-v">${woEsc(whereText)}</span></div>
             <div class="wo-row"><span class="wo-k">🛠 ${t("woWhat")}</span><span class="wo-v">${woEsc(categoryLabel(o.category))}${o.description ? " — " + woEsc(o.description) : ""}</span></div>
             <div class="sub" style="font-size:11px;color:#7b8a85;margin-top:4px">${originLabel(o)}${when ? " · " + when : ""}</div>
             ${o.photoData ? `<img class="photo-thumb order-photo" src="${o.photoData}" alt="">` : ""}
+            ${proofBlock}
             ${estSelect}
           </div>
           <span class="badge ${o.status}">${t(o.status) || o.status}</span>
@@ -498,12 +522,49 @@ if (!isSecurity) {
         if (btn.dataset.next === "completed") payload.completedAt = serverTimestamp();
         try {
           await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), payload);
+          // Finished a job: offer to move straight on to the next one in the queue.
+          if (btn.dataset.next === "completed") {
+            const next = nextQueuedOrder(btn.dataset.id);
+            const busy = lastOrderRows.some(o => o.status === "in_progress" && o.id !== btn.dataset.id);
+            if (next && !busy && confirm(`${t("woStartNextAsk")}\n${categoryLabel(next.category)}`)) {
+              await updateDoc(doc(db, "maintenanceRequests", next.id), {
+                status: "in_progress", statusSeenByResident: false, statusChangedAt: serverTimestamp()
+              });
+            }
+          }
         } catch (err) {
           console.error("Failed to update work order status:", err);
           btn.disabled = false;
           alert(err.code === "permission-denied"
             ? "Permission denied — ask the admin to publish the latest Firestore rules."
             : (err.message || String(err)));
+        }
+      });
+    });
+    el.querySelectorAll(".order-photo-input").forEach(inp => {
+      inp.addEventListener("click", (e) => e.stopPropagation());
+      inp.addEventListener("change", async () => {
+        const file = inp.files && inp.files[0];
+        if (!file) return;
+        if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); inp.value = ""; return; }
+        const label = inp.closest("label");
+        if (label) label.style.opacity = "0.5";
+        try {
+          // 220 KB cap: a request can now carry the resident's photo plus a before and an after shot,
+          // and the whole Firestore document must stay under 1 MiB.
+          const { dataUrl } = await preparePhotoFile(file, 220000);
+          const field = inp.dataset.field; // beforePhoto | afterPhoto
+          await updateDoc(doc(db, "maintenanceRequests", inp.dataset.id), {
+            [field]: dataUrl,
+            [field + "At"]: serverTimestamp()
+          });
+        } catch (err) {
+          console.error("Failed to save work photo:", err);
+          if (label) label.style.opacity = "";
+          inp.value = "";
+          alert(err.code === "permission-denied"
+            ? "Permission denied — ask the admin to publish the latest Firestore rules."
+            : (err.code === "too_large" || err.code === "bad_image" ? t("woPhotoError") : (err.message || String(err))));
         }
       });
     });
@@ -530,6 +591,126 @@ if (!isSecurity) {
       });
       sel.dataset.previous = sel.value;
     });
+  });
+}
+
+// Shifts the admin planned for me.
+try { (await import("./shift-plans.js")).mountMyShiftPlans(user.uid, "myPlansList"); }
+catch (e) { console.error("shift-plans.js failed to load:", e); }
+
+// ---------- SOS / emergency (security only) ----------
+if (isSecurity) {
+  const sosCard = document.getElementById("sosCard");
+  const sosBtn = document.getElementById("sosBtn");
+  const sosStatus = document.getElementById("sosStatus");
+  sosCard.style.display = "block";
+  // Live status of my last alert: open until the admin or manager closes it.
+  onSnapshot(query(collection(db, "sosAlerts"), where("workerId", "==", user.uid)), (snap) => {
+    // Sorted here (not in the query) so no composite Firestore index is needed.
+    const last = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0))[0];
+    if (!last) { sosStatus.textContent = ""; return; }
+    const open = last.status === "open";
+    sosStatus.style.color = open ? "#b3261e" : "#0f6e5f";
+    sosStatus.textContent = open ? t("sosSent") : t("sosHandled");
+  }, (err) => console.error("SOS status listener failed:", err));
+  sosBtn.addEventListener("click", async () => {
+    if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
+    if (!confirm(t("sosConfirm"))) return;
+    sosBtn.disabled = true;
+    // Location is best effort: the alert is sent even if the phone refuses or is slow to answer.
+    const pos = await new Promise((resolve) => {
+      if (!navigator.geolocation) return resolve(null);
+      navigator.geolocation.getCurrentPosition(
+        (p) => resolve({ lat: p.coords.latitude, lng: p.coords.longitude }),
+        () => resolve(null), { timeout: 4000, maximumAge: 60000 });
+    });
+    try {
+      await addDoc(collection(db, "sosAlerts"), {
+        workerId: user.uid,
+        workerName: profile.name || "",
+        status: "open",
+        ...(pos ? { lat: pos.lat, lng: pos.lng } : {}),
+        createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Failed to send SOS:", err);
+      alert(err.code === "permission-denied"
+        ? "Permission denied — ask the admin to publish the latest Firestore rules."
+        : (err.message || String(err)));
+    } finally {
+      sosBtn.disabled = false;
+    }
+  });
+}
+
+// ---------- Patrol round (security only): visit the checkpoints in order, tick them, add notes ----------
+if (isSecurity) {
+  const card = document.getElementById("patrolCard");
+  const startBtn = document.getElementById("patrolStartBtn");
+  const run = document.getElementById("patrolRun");
+  const list = document.getElementById("patrolChecklist");
+  const msg = document.getElementById("patrolMsg");
+  card.style.display = "block";
+  let points = [];
+  let startedMs = 0;
+  const showMsg = (m) => { msg.textContent = m || ""; msg.style.display = m ? "block" : "none"; };
+  const pEsc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  // My latest round, for the line under the title.
+  onSnapshot(query(collection(db, "patrolRounds"), where("workerId", "==", user.uid)), (snap) => {
+    const last = snap.docs.map(d => d.data()).sort((a, b) => (b.finishedAt?.seconds || 0) - (a.finishedAt?.seconds || 0))[0];
+    const el = document.getElementById("patrolLast");
+    if (!last) { el.textContent = t("patrolNeverDone"); return; }
+    const when = last.finishedAt?.seconds ? new Date(last.finishedAt.seconds * 1000).toLocaleString(
+      window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+    el.textContent = `${t("patrolLastRound")}: ${when} · ${last.checked}/${last.total}`;
+  }, (err) => console.error("patrol history listener failed:", err));
+
+  startBtn.addEventListener("click", async () => {
+    if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
+    startBtn.disabled = true; showMsg("");
+    try {
+      const snap = await getDocs(query(collection(db, "patrolPoints")));
+      points = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
+      if (points.length === 0) { alert(t("patrolNoPointsWorker")); return; }
+      startedMs = Date.now();
+      list.innerHTML = points.map((p, i) => `
+        <div class="list-item" style="align-items:flex-start">
+          <div class="meta" style="width:100%">
+            <label style="display:flex;gap:8px;align-items:center;font-weight:700"><input type="checkbox" class="patrol-chk" data-i="${i}" style="width:20px;height:20px"> ${i + 1}. ${pEsc(p.name)}</label>
+            <input type="text" class="patrol-note" data-i="${i}" data-i18n-placeholder="patrolNotePh" placeholder="${pEsc(t("patrolNotePh"))}" style="width:100%;margin-top:6px">
+          </div>
+        </div>`).join("");
+      // Remember when each checkpoint was ticked, so the log shows the actual walk.
+      list.querySelectorAll(".patrol-chk").forEach(c => c.addEventListener("change", () => { c.dataset.at = c.checked ? String(Date.now()) : ""; }));
+      startBtn.style.display = "none"; run.style.display = "block";
+    } catch (err) {
+      console.error("Failed to load checkpoints:", err);
+      alert(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+    } finally { startBtn.disabled = false; }
+  });
+  function endRun() { run.style.display = "none"; startBtn.style.display = ""; list.innerHTML = ""; showMsg(""); }
+  document.getElementById("patrolCancelBtn").addEventListener("click", () => { if (confirm(t("patrolCancelConfirm"))) endRun(); });
+  document.getElementById("patrolFinishBtn").addEventListener("click", async () => {
+    const checks = points.map((p, i) => {
+      const chk = list.querySelector(`.patrol-chk[data-i="${i}"]`);
+      const note = list.querySelector(`.patrol-note[data-i="${i}"]`).value.trim();
+      return { pointId: p.id, name: p.name, ok: chk.checked, ...(chk.checked && chk.dataset.at ? { atMs: Number(chk.dataset.at) } : {}), ...(note ? { note } : {}) };
+    });
+    const done = checks.filter(c => c.ok).length;
+    if (done < checks.length && !confirm(t("patrolIncompleteConfirm"))) return;
+    const btn = document.getElementById("patrolFinishBtn");
+    btn.disabled = true; showMsg("");
+    try {
+      await addDoc(collection(db, "patrolRounds"), {
+        workerId: user.uid, workerName: profile.name || "", startedAtMs: startedMs,
+        finishedAt: serverTimestamp(), total: checks.length, checked: done, checks
+      });
+      endRun();
+    } catch (err) {
+      console.error("Failed to save patrol round:", err);
+      showMsg(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+    } finally { btn.disabled = false; }
   });
 }
 

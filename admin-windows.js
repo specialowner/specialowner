@@ -12,7 +12,7 @@
   "use strict";
 
   var MAX_WINDOWS = 4;
-  var TABS = ["residents", "property", "announcements", "access", "workers", "finance", "maint", "areas"];
+  var TABS = ["residents", "property", "announcements", "access", "workers", "finance", "maint", "areas", "shops"];
   var STORE_KEY = "so_admin_windows";
   var GAP = 6;
 

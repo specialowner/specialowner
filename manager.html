@@ -37,6 +37,11 @@
       </div>
 
       <div class="card">
+        <h3 data-i18n="planMine">My upcoming shifts</h3>
+        <div id="myPlansList"><p class="empty-state" data-i18n="planNone">No planned shifts yet.</p></div>
+      </div>
+
+      <div class="card">
         <div style="display:flex;justify-content:space-between;align-items:center">
           <div>
             <div style="font-size:12px;color:var(--muted)" data-i18n="today">Today</div>
@@ -175,6 +180,11 @@
         </div>
         <p class="error-text" id="onsiteTaskError" style="display:none"></p>
         <button class="btn btn-primary" id="createOnsiteTaskBtn" data-i18n="createOnsiteTask">Create task</button>
+      </div>
+      <div class="card">
+        <h3 data-i18n="wlTitle">Workload per worker</h3>
+        <p class="sub" data-i18n="wlDesc">Each worker's open jobs: on-site tasks and resident requests together, with the estimated time left.</p>
+        <div id="mgrWorkload"><p class="empty-state" data-i18n="opsNoWorkers">No workers yet.</p></div>
       </div>
       <div class="card">
         <h3 data-i18n="maintenanceRequests">Maintenance requests</h3>

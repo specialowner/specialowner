@@ -23,8 +23,6 @@ renderGreeting();
 window.addEventListener("so-lang-changed", renderGreeting);
 window.addEventListener("so-lang-changed", renderAccountStatus);
 
-document.getElementById("pointsNum").textContent = profile.points ?? 0;
-document.getElementById("shopsPoints").textContent = profile.points ?? 0;
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
 // ---------- Account status (pending / active / suspended) ----------
@@ -567,6 +565,7 @@ onSnapshot(maintQ, (snap) => {
           <div class="sub">${m.description}</div>
           ${queueLine}
           ${m.photoData ? `<img class="photo-thumb req-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
+          ${m.beforePhoto ? `<img class="photo-thumb req-photo" src="${m.beforePhoto}" title="${t("woPhotoBefore")}" alt="">` : ""}${m.afterPhoto ? `<img class="photo-thumb req-photo" src="${m.afterPhoto}" title="${t("woPhotoAfter")}" alt="">` : ""}
         </div>
         <span class="badge ${m.status}">${t(m.status) || m.status.replace("_", " ")}</span>
         ${isUnseen ? `<span class="badge" style="background:#fdeaea;color:#a63b3b;border:1px solid #f2c6c6;margin-left:4px">${t("newUpdate") || "New update"}</span>` : ""}
@@ -743,23 +742,83 @@ async function markMaintSeen() {
 }
 document.querySelector('.tab-btn[data-tab="maint"]')?.addEventListener("click", markMaintSeen);
 
-// ---------- Shops ----------
-const shopsQ = query(collection(db, "shops"), orderBy("name", "asc"));
-onSnapshot(shopsQ, (snap) => {
+// ---------- Shops, points and redemptions ----------
+let myPoints = Number(profile.points) || 0;
+function showPoints() {
+  document.getElementById("pointsNum").textContent = myPoints;
+  document.getElementById("shopsPoints").textContent = myPoints;
+}
+showPoints();
+// Live balance: the admin gives points or approves a redemption while the app is open.
+onSnapshot(doc(db, "users", user.uid), (d) => { myPoints = Number(d.data()?.points) || 0; showPoints(); renderShops(); },
+  (err) => console.error("points listener failed:", err));
+
+const resEsc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+let shopRows = [];
+let myRedemptions = [];
+function renderShops() {
   const el = document.getElementById("shopsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noShops")}</p>`; return; }
-  el.innerHTML = "";
-  snap.forEach(d => {
-    const s = d.data();
-    el.innerHTML += `
+  if (shopRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noShops")}</p>`; return; }
+  el.innerHTML = shopRows.map(s => {
+    const cost = Number(s.pointsCost) || 0;
+    const waiting = myRedemptions.some(r => r.shopId === s.id && r.status === "requested");
+    let action = "";
+    if (cost > 0) {
+      const enough = myPoints >= cost;
+      action = waiting
+        ? `<p style="font-size:12px;color:var(--muted);margin-top:8px">${t("redeemWaiting")}</p>`
+        : `<button type="button" class="btn btn-sm btn-primary shop-redeem" data-id="${s.id}" ${enough ? "" : "disabled"} style="margin-top:8px">⭐ ${cost} · ${t("redeemBtn")}</button>${enough ? "" : `<p style="font-size:11px;color:var(--muted);margin-top:4px">${t("redeemNeedMore")}</p>`}`;
+    }
+    return `
       <div class="card" style="margin-bottom:10px">
-        <h3>${s.name}</h3>
-        <p class="label">${s.category || ""}</p>
-        <p style="font-size:13px;margin-top:6px">${s.description || ""}</p>
-        ${s.offer ? `<p style="font-size:12px;color:var(--accent);margin-top:6px;font-weight:700">🏷️ ${s.offer}</p>` : ""}
+        <h3>${resEsc(s.name)}</h3>
+        <p class="label">${resEsc(s.category || "")}</p>
+        <p style="font-size:13px;margin-top:6px">${resEsc(s.description || "")}</p>
+        ${s.offer ? `<p style="font-size:12px;color:var(--accent);margin-top:6px;font-weight:700">🏷️ ${resEsc(s.offer)}</p>` : ""}
+        ${action}
       </div>`;
-  });
+  }).join("");
+  el.querySelectorAll(".shop-redeem").forEach(btn => btn.addEventListener("click", async () => {
+    const shop = shopRows.find(x => x.id === btn.dataset.id);
+    if (!shop || !confirm(`${t("redeemConfirm")}\n${shop.name} · ⭐ ${shop.pointsCost}`)) return;
+    btn.disabled = true;
+    try {
+      await addDoc(collection(db, "redemptions"), {
+        residentId: user.uid, residentName: profile.name || "", unit: profile.unit || "",
+        shopId: shop.id, shopName: shop.name, cost: Number(shop.pointsCost),
+        status: "requested", createdAt: serverTimestamp()
+      });
+    } catch (err) {
+      console.error("Redeem request failed:", err);
+      btn.disabled = false;
+      alert(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+    }
+  }));
+}
+onSnapshot(query(collection(db, "shops"), orderBy("name", "asc")), (snap) => {
+  shopRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderShops();
 });
+onSnapshot(query(collection(db, "redemptions"), where("residentId", "==", user.uid)), (snap) => {
+  myRedemptions = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const el = document.getElementById("redemptionsList");
+  if (myRedemptions.length === 0) { el.innerHTML = `<p class="empty-state">${t("redeemNoneMine")}</p>`; }
+  else el.innerHTML = myRedemptions.slice(0, 15).map(r => `
+    <div class="list-item"><div class="meta">
+      <div class="title">${resEsc(r.shopName)} · ⭐ ${r.cost}</div>
+      ${r.status === "approved" ? `<div class="sub">${t("redeemCode")}: <b style="font-size:16px;letter-spacing:1px">${resEsc(r.code || "")}</b> — ${t("redeemShowCode")}</div>` : ""}
+    </div><span class="badge ${r.status === "approved" ? "active" : r.status === "rejected" ? "overdue" : "pending"}">${t(r.status === "approved" ? "redeemApproved" : r.status === "rejected" ? "redeemRejected" : "redeemPending")}</span></div>`).join("");
+  renderShops();
+}, (err) => console.error("redemptions listener failed:", err));
+onSnapshot(query(collection(db, "pointsTransactions"), where("residentId", "==", user.uid)), (snap) => {
+  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 20);
+  const el = document.getElementById("pointsHistoryList");
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
+  el.innerHTML = rows.map(r => `<div class="sub-row"><span>${resEsc(r.note || (r.type === "earn" ? t("ptsGive") : t("ptsRemove")))}</span>
+    <span style="font-weight:700;color:${r.type === "earn" ? "#0f6e5f" : "#b3261e"}">${r.type === "earn" ? "+" : "−"}${r.amount}</span></div>`).join("");
+}, (err) => console.error("points history listener failed:", err));
+window.addEventListener("so-lang-changed", () => renderShops());
 
 // ---------- Helpers ----------
 function fmtDate(v) {

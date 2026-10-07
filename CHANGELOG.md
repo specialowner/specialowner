@@ -1,8 +1,54 @@
 # Special Owner — Update archive
 
-Current version: **v1.16.0**
+Current version: **v1.19.0**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.19.0 — 2026-10-07
+
+**English**
+- Admin panel: a new "Shops" tab in the residents dashboard: add and delete partner shops (name, category, description, offer, and a points price if any), and give or remove points for a resident by email, with a log of recent movements.
+- Points redemption: a resident asks to redeem at a shop that has a points price, and the admin approves (the balance is deducted, the movement is logged and a voucher code is shown to the resident for the shop) or rejects. If the balance is not enough, approval is refused.
+- Resident app: the "Shops" tab is back: live points balance, shops with a Redeem button, my redemptions with their codes, and the points history.
+- Security: a "Patrol round" card on Home. The guard starts a round, ticks each checkpoint in order, adds a note if needed and finishes the round. The admin defines the checkpoints and sees the latest rounds (who did them, how many checkpoints were checked, what was missed, and the notes) in the Access tab.
+- Important: this update needs the new `firestore.rules` file published to Firebase (redemptions, patrolPoints and patrolRounds), otherwise shops and patrols return an error.
+
+**العربية**
+- لوحة الأدمن: تبويب جديد «المحلات» في لوحة السكان: إضافة وحذف المحلات الشريكة (اسم، تصنيف، وصف، عرض، ونقاط الاستبدال لو فيه)، وإضافة أو خصم نقاط لساكن بالإيميل مع سجل بآخر الحركات.
+- استبدال النقاط: الساكن بيطلب الاستبدال من محل ليه سعر بالنقاط، والأدمن بيوافق (بيتخصم الرصيد ويتسجل في سجل النقاط ويطلع كود للساكن يوريه للمحل) أو يرفض. لو الرصيد مش كفاية الموافقة بتترفض.
+- تطبيق الساكن: تبويب «المحلات» اتفعّل تاني: رصيد النقاط بيتحدّث لحظيًا، المحلات مع زرار استبدال، طلباتي وأكوادها، وسجل النقاط.
+- الأمن: كارت «جولة الأمن» في الرئيسية. العامل يبدأ جولة، يعلّم على كل نقطة تفتيش بالترتيب ويكتب ملاحظة لو عايز، وينهي الجولة. الأدمن بيحدّد نقاط التفتيش وبيشوف آخر الجولات (مين عملها، كام نقطة اتفحصت، إيه الناقص والملاحظات) من تبويب الدخول.
+- مهم: التحديث ده محتاج نشر ملف القواعد `firestore.rules` الجديد على Firebase (redemptions وpatrolPoints وpatrolRounds)، وإلا المحلات والجولات هتديك رسالة خطأ.
+
+## v1.18.0 — 2026-10-07
+
+**English**
+- Admin panel, Staff section: a "Planned shifts" card to schedule a shift for a worker or site manager (date, from, to, note), with a list of upcoming shifts and a remove button. It blocks two overlapping shifts for the same person on the same day.
+- Worker and site manager screens: an "My upcoming shifts" card on Home. Clocking in is still free as before; the schedule is for information and planning.
+- Site manager, Maintenance tab: a "Workload per worker" card showing what each worker is doing now, how many on-site tasks and resident requests they have, and the estimated time left.
+- Worker screen: the first waiting job in the queue is marked "Next up", and after finishing a job the worker is asked whether to start the next one right away.
+- Important: this update needs the new `firestore.rules` file published to Firebase, otherwise planned shifts return an error.
+
+**العربية**
+- لوحة الأدمن، قسم الموظفين: كارت «الشيفتات المجدولة» لجدولة شيفت لعامل أو مدير موقع (تاريخ، من، إلى، ملاحظة)، مع قايمة بالشيفتات القادمة وزرار حذف. بيمنع تداخل شيفتين لنفس الشخص في نفس اليوم.
+- شاشة العامل ومدير الموقع: كارت «شيفتاتي القادمة» في الرئيسية. تسجيل الحضور لسه حر زي ما هو، والجدول للعلم والتنظيم.
+- مدير الموقع، تبويب الصيانة: كارت «حمل العمل لكل عامل»: بيشتغل على إيه دلوقتي، وكام مهمة مباشرة وكام طلب ساكن عنده، والوقت المتوقع المتبقي.
+- شاشة العامل: أول مهمة مستنية في الطابور عليها علامة «المهمة اللي بعدها»، ولما يخلّص مهمة بيتسأل لو عايز يبدأ اللي بعدها على طول.
+- مهم: التحديث ده محتاج نشر ملف القواعد `firestore.rules` الجديد على Firebase، وإلا الشيفتات المجدولة هتديك رسالة خطأ.
+
+## v1.17.0 — 2026-10-07
+
+**English**
+- Worker screen (orders): a "📷 Before photo" button on any job not yet done, and an "📷 After photo" button while it is in progress. Photos are optional and are shown to the admin, the site manager and the resident who made the request.
+- Security: an "Emergency" card on Home with an SOS button. After confirmation an alert goes to the admin and the site manager with the worker's name, the time and their location if the phone allows it.
+- Admin and site manager: a red bar at the top of the screen for every open emergency alert, with a sound when a new one arrives and a "Handled" button. The bar only works while the page is open, because push notifications still need Firebase Blaze.
+- Important: this update needs the new `firestore.rules` file published to Firebase, otherwise the photos and the SOS button return an error.
+
+**العربية**
+- شاشة العامل (الطلبات): زرار «📷 صورة قبل» على أي مهمة لسه ما خلصتش، وزرار «📷 صورة بعد» وهي جاري تنفيذها. الصور اختيارية، وبتظهر للأدمن ومدير الموقع والساكن صاحب الطلب.
+- الأمن: كارت «طوارئ» في الرئيسية بزرار SOS. بعد التأكيد بيتبعت تنبيه للأدمن ومدير الموقع فيه اسم العامل والوقت وموقعه لو الموبايل سمح.
+- الأدمن ومدير الموقع: شريط أحمر فوق الشاشة لأي تنبيه طوارئ مفتوح، مع صوت تنبيه لما يوصل تنبيه جديد وزرار «تم التعامل». الشريط شغال والصفحة مفتوحة بس، لأن إشعارات push لسه محتاجة Firebase Blaze.
+- مهم: التحديث ده محتاج نشر ملف القواعد `firestore.rules` الجديد على Firebase، وإلا الصور وزرار SOS هيرجّعوا رسالة خطأ.
 
 ## v1.16.0 — 2026-10-06
 

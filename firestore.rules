@@ -113,11 +113,12 @@ service cloud.firestore {
       // Admin/manager can assign workers, change status, and recompute queue positions on
       // every request. An assigned active worker may only move their own order forward
       // (status + the bookkeeping fields written alongside a status change), or set the
-      // duration estimate that feeds the residents' waiting time.
+      // duration estimate that feeds the residents' waiting time, or attach the
+      // before/after photos that prove the job was done.
       allow update: if isAdmin() || isActiveManager() ||
         (isActiveWorker() && resource.data.assignedWorkerId == request.auth.uid &&
          request.resource.data.diff(resource.data).affectedKeys()
-           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours']));
+           .hasOnly(['status', 'statusSeenByResident', 'statusChangedAt', 'completedAt', 'estimatedHours', 'beforePhoto', 'beforePhotoAt', 'afterPhoto', 'afterPhotoAt']));
       allow delete: if isAdmin();
     }
 
@@ -197,8 +198,53 @@ service cloud.firestore {
       allow create: if isAdmin() || isActiveSecurityWorker();
     }
 
+    // Emergency (SOS) alerts. An active security worker raises one for themselves (always
+    // starting as 'open'); the admin and the site manager see every alert and close it.
+    match /sosAlerts/{alertId} {
+      allow read: if isAdmin() || isActiveManager() ||
+        (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveSecurityWorker() &&
+        request.resource.data.workerId == request.auth.uid &&
+        request.resource.data.status == 'open';
+      allow update: if isAdmin() || isActiveManager();
+      allow delete: if isAdmin();
+    }
+
+    // Points redemption: a resident asks to spend points at a partner shop; the admin approves
+    // (which deducts the points in a transaction) or rejects. The cost must match the shop's price.
+    match /redemptions/{redemptionId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.residentId == request.auth.uid &&
+        request.resource.data.status == 'requested' &&
+        request.resource.data.cost is number && request.resource.data.cost > 0 &&
+        request.resource.data.cost == get(/databases/$(database)/documents/shops/$(request.resource.data.shopId)).data.pointsCost;
+      allow update, delete: if isAdmin();
+    }
+
+    // Security patrol: checkpoints are defined by the admin; a security worker submits a finished
+    // round (which checkpoints were checked, with notes). Admin and site manager read the log.
+    match /patrolPoints/{pointId} {
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker();
+      allow write: if isAdmin();
+    }
+    match /patrolRounds/{roundId} {
+      allow read: if isAdmin() || isActiveManager() ||
+        (isSignedIn() && resource.data.workerId == request.auth.uid);
+      allow create: if isActiveSecurityWorker() && request.resource.data.workerId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
     match /pointsTransactions/{txId} {
       allow read: if isSignedIn() && (isAdmin() || resource.data.residentId == request.auth.uid);
+      allow write: if isAdmin();
+    }
+
+    // Shifts the admin plans in advance for staff. A worker or manager reads only their own;
+    // only the admin writes. (The shift they actually work is still recorded in `attendance`.)
+    match /shiftPlans/{planId} {
+      allow read: if isAdmin() || isActiveManager() ||
+        (isSignedIn() && resource.data.workerId == request.auth.uid);
       allow write: if isAdmin();
     }
 

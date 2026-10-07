@@ -7,11 +7,15 @@ import { exportDataset } from "./csv-export.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
-  onSnapshot, serverTimestamp, writeBatch
+  onSnapshot, serverTimestamp, writeBatch, deleteDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("admin");
 document.getElementById("logoutBtn").addEventListener("click", logout);
+
+// Emergency (SOS) banner. Optional module: if it fails to load, the rest of the panel keeps working.
+try { (await import("./sos-alerts.js")).mountSosBanner(user); }
+catch (e) { console.error("sos-alerts.js failed to load:", e); }
 
 const STATUS_KEYS = { active: "statusActive", suspended: "statusSuspended", used: "statusUsed", pending: "pending", revoked: "revoked", expired: "expired" };
 function stLabel(st) { return (STATUS_KEYS[st] && t(STATUS_KEYS[st])) || st; }
@@ -59,9 +63,9 @@ let drillStack = [];             // navigation stack: [{type, id?}, ...] — emp
 // and "ops" (access, personnel, maintenance). Each tab-btn/section carries a data-dashboard
 // attribute; switching dashboards just filters which tab buttons are visible and jumps to
 // a tab inside that dashboard (remembering the last one visited per dashboard).
-const ALL_TABS = ["residents", "property", "announcements", "access", "workers", "finance", "maint", "areas"];
+const ALL_TABS = ["residents", "property", "announcements", "access", "workers", "finance", "maint", "areas", "shops"];
 const DASHBOARD_TABS = {
-  res: ["residents", "property", "finance", "announcements"],
+  res: ["residents", "property", "finance", "announcements", "shops"],
   ops: ["access", "workers", "maint", "areas"]
 };
 const DASH_STORAGE_KEY = "so_admin_dashboard";
@@ -1424,6 +1428,7 @@ function renderMaintList() {
           ${m.residentName ? `<div class="sub">👤 ${opsEsc(m.residentName)}</div>` : ""}
           <div class="sub">${m.description}</div>
           ${m.photoData ? `<img class="photo-thumb maint-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
+          ${m.beforePhoto ? `<img class="photo-thumb maint-photo" src="${m.beforePhoto}" title="${t("woPhotoBefore")}" alt="">` : ""}${m.afterPhoto ? `<img class="photo-thumb maint-photo" src="${m.afterPhoto}" title="${t("woPhotoAfter")}" alt="">` : ""}
           <div class="sub" style="font-size:11px;color:#7b8a85">${t("estDuration")}: ${Number(m.estimatedHours) > 0 ? (Number(m.estimatedHours) === 0.5 ? t("estHalfHour") : `${m.estimatedHours} ${Number(m.estimatedHours) === 1 ? t("estHour") : t("estHours")}`) : t("estNotSet")}</div>
           <select data-id="${m.id}" class="maint-assign" style="border-radius:8px;border:1px solid #dfe6e3;padding:4px;font-size:11px;margin-top:6px">
             <option value="">${t("unassigned")}</option>
@@ -1563,6 +1568,7 @@ window.addEventListener("so-lang-changed", renderSubsList);
 
 onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap) => {
   workerOptionsCache = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderPlanOptions();
   renderMaintList();
   renderOpsOverview();
   renderOnsiteWorkerOptions();
@@ -1693,6 +1699,287 @@ function renderOpsOverview() {
     </div>`).join("");
 }
 window.addEventListener("so-lang-changed", renderOpsOverview);
+
+
+// ---------- Planned shifts: the admin schedules shifts ahead of time ----------
+let planRows = [];
+let managersForPlan = [];
+function planStaff() {
+  return [...workerOptionsCache, ...managersForPlan]
+    .filter(w => (w.accountStatus || "active") === "active")
+    .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+}
+function renderPlanOptions() {
+  const sel = document.getElementById("planWorker");
+  if (!sel) return;
+  const keep = sel.value;
+  sel.innerHTML = `<option value="">${t("selectWorkerOption")}</option>` +
+    planStaff().map(w => `<option value="${w.id}">${opsEsc(w.name || w.email || w.id)} (${opsEsc(w.role === "manager" ? t("siteManager") : workerTypeLabel(w.workerType))})</option>`).join("");
+  sel.value = keep;
+}
+function renderPlanList() {
+  const el = document.getElementById("planList");
+  if (!el) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const upcoming = planRows.filter(p => p.date >= today)
+    .sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+  if (upcoming.length === 0) { el.innerHTML = `<p class="empty-state">${t("planNone")}</p>`; return; }
+  el.innerHTML = upcoming.map(p => `
+    <div class="list-item">
+      <div class="meta">
+        <div class="title">${opsEsc(p.workerName || "—")}</div>
+        <div class="sub">${opsEsc(p.date)} · ${opsEsc(p.start)} – ${opsEsc(p.end)}${p.note ? " · " + opsEsc(p.note) : ""}</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline plan-del" data-id="${p.id}">${t("planDelete")}</button>
+    </div>`).join("");
+  el.querySelectorAll(".plan-del").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("planDeleteConfirm"))) return;
+    btn.disabled = true;
+    try { await deleteDoc(doc(db, "shiftPlans", btn.dataset.id)); }
+    catch (err) { console.error("Failed to delete planned shift:", err); btn.disabled = false; alert(err.message || String(err)); }
+  }));
+}
+onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap) => {
+  managersForPlan = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderPlanOptions();
+});
+onSnapshot(query(collection(db, "shiftPlans")), (snap) => {
+  planRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  renderPlanList();
+}, (err) => console.error("shiftPlans listener failed:", err));
+document.getElementById("addPlanBtn")?.addEventListener("click", async () => {
+  const errEl = document.getElementById("planError");
+  const showErr = (m) => { errEl.textContent = m; errEl.style.display = m ? "block" : "none"; };
+  const workerId = document.getElementById("planWorker").value;
+  const date = document.getElementById("planDate").value;
+  const start = document.getElementById("planStart").value;
+  const end = document.getElementById("planEnd").value;
+  const note = document.getElementById("planNoteInput").value.trim();
+  showErr("");
+  if (!workerId || !date || !start || !end) { showErr(t("planMissing")); return; }
+  if (end <= start) { showErr(t("planBadTime")); return; }
+  // Same person, same day, overlapping hours: almost certainly a mistake.
+  const clash = planRows.some(p => p.workerId === workerId && p.date === date && start < p.end && end > p.start);
+  if (clash) { showErr(t("planClash")); return; }
+  const person = planStaff().find(w => w.id === workerId);
+  const btn = document.getElementById("addPlanBtn");
+  btn.disabled = true;
+  try {
+    await addDoc(collection(db, "shiftPlans"), {
+      workerId, workerName: person?.name || person?.email || "", date, start, end,
+      ...(note ? { note } : {}), createdBy: user.uid, createdAt: serverTimestamp()
+    });
+    document.getElementById("planNoteInput").value = "";
+  } catch (err) {
+    console.error("Failed to add planned shift:", err);
+    showErr(err.code === "permission-denied" ? "Permission denied — publish the latest Firestore rules." : (err.message || String(err)));
+  } finally { btn.disabled = false; }
+});
+window.addEventListener("so-lang-changed", () => { renderPlanOptions(); renderPlanList(); });
+
+
+// ---------- Shops & points ----------
+function setMsg(id, text, ok) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text || "";
+  el.style.display = text ? "block" : "none";
+  el.style.color = ok ? "#0f6e5f" : "";
+}
+function permMsg(err) {
+  return err && err.code === "permission-denied" ? "Permission denied — publish the latest Firestore rules." : ((err && err.message) || String(err));
+}
+
+// Partner shops
+let shopsAdminRows = [];
+onSnapshot(query(collection(db, "shops"), orderBy("name", "asc")), (snap) => {
+  shopsAdminRows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  const el = document.getElementById("shopsAdminList");
+  if (!el) return;
+  if (shopsAdminRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noShops")}</p>`; return; }
+  el.innerHTML = shopsAdminRows.map(sh => `
+    <div class="list-item">
+      <div class="meta">
+        <div class="title">${opsEsc(sh.name)}${sh.category ? " · " + opsEsc(sh.category) : ""}</div>
+        <div class="sub">${opsEsc(sh.description || "")}</div>
+        ${sh.offer ? `<div class="sub">🏷️ ${opsEsc(sh.offer)}</div>` : ""}
+        <div class="sub">${Number(sh.pointsCost) > 0 ? `⭐ ${Number(sh.pointsCost)} ${t("ptsUnit")}` : t("shopNoCost")}</div>
+      </div>
+      <button type="button" class="btn btn-sm btn-outline shop-del" data-id="${sh.id}">${t("planDelete")}</button>
+    </div>`).join("");
+  el.querySelectorAll(".shop-del").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("shopDeleteConfirm"))) return;
+    btn.disabled = true;
+    try { await deleteDoc(doc(db, "shops", btn.dataset.id)); }
+    catch (err) { btn.disabled = false; alert(permMsg(err)); }
+  }));
+}, (err) => console.error("shops listener failed:", err));
+document.getElementById("addShopBtn")?.addEventListener("click", async () => {
+  const name = document.getElementById("shopName").value.trim();
+  if (!name) { setMsg("shopMsg", t("shopNameMissing")); return; }
+  const cost = Number(document.getElementById("shopCost").value) || 0;
+  const btn = document.getElementById("addShopBtn");
+  btn.disabled = true; setMsg("shopMsg", "");
+  try {
+    await addDoc(collection(db, "shops"), {
+      name,
+      category: document.getElementById("shopCategory").value.trim(),
+      description: document.getElementById("shopDesc").value.trim(),
+      offer: document.getElementById("shopOffer").value.trim(),
+      pointsCost: cost > 0 ? Math.round(cost) : 0,
+      createdAt: serverTimestamp()
+    });
+    ["shopName", "shopCategory", "shopDesc", "shopOffer", "shopCost"].forEach(id => { document.getElementById(id).value = ""; });
+  } catch (err) { setMsg("shopMsg", permMsg(err)); }
+  finally { btn.disabled = false; }
+});
+
+// Give / remove points (one transaction: balance + ledger entry together)
+document.getElementById("ptsBtn")?.addEventListener("click", async () => {
+  const email = document.getElementById("ptsEmail").value.trim().toLowerCase();
+  const type = document.getElementById("ptsType").value;
+  const amount = Math.round(Number(document.getElementById("ptsAmount").value));
+  const note = document.getElementById("ptsNote").value.trim();
+  if (!email || !(amount > 0)) { setMsg("ptsMsg", t("ptsMissing")); return; }
+  const btn = document.getElementById("ptsBtn");
+  btn.disabled = true; setMsg("ptsMsg", "");
+  try {
+    const found = await getDocs(query(collection(db, "users"), where("email", "==", email)));
+    const resDoc = found.docs.find(d => d.data().role === "resident");
+    if (!resDoc) { setMsg("ptsMsg", t("ptsNoResident")); return; }
+    await applyPoints(resDoc.id, resDoc.data().name || email, type === "earn" ? amount : -amount, { type, note });
+    setMsg("ptsMsg", t("ptsDone"), true);
+    document.getElementById("ptsAmount").value = ""; document.getElementById("ptsNote").value = "";
+  } catch (err) {
+    setMsg("ptsMsg", err.message === "insufficient" ? t("ptsInsufficient") : permMsg(err));
+  } finally { btn.disabled = false; }
+});
+// delta > 0 adds points, delta < 0 deducts (never below zero). Throws Error("insufficient").
+async function applyPoints(residentId, residentName, delta, extra = {}) {
+  const userRef = doc(db, "users", residentId);
+  const txRef = doc(collection(db, "pointsTransactions"));
+  await runTransaction(db, async (tx) => {
+    const cur = Number((await tx.get(userRef)).data()?.points) || 0;
+    if (cur + delta < 0) throw new Error("insufficient");
+    tx.update(userRef, { points: cur + delta });
+    tx.set(txRef, {
+      residentId, residentName, amount: Math.abs(delta), type: delta >= 0 ? "earn" : "spend",
+      note: extra.note || "", ...(extra.shopId ? { shopId: extra.shopId } : {}),
+      ...(extra.redemptionId ? { redemptionId: extra.redemptionId } : {}),
+      createdBy: user.uid, createdAt: serverTimestamp()
+    });
+  });
+}
+onSnapshot(query(collection(db, "pointsTransactions")), (snap) => {
+  const el = document.getElementById("ptsLog");
+  if (!el) return;
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)).slice(0, 20);
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noEntries")}</p>`; return; }
+  el.innerHTML = rows.map(r => `
+    <div class="sub-row"><span>${opsEsc(r.residentName || "—")}${r.note ? " · " + opsEsc(r.note) : ""}</span>
+    <span style="font-weight:700;color:${r.type === "earn" ? "#0f6e5f" : "#b3261e"}">${r.type === "earn" ? "+" : "−"}${r.amount}</span></div>`).join("");
+}, (err) => console.error("pointsTransactions listener failed:", err));
+
+// Redemption requests from residents
+onSnapshot(query(collection(db, "redemptions")), (snap) => {
+  const el = document.getElementById("redeemQueue");
+  if (!el) return;
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+  const pending = rows.filter(r => r.status === "requested");
+  const recent = rows.filter(r => r.status !== "requested").slice(0, 8);
+  if (pending.length === 0 && recent.length === 0) { el.innerHTML = `<p class="empty-state">${t("redeemNone")}</p>`; return; }
+  const card = (r, actions) => `
+    <div class="list-item">
+      <div class="meta">
+        <div class="title">${opsEsc(r.residentName || "—")} · ${t("unitLabel")} ${opsEsc(r.unit || "—")}</div>
+        <div class="sub">${opsEsc(r.shopName || "")} · ⭐ ${r.cost}</div>
+        ${r.status === "approved" ? `<div class="sub">${t("redeemCode")}: <b>${opsEsc(r.code || "")}</b></div>` : ""}
+      </div>
+      ${actions || `<span class="badge ${r.status === "approved" ? "active" : "overdue"}">${t(r.status === "approved" ? "redeemApproved" : "redeemRejected")}</span>`}
+    </div>`;
+  el.innerHTML = pending.map(r => card(r, `
+      <div style="display:flex;gap:6px"><button type="button" class="btn btn-sm btn-primary redeem-ok" data-id="${r.id}">${t("redeemApprove")}</button>
+      <button type="button" class="btn btn-sm btn-outline redeem-no" data-id="${r.id}">${t("redeemReject")}</button></div>`)).join("")
+    + (recent.length ? `<h4 class="ops-subtitle">${t("redeemRecent")}</h4>` + recent.map(r => card(r)).join("") : "");
+  const byId = Object.fromEntries(rows.map(r => [r.id, r]));
+  el.querySelectorAll(".redeem-ok").forEach(btn => btn.addEventListener("click", async () => {
+    const r = byId[btn.dataset.id];
+    btn.disabled = true;
+    try {
+      const rRef = doc(db, "redemptions", r.id);
+      const userRef = doc(db, "users", r.residentId);
+      const txRef = doc(collection(db, "pointsTransactions"));
+      await runTransaction(db, async (tx) => {
+        const cur = await tx.get(rRef);
+        if (cur.data()?.status !== "requested") throw new Error("handled");
+        const pts = Number((await tx.get(userRef)).data()?.points) || 0;
+        if (pts < r.cost) throw new Error("insufficient");
+        tx.update(userRef, { points: pts - r.cost });
+        tx.set(txRef, { residentId: r.residentId, residentName: r.residentName || "", amount: r.cost, type: "spend",
+          shopId: r.shopId, redemptionId: r.id, note: r.shopName || "", createdBy: user.uid, createdAt: serverTimestamp() });
+        tx.update(rRef, { status: "approved", code: r.id.slice(0, 6).toUpperCase(), approvedBy: user.uid, approvedAt: serverTimestamp() });
+      });
+    } catch (err) {
+      btn.disabled = false;
+      alert(err.message === "insufficient" ? t("ptsInsufficient") : (err.message === "handled" ? t("redeemHandled") : permMsg(err)));
+    }
+  }));
+  el.querySelectorAll(".redeem-no").forEach(btn => btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try { await updateDoc(doc(db, "redemptions", btn.dataset.id), { status: "rejected", rejectedBy: user.uid, rejectedAt: serverTimestamp() }); }
+    catch (err) { btn.disabled = false; alert(permMsg(err)); }
+  }));
+}, (err) => console.error("redemptions listener failed:", err));
+
+// ---------- Security patrol: checkpoints + round log ----------
+onSnapshot(query(collection(db, "patrolPoints")), (snap) => {
+  const el = document.getElementById("patrolPointsList");
+  if (!el) return;
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (a.order || 0) - (b.order || 0));
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("patrolNoPoints")}</p>`; window.__patrolCount = 0; return; }
+  window.__patrolCount = rows.length;
+  window.__patrolMaxOrder = Math.max(...rows.map(r => r.order || 0));
+  el.innerHTML = rows.map((r, i) => `
+    <div class="list-item"><div class="meta"><div class="title">${i + 1}. ${opsEsc(r.name)}</div></div>
+    <button type="button" class="btn btn-sm btn-outline patrol-del" data-id="${r.id}">${t("planDelete")}</button></div>`).join("");
+  el.querySelectorAll(".patrol-del").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("patrolDeleteConfirm"))) return;
+    btn.disabled = true;
+    try { await deleteDoc(doc(db, "patrolPoints", btn.dataset.id)); }
+    catch (err) { btn.disabled = false; alert(permMsg(err)); }
+  }));
+}, (err) => console.error("patrolPoints listener failed:", err));
+document.getElementById("addPatrolPointBtn")?.addEventListener("click", async () => {
+  const name = document.getElementById("patrolPointName").value.trim();
+  if (!name) { setMsg("patrolPointMsg", t("patrolPointMissing")); return; }
+  const btn = document.getElementById("addPatrolPointBtn");
+  btn.disabled = true; setMsg("patrolPointMsg", "");
+  try {
+    await addDoc(collection(db, "patrolPoints"), { name, order: (window.__patrolMaxOrder || 0) + 1, createdAt: serverTimestamp() });
+    document.getElementById("patrolPointName").value = "";
+  } catch (err) { setMsg("patrolPointMsg", permMsg(err)); }
+  finally { btn.disabled = false; }
+});
+onSnapshot(query(collection(db, "patrolRounds")), (snap) => {
+  const el = document.getElementById("patrolRoundsList");
+  if (!el) return;
+  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.finishedAt?.seconds || 0) - (a.finishedAt?.seconds || 0)).slice(0, 20);
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("patrolNoRounds")}</p>`; return; }
+  const locale = window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB";
+  el.innerHTML = rows.map(r => {
+    const when = r.finishedAt?.seconds ? new Date(r.finishedAt.seconds * 1000).toLocaleString(locale, { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "";
+    const missed = (r.checks || []).filter(c => !c.ok).map(c => c.name);
+    const notes = (r.checks || []).filter(c => c.note).map(c => `${c.name}: ${c.note}`);
+    return `<div class="list-item"><div class="meta">
+      <div class="title">${opsEsc(r.workerName || "—")} · ${opsEsc(when)}</div>
+      <div class="sub" style="color:${missed.length ? "#b3261e" : "#0f6e5f"}">${r.checked}/${r.total} ${t("patrolChecked")}${missed.length ? " · " + t("patrolMissed") + ": " + opsEsc(missed.join("، ")) : ""}</div>
+      ${notes.length ? `<div class="sub">📝 ${opsEsc(notes.join(" | "))}</div>` : ""}
+    </div></div>`;
+  }).join("");
+}, (err) => console.error("patrolRounds listener failed:", err));
 
 // Requests created before names were stored on them: the admin can read resident profiles
 // (workers can't), so copy the resident's name onto the request so the assigned worker can

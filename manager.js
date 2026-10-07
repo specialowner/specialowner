@@ -10,6 +10,14 @@ import {
 const { user, profile } = await requireAuth("manager");
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
+// Shifts the admin planned for me. Optional module: the panel works without it.
+try { (await import("./shift-plans.js")).mountMyShiftPlans(user.uid, "myPlansList"); }
+catch (e) { console.error("shift-plans.js failed to load:", e); }
+
+// Emergency (SOS) banner. Optional module: if it fails to load, the rest of the panel keeps working.
+try { (await import("./sos-alerts.js")).mountSosBanner(user); }
+catch (e) { console.error("sos-alerts.js failed to load:", e); }
+
 function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
@@ -233,6 +241,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
   });
   renderAnnTargetList();
   renderMaintList();
+  renderWorkload();
   renderOnsiteWorkerOptions();
 });
 
@@ -317,6 +326,41 @@ async function recomputeQueuePositions() {
   if (writes.length) await Promise.all(writes).catch(() => {});
 }
 
+// ---------- Workload per worker: on-site tasks + resident requests in one view ----------
+function renderWorkload() {
+  const el = document.getElementById("mgrWorkload");
+  if (!el) return;
+  const esc = (v) => String(v == null ? "" : v).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  const rows = workersCache
+    .filter(w => w.workerType !== "security" && (w.accountStatus || "active") === "active")
+    .map(w => {
+      const open = lastMaintDocs.filter(m => m.assignedWorkerId === w.id && m.status !== "completed")
+        .sort((a, b) => ((b.status === "in_progress") - (a.status === "in_progress")) || ((a.createdAt?.seconds || 0) - (b.createdAt?.seconds || 0)));
+      const onsite = open.filter(m => m.source === "onsite").length;
+      const hours = open.reduce((sum, m) => sum + (Number(m.estimatedHours) > 0 ? Number(m.estimatedHours) : DEFAULT_TASK_HOURS), 0);
+      return { w, open, onsite, calls: open.length - onsite, hours };
+    })
+    .sort((a, b) => (b.open.length - a.open.length) || String(a.w.name || "").localeCompare(String(b.w.name || "")));
+  if (rows.length === 0) { el.innerHTML = `<p class="empty-state">${t("opsNoWorkers")}</p>`; return; }
+  el.innerHTML = rows.map(r => {
+    const current = r.open.find(m => m.status === "in_progress");
+    const where = (m) => m.source === "onsite" ? (m.location || "—") : `${t("unitLabel")} ${m.unit || "—"}`;
+    const nowLine = current
+      ? `${t("wlNow")}: ${esc(categoryLabel(current.category))} · ${esc(where(current))}`
+      : (r.open.length ? t("wlNotStarted") : t("wlFree"));
+    return `
+      <div class="ops-row">
+        <div class="ops-head">
+          <span class="ops-name">${esc(r.w.name || r.w.email || r.w.id)} <small>· ${esc(workerTypeLabel(r.w.workerType))}</small></span>
+          <span class="ops-count">${r.open.length}</span>
+        </div>
+        <div class="sub" style="font-size:11px;color:#7b8a85">${nowLine}</div>
+        <div class="sub" style="font-size:11px;color:#7b8a85">🛠 ${r.onsite} ${t("wlOnsite")} · 📞 ${r.calls} ${t("wlCalls")}${r.open.length ? ` · ≈ ${r.hours} ${t("wlHours")}` : ""}</div>
+      </div>`;
+  }).join("");
+}
+window.addEventListener("so-lang-changed", renderWorkload);
+
 function renderMaintList() {
   const el = document.getElementById("mgrMaintList");
   if (!el) return;
@@ -396,6 +440,7 @@ function renderMaintList() {
 onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "desc")), (snap) => {
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
+  renderWorkload();
   recomputeQueuePositions();
 });
 

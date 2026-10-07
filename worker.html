@@ -46,6 +46,30 @@
         </div>
       </div>
 
+      <div class="card" id="sosCard" style="display:none;text-align:center">
+        <h3 data-i18n="sosTitle">Emergency</h3>
+        <p style="font-size:12px;color:var(--muted);margin:6px 0 10px" data-i18n="sosHint">Sends an alert to the admin and the site manager right away.</p>
+        <button class="btn btn-danger" id="sosBtn" style="font-size:18px;padding:16px 10px">🚨 <span data-i18n="sosButton">SOS</span></button>
+        <p id="sosStatus" style="font-size:12px;margin-top:8px"></p>
+      </div>
+
+      <div class="card" id="patrolCard" style="display:none">
+        <h3 data-i18n="patrolTitle">Patrol round</h3>
+        <p id="patrolLast" style="font-size:12px;color:var(--muted);margin-bottom:8px"></p>
+        <button class="btn btn-primary" id="patrolStartBtn" data-i18n="patrolStart">Start a round</button>
+        <div id="patrolRun" style="display:none">
+          <div id="patrolChecklist"></div>
+          <p class="error-text" id="patrolMsg" style="display:none"></p>
+          <button class="btn btn-primary" id="patrolFinishBtn" data-i18n="patrolFinish">Finish round</button>
+          <button class="btn btn-outline" id="patrolCancelBtn" data-i18n="patrolCancel">Cancel</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="planMine">My upcoming shifts</h3>
+        <div id="myPlansList"><p class="empty-state" data-i18n="planNone">No planned shifts yet.</p></div>
+      </div>
+
       <div class="card">
         <h3 data-i18n="myShift">My shift</h3>
         <p style="font-size:13px;color:var(--muted);margin-bottom:10px" id="shiftStatusText" data-i18n="shiftClosed">You have no open shift.</p>

@@ -60,7 +60,7 @@ export async function prepareProofFile(file) {
 const MAX_PHOTO_CHARS = 320000; // ~320KB of data URL
 
 // Returns { dataUrl, fileName }. Throws Error with .code = "too_large" | "bad_image".
-export async function preparePhotoFile(file) {
+export async function preparePhotoFile(file, maxChars = MAX_PHOTO_CHARS) {
   let img;
   try { img = await loadImage(file); }
   catch { const e = new Error("Unsupported image"); e.code = "bad_image"; throw e; }
@@ -76,7 +76,7 @@ export async function preparePhotoFile(file) {
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
     const dataUrl = canvas.toDataURL("image/jpeg", quality);
-    if (dataUrl.length <= MAX_PHOTO_CHARS) {
+    if (dataUrl.length <= maxChars) {
       return { dataUrl, fileName: file.name.replace(/\.[^.]+$/, "") + ".jpg" };
     }
     maxSide = Math.round(maxSide * 0.75);

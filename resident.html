@@ -212,12 +212,19 @@
 
     <!-- SHOPS -->
     <section id="tab-shops" style="display:none">
-      <!-- Points balance hidden temporarily from the UI; logic/markup kept as-is for when it's re-enabled -->
-      <div class="card" style="text-align:center;display:none">
+      <div class="card" style="text-align:center">
         <div class="label" data-i18n="yourPointsBalance">Your points balance</div>
         <div style="font-size:26px;font-weight:800;color:var(--primary)" id="shopsPoints">0</div>
       </div>
       <div id="shopsList"><p class="empty-state" data-i18n="noShops">No partner shops yet.</p></div>
+      <div class="card">
+        <h3 data-i18n="myRedemptions">My redemptions</h3>
+        <div id="redemptionsList"><p class="empty-state" data-i18n="redeemNoneMine">No redemptions yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="pointsHistory">Points history</h3>
+        <div id="pointsHistoryList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+      </div>
     </section>
 
   </div>
@@ -227,8 +234,7 @@
     <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
     <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabRequests">Requests</span></button>
-    <!-- Shops tab hidden temporarily from the UI; markup/logic kept as-is for when it's re-enabled -->
-    <button class="tab-btn" data-tab="shops" style="display:none"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
+    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
   </div>
 </div>
 

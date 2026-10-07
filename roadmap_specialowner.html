@@ -86,6 +86,23 @@
   </div>
 
   <div class="card">
+    <h2>Sessione 2026-10-07 (2) — Negozi e punti, giri di sicurezza (v1.19.0)</h2>
+    <div class="desc">Ancora nessuna funzione che richieda Blaze. Nuove collezioni: <code>redemptions</code>, <code>patrolPoints</code>, <code>patrolRounds</code> — ripubblicare <code>firestore.rules</code>.</div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">Negozi, punti e riscatto <span class="status-tag done">Fatto</span></div><div class="step-detail">Tab "Negozi" per l'admin; il residente chiede il riscatto, l'admin approva con transazione (saldo scalato, voucher). Tab Negozi riattivato nell'app residente.</div></div></div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">Giro di sicurezza <span class="status-tag done">Fatto</span></div><div class="step-detail">Checkpoint definiti dall'admin (tab Accesso), giro con spunte e note per la guardia, registro dei giri con punti mancati.</div></div></div>
+    <div class="step"><div class="step-badge todo">!</div><div class="step-body"><div class="step-title">Restano fuori <span class="status-tag todo">Da fare</span></div><div class="step-detail">Notifiche push e Cloud Function overdue (richiedono Blaze); pagamenti online (serve un gateway esterno); payroll con collegamento bancario.</div></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Sessione 2026-10-07 — Foto di lavoro, SOS, turni pianificati, carico di lavoro (v1.17.0 – v1.18.0)</h2>
+    <div class="desc">Solo funzioni che non richiedono il piano Blaze. Le <code>firestore.rules</code> vanno ripubblicate (nuove collezioni <code>sosAlerts</code> e <code>shiftPlans</code>, nuovi campi foto sulle richieste). Nuovi file: <code>sos-alerts.js</code>, <code>shift-plans.js</code>.</div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">Foto prima/dopo sul lavoro <span class="status-tag done">Fatto</span></div><div class="step-detail">Opzionali, max ~220 KB ciascuna, salvate nel documento della richiesta; visibili ad admin e residente.</div></div></div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">SOS per la sicurezza <span class="status-tag done">Fatto</span></div><div class="step-detail">Allarme rosso per admin e site manager con suono e posizione; funziona solo a pagina aperta (le push richiedono Blaze).</div></div></div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">Turni pianificati <span class="status-tag done">Fatto</span></div><div class="step-detail">L'admin pianifica, il personale vede i prossimi turni; blocca le sovrapposizioni per la stessa persona.</div></div></div>
+    <div class="step"><div class="step-badge done">✓</div><div class="step-body"><div class="step-title">Carico di lavoro (site manager) e prossima voce (operaio) <span class="status-tag done">Fatto</span></div><div class="step-detail">Vista per operaio con task on-site + richieste insieme; a fine lavoro l'operaio può passare alla successiva.</div></div></div>
+  </div>
+
+  <div class="card">
     <h2>Riorganizzazione nav Admin — piano a 4 step</h2>
     <div class="desc">File toccati in questo intervento: <code>admin.html</code>, <code>admin.js</code>, <code>style.css</code>, <code>i18n.js</code> (cartella radice, quella davvero servita).</div>
 
@@ -556,35 +573,35 @@
 
       <div class="cat-card">
         <h3>App Operaio (Worker)</h3>
-        <div class="count">6 da fare</div>
+        <div class="count">1 da fare · 5 fatte</div>
         <div class="item">Notifiche push (nuovo ordine, ferie approvate, stipendio pagato)</div>
-        <div class="item">Foto prima/dopo come prova di lavoro completato</div>
-        <div class="item">Turni pianificati dall'admin (invece del solo clock-in libero)</div>
-        <div class="item">Percorso di ronda/checklist per il personale di sicurezza</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Foto prima/dopo come prova di lavoro — fatto (v1.17.0), opzionali, visibili ad admin, site manager e residente</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Turni pianificati dall'admin — fatto (v1.18.0): scheda "Turni pianificati" in Personale, i lavoratori e il site manager vedono "I miei prossimi turni"; il clock-in resta libero</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Percorso di ronda/checklist per la sicurezza — fatto (v1.19.0): punti di controllo definiti dall'admin, giri registrati con note</div>
         <div class="item">Calcolo automatico busta paga + esportazione PDF</div>
-        <div class="item">Bottone SOS/emergenza per la sicurezza</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Bottone SOS per la sicurezza — fatto (v1.17.0): avviso rosso per admin e site manager, solo con la pagina aperta (le push richiedono Blaze)</div>
       </div>
 
       <div class="cat-card">
         <h3>Punti & Negozi</h3>
-        <div class="count">3 da fare</div>
-        <div class="item">UI admin per la gestione punti fedeltà (pointsTransactions)</div>
-        <div class="item">UI admin per la gestione negozi partner (shops)</div>
-        <div class="item">Riscatto punti nei negozi partner (lato app residente)</div>
+        <div class="count">tutte fatte</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ UI admin per i punti fedeltà — fatto (v1.19.0): assegna/rimuovi punti con registro (<code>pointsTransactions</code>)</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ UI admin per i negozi partner — fatto (v1.19.0)</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Riscatto punti nei negozi — fatto (v1.19.0): richiesta del residente, approvazione admin con scalo punti e codice voucher; il tab Negozi è di nuovo visibile</div>
       </div>
 
       <div class="cat-card">
         <h3>Call Center — Coda chiamate manutenzione</h3>
-        <div class="count">2 da fare · 6 fatte (vedi sopra)</div>
+        <div class="count">1 da fare · 8 fatte (vedi sopra)</div>
         <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Smistamento verso l'operaio più libero — fatto per <code>maintenanceRequests</code> (distribuzione automatica per mestiere), non ancora per un vero flusso Call Center con chiamate manuali</div>
         <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Posizione in coda del residente — fatta, ora con stima in ore ("N richieste prima della tua ≈ 3 ore")</div>
         <div class="item">✓ Nuovo ruolo "Call Center" con account dedicato e permessi propri — fatto: ruolo <code>callcenter</code>, creato solo dall'admin, permessi limitati alla ricerca residenti e alla registrazione chiamate</div>
         <div class="item">✓ Pannello Call Center: form per inserire una chiamata manualmente — fatto (ricerca per unità, categoria, descrizione). L'assegnazione all'operaio resta quella automatica/manuale già esistente lato admin e site manager, non si fa dal pannello Call Center</div>
         <div class="item">Nuova struttura dati "coda" per operaio: task on-site (assegnati dal manager) + chiamate residenti (da app o da Call Center), con ordine e provenienza distinguibili — oggi <code>maintenanceRequests</code> resta un'unica collezione senza task on-site separati</div>
         <div class="item">✓ UI operaio: dropdown per stimare la durata (in ore) — fatto sulle richieste <code>maintenanceRequests</code>, non ancora su una vera coda con task on-site</div>
-        <div class="item">UI operaio: completamento di una voce in coda → passaggio automatico alla successiva (oggi ogni richiesta resta indipendente, l'operaio la apre e chiude singolarmente)</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ UI operaio — fatto (v1.18.0): la prima voce in attesa è marcata "Prossima" e a fine lavoro l'operaio può avviare subito la successiva</div>
         <div class="item">✓ Tempo stimato residuo per il residente — fatto: somma delle stime di chi lo precede, ricalcolata a ogni completamento o nuova stima (fallback 1 ora per le voci non ancora stimate)</div>
-        <div class="item">Vista Site Manager: carico di lavoro per operaio, task on-site + chiamate in coda insieme (oggi vede solo le richieste <code>maintenanceRequests</code>, non task on-site separati)</div>
+        <div class="item" style="background:var(--done-bg);border-color:var(--done-bd);color:var(--done-tx)">✓ Vista Site Manager: carico di lavoro per operaio — fatto (v1.18.0), task on-site e richieste dei residenti insieme, con ore stimate residue</div>
       </div>
 
     </div>

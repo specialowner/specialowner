@@ -17,7 +17,10 @@ A base residential-compound management app: resident interface + admin dashboard
 - Access: **live camera QR scanner** that validates an invitation and logs entry/exit
 - Workers: add/list workers
 - Finance: add payment records per resident (by unit + email), view all payments
-- Maintenance: view all requests and change status (pending → in progress → completed)
+- Maintenance: view all requests and change status (pending → in progress → completed); workers can attach before/after photos, which the admin, site manager and resident see
+- Shops & points: partner shops with an optional points price, give/remove points, residents request a redemption and the admin approves it (balance deducted, voucher code issued)
+- Security patrol: the admin defines checkpoints, guards submit rounds (`patrolPoints`, `patrolRounds`)
+- Emergency: a security worker's SOS button raises a red alert bar for the admin and the site manager (`sosAlerts` collection, `sos-alerts.js`)
 
 **Call center panel** (`call-center.html`)
 - Staff-only account created by the admin (no self sign-up), same as site manager and worker accounts

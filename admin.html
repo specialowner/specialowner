@@ -202,6 +202,16 @@
         <div style="display:flex;gap:8px;margin-bottom:8px"><select id="accessFilterType" style="flex:1;min-width:0"><option value="" data-i18n="allMovements">All movements</option><option value="entry" data-i18n="accessEntry">Entered</option><option value="exit" data-i18n="accessExit">Exited</option></select><select id="accessFilterPerson" style="flex:1;min-width:0"><option value="">All</option></select></div>
         <div id="accessList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
       </div>
+          <div class="card">
+        <h3 data-i18n="patrolAdminTitle">Security patrol</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="patrolAdminNote">Define the checkpoints a guard must visit on every round, in order.</p>
+        <div class="field"><label data-i18n="patrolPointName">Checkpoint</label><input type="text" id="patrolPointName" data-i18n-placeholder="patrolPointPh" placeholder="e.g. Main gate, Garage level 1"></div>
+        <p class="error-text" id="patrolPointMsg" style="display:none"></p>
+        <button class="btn btn-primary" id="addPatrolPointBtn" data-i18n="patrolAddPoint">Add checkpoint</button>
+        <div id="patrolPointsList"><p class="empty-state" data-i18n="patrolNoPoints">No checkpoints yet.</p></div>
+        <h4 class="ops-subtitle" data-i18n="patrolLogTitle">Recent rounds</h4>
+        <div id="patrolRoundsList"><p class="empty-state" data-i18n="patrolNoRounds">No rounds recorded yet.</p></div>
+      </div>
     </section>
 
     <!-- WORKERS -->
@@ -264,6 +274,19 @@
         <button class="btn btn-primary" id="addWorkerAccBtn" data-i18n="addWorkerAccount">Add worker account</button>
       </div>
       <div class="card">
+        <h3 data-i18n="planTitle">Planned shifts</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="planNote">Schedule a shift for a worker or site manager. They see it under "My upcoming shifts".</p>
+        <div class="field"><label data-i18n="planWho">Staff member</label><select id="planWorker"><option value="" data-i18n="selectWorkerOption">Select a worker</option></select></div>
+        <div class="field"><label data-i18n="planDate">Date</label><input type="date" id="planDate"></div>
+        <div class="field"><label data-i18n="planStart">From</label><input type="time" id="planStart" value="08:00"></div>
+        <div class="field"><label data-i18n="planEnd">To</label><input type="time" id="planEnd" value="16:00"></div>
+        <div class="field"><label data-i18n="planPostNote">Note (optional)</label><input type="text" id="planNoteInput" data-i18n-placeholder="planPostPh" placeholder="e.g. Main gate"></div>
+        <p class="error-text" id="planError" style="display:none"></p>
+        <button class="btn btn-primary" id="addPlanBtn" data-i18n="planAdd">Add shift</button>
+        <h4 class="ops-subtitle" data-i18n="planUpcoming">Upcoming planned shifts</h4>
+        <div id="planList"><p class="empty-state" data-i18n="planNone">No planned shifts yet.</p></div>
+      </div>
+      <div class="card">
         <h3 data-i18n="workerShifts">Worker shifts</h3>
         <div class="field" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label data-i18n="shiftStatsTitle" style="margin:0">This month — totals per worker</label><span style="font-size:12px"><span data-i18n="lateAfter">Late after</span> <input type="time" id="lateAfterTime" value="09:00" style="width:auto"></span></div>
         <div id="shiftStats"></div>
@@ -293,6 +316,38 @@
       <div class="card">
         <h3 data-i18n="workers">Workers</h3>
         <div id="workersList"><p class="empty-state" data-i18n="noWorkers">No workers added yet.</p></div>
+      </div>
+    </section>
+
+    <!-- SHOPS & POINTS -->
+    <section id="tab-shops" data-dashboard="res" style="display:none">
+      <div class="card">
+        <h3 data-i18n="redeemQueueTitle">Redemption requests</h3>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:10px" data-i18n="redeemQueueNote">Approving deducts the points from the resident and gives them a voucher code to show at the shop.</p>
+        <div id="redeemQueue"><p class="empty-state" data-i18n="redeemNone">No redemption requests.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="pointsAdjustTitle">Give or remove points</h3>
+        <div class="field"><label data-i18n="email">Email</label><input type="email" id="ptsEmail" placeholder="you@example.com" data-i18n-placeholder="emailPh"></div>
+        <div class="field"><label data-i18n="ptsAction">Action</label>
+          <select id="ptsType"><option value="earn" data-i18n="ptsGive">Give points</option><option value="spend" data-i18n="ptsRemove">Remove points</option></select></div>
+        <div class="field"><label data-i18n="ptsAmount">Points</label><input type="number" id="ptsAmount" min="1" placeholder="0"></div>
+        <div class="field"><label data-i18n="planPostNote">Note (optional)</label><input type="text" id="ptsNote"></div>
+        <p class="error-text" id="ptsMsg" style="display:none"></p>
+        <button class="btn btn-primary" id="ptsBtn" data-i18n="ptsApply">Apply</button>
+        <h4 class="ops-subtitle" data-i18n="ptsRecent">Recent points movements</h4>
+        <div id="ptsLog"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+      </div>
+      <div class="card">
+        <h3 data-i18n="shopsTitle">Partner shops</h3>
+        <div class="field"><label data-i18n="shopName">Shop name</label><input type="text" id="shopName"></div>
+        <div class="field"><label data-i18n="shopCategory">Category</label><input type="text" id="shopCategory" data-i18n-placeholder="shopCategoryPh" placeholder="e.g. Cafe, Pharmacy"></div>
+        <div class="field"><label data-i18n="reason">Reason</label><textarea id="shopDesc"></textarea></div>
+        <div class="field"><label data-i18n="shopOffer">Offer</label><input type="text" id="shopOffer" data-i18n-placeholder="shopOfferPh" placeholder="e.g. 10% off for residents"></div>
+        <div class="field"><label data-i18n="shopCost">Points needed to redeem (optional)</label><input type="number" id="shopCost" min="0" placeholder="0"></div>
+        <p class="error-text" id="shopMsg" style="display:none"></p>
+        <button class="btn btn-primary" id="addShopBtn" data-i18n="shopAdd">Add shop</button>
+        <div id="shopsAdminList"><p class="empty-state" data-i18n="noShops">No partner shops yet.</p></div>
       </div>
     </section>
 
@@ -500,6 +555,7 @@
     <button class="tab-btn" data-tab="property" data-dashboard="res"><span class="tab-icon">🏢</span><span data-i18n="tabProperty">Property</span></button>
     <button class="tab-btn" data-tab="finance" data-dashboard="res"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="announcements" data-dashboard="res"><span class="tab-icon">📢</span><span data-i18n="tabAnnouncements">Announce</span></button>
+    <button class="tab-btn" data-tab="shops" data-dashboard="res"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
     <button class="tab-btn" data-tab="access" data-dashboard="ops" style="display:none"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
     <button class="tab-btn" data-tab="workers" data-dashboard="ops" style="display:none"><span class="tab-icon">👷</span><span data-i18n="tabWorkers">Workers</span></button>
     <button class="tab-btn" data-tab="maint" data-dashboard="ops" style="display:none"><span class="tab-icon">🛠️</span><span data-i18n="tabMaintShort">Maint.</span></button>
