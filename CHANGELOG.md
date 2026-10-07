@@ -1,8 +1,20 @@
 # Special Owner — Update archive
 
-Current version: **v1.19.0**
+Current version: **v1.19.1**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.19.1 — 2026-10-07
+
+**English**
+- Docs: the roadmap file now matches the real code, and items that were still marked "to do" are marked done: attendance stats, monthly leave accrual, exit logging and the movements filter, promoting an admin from the app, CSV export, cancelling an invitation, the payslip with PDF save, and direct on-site tasks.
+- Still open on the roadmap: push notifications and the server-side overdue check (both need Firebase Blaze), online payment of dues (needs a payment gateway and an external server), and bank linking for payroll.
+- No change to app behavior or Firestore rules in this release, so `firestore.rules` does not need to be published again.
+
+**العربية**
+- توثيق: ملف الرودماب اتحدّث ليطابق الكود الفعلي، وبنود كانت متعلّمة «لسه» اتعلّمت «تم»: إحصائيات الحضور، احتساب الإجازات الشهري، تسجيل الخروج وفلتر الحركات، ترقية أدمن من التطبيق، تصدير CSV، إلغاء الدعوة، قسيمة المرتب بحفظ PDF، والمهام المباشرة في الموقع.
+- اللي لسه مفتوح في الرودماب: إشعارات push وفحص الـ overdue من السيرفر (محتاجين Firebase Blaze)، الدفع الأونلاين للأقساط (محتاج بوابة دفع وسيرفر خارجي)، والربط البنكي للمرتبات.
+- مفيش تغيير في سلوك التطبيق ولا في قواعد Firestore في الإصدار ده، ومش محتاج نشر `firestore.rules` من جديد.
 
 ## v1.19.0 — 2026-10-07
 
