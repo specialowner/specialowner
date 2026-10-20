@@ -8,8 +8,18 @@ service cloud.firestore {
     function myData() {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
+    // Super admin (owner): has every admin permission, plus the finance dashboard.
+    // isAdmin() accepts both roles so existing admins keep working and the super
+    // admin can also open the regular admin panel.
+    function isSuperAdmin() {
+      return isSignedIn() && myData().role == 'superadmin';
+    }
     function isAdmin() {
-      return isSignedIn() && myData().role == 'admin';
+      return isSignedIn() && (myData().role == 'admin' || myData().role == 'superadmin');
+    }
+    // admin / superadmin accounts can only be created, changed, suspended or removed by the Super Admin.
+    function isPrivRole(r) {
+      return r == 'admin' || r == 'superadmin';
     }
     function isOwner(uid) {
       return isSignedIn() && request.auth.uid == uid;
@@ -59,14 +69,17 @@ service cloud.firestore {
       // sign-up, but that alone wouldn't stop a crafted request without this rule.
       allow create: if
         (isOwner(userId) && request.resource.data.role == 'resident') ||
-        isAdmin() ||
+        isSuperAdmin() ||
+        (isAdmin() && !isPrivRole(request.resource.data.get('role', ''))) ||
         (isActiveManager() && request.resource.data.role == 'worker');
       // A resident/worker/manager may only touch their own activation-request fields — not role, accountStatus, salary, or points.
-      allow update: if isAdmin() ||
+      // A plain admin can no longer touch an admin / super admin account, nor turn anyone into one.
+      allow update: if isSuperAdmin() ||
+        (isAdmin() && !isPrivRole(resource.data.role) && !isPrivRole(request.resource.data.get('role', ''))) ||
         (isOwner(userId) &&
          request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['activationRequestStatus', 'activationRequestedAt']));
-      allow delete: if isAdmin();
+      allow delete: if isSuperAdmin() || (isAdmin() && !isPrivRole(resource.data.role));
     }
 
     match /invitations/{inviteId} {
@@ -82,6 +95,16 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'revokedBy']) &&
          request.resource.data.get('revokedBy', request.auth.uid) == request.auth.uid);
       allow delete: if isAdmin();
+    }
+
+    // Audit trail: any admin can add an entry about their own action; nobody can edit
+    // or delete one; only the Super Admin can read the log.
+    match /activityLog/{logId} {
+      allow read: if isSuperAdmin();
+      allow create: if isAdmin() &&
+        request.resource.data.actorId == request.auth.uid &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
 
     match /payments/{payId} {

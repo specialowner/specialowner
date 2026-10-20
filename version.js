@@ -13,9 +13,92 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.19.1";
+  var APP_VERSION = "1.24.0";
 
   var CHANGELOG = [
+    {
+      version: "1.24.0", date: "2026-10-20",
+      ar: [
+        "السوبر أدمن: قائمة «السكان المتأخرين» جاهزة للمتابعة بالتليفون: كل ساكن عليه أقساط متأخرة مع رقم تليفونه وعدد الأقساط وإجمالي المتأخر وأقدم استحقاق وعدد أيام التأخير، الأكبر مبلغاً الأول، وزرار «تصدير CSV» بيفتح في إكسل بالعربي.",
+        "ترقية الأدمن وإزالته وإيقافه بقت للسوبر أدمن بس: كارت «حسابات الأدمن» بيختفي عند الأدمن العادي، وقواعد Firestore بتمنع الأدمن العادي من تعديل أو إنشاء أو حذف أي حساب أدمن أو سوبر أدمن حتى لو حاول من برّه التطبيق.",
+        "سجل نشاط جديد عند السوبر أدمن: مين سجّل دفعة كمدفوعة، وافق على إيصال أو رفضه، ورقّى أو شال أدمن، ومتى. السجل بيتكتب مع نفس العملية (يا الاتنين يتحفظوا يا ولا واحد)، ومحدش يقدر يعدّله أو يمسحه.",
+        "لازم تنشر firestore.rules من جديد (فيها مجموعة activityLog الجديدة وقواعد حسابات الأدمن). الحركات اللي حصلت قبل الإصدار ده مش هتظهر في السجل.",
+      ],
+      en: [
+        "Super Admin: an \"Overdue residents\" list ready for phone follow-up: each resident with overdue installments, their phone, number of installments, total overdue, oldest due date and days late, largest balance first, with an \"Export CSV\" button (opens in Excel with Arabic text intact).",
+        "Promoting, removing and suspending admins is now Super Admin only: the \"Admin accounts\" card is hidden from regular admins, and Firestore rules stop a regular admin from editing, creating or deleting any admin or super admin account, even with a crafted request.",
+        "New activity log for the Super Admin: who marked a payment as paid, approved or rejected a receipt, and promoted or removed an admin, and when. Each entry is written in the same commit as the action (both succeed or neither), and nobody can edit or delete an entry.",
+        "You must publish firestore.rules again (it adds the activityLog collection and the admin-account rules). Actions taken before this version are not in the log.",
+      ]
+    },
+    {
+      version: "1.23.0", date: "2026-10-20",
+      ar: [
+        "دور جديد «سوبر أدمن»: صفحة خاصة (superadmin.html) بتفتح تلقائياً بعد تسجيل الدخول، وكمان يقدر يفتح لوحة الأدمن العادية.",
+        "لوحة المدفوعات: كل الأقساط وحالتها (مدفوع / متأخر / إيصال في انتظار المراجعة / لسه ماحلش ميعاده)، مع فلتر بالشهر والحالة والمبنى وبحث بالوحدة أو الاسم، وفوقها إجمالي المحصّل والمتأخر ونسبة التحصيل.",
+        "الأدمن الحالي ماتأثرش: قواعد Firestore بقت تقبل الدورين. لازم تنشر firestore.rules من جديد، وتحوّل حساب المالك لدور superadmin من Firestore (users/UID ← role).",
+      ],
+      en: [
+        "New \"Super Admin\" role: its own page (superadmin.html) opened automatically after login; it can also open the regular admin panel.",
+        "Payments dashboard: every installment with a clear status (paid / overdue / receipt awaiting review / not yet due), filters for month, status, building and a unit-or-name search, and totals on top (collected, overdue, collection rate).",
+        "Existing admins are unaffected: Firestore rules now accept both roles. Publish firestore.rules again, and set the owner's account to role superadmin in Firestore (users/UID, field role).",
+      ]
+    },
+    {
+      version: "1.22.0", date: "2026-10-20",
+      ar: [
+        "لوحة الأدمن: كارت «محتاج تدخلك» أول الرئيسية: طلبات التفعيل، الإيصالات للمراجعة، المدفوعات المتأخرة، الصيانة الجديدة، طلبات الخدمات، استبدال النقاط، والإجازات والسلف. الدوس على أي رقم بيفتح التبويب المناسب (حتى لو في لوحة العمليات). ولو مفيش حاجة مستنية بيقولك كده.",
+        "تأكيد قبل الإجراءات اللي مفيهاش رجوع: تسجيل دفعة كمدفوعة، الموافقة على إيصال، والموافقة على استبدال نقاط أو رفضه.",
+        "موافقة ورفض الإجازات والسلف مابقتش بتفشل في صمت: لو حصلت مشكلة بتظهر رسالة.",
+        "رسائل الخطأ عند الأدمن بقت قصيرة وبالعربي (النت مش شغال، مفيش صلاحية) بدل نص Firebase التقني، وتنبيهات كانت بالإنجليزي بس بقت بلغة التطبيق.",
+        "مفيش تغيير في قواعد Firestore ومفيش مجموعات بيانات جديدة، فمش محتاج نشر `firestore.rules`."
+      ],
+      en: [
+        "Admin panel: a \"Needs your attention\" card at the top of Home: account requests, receipts to review, overdue payments, new maintenance, service requests, points redemptions, and leave and advance requests. Tapping a number opens the right tab (even in the Operations dashboard). When nothing is waiting it says so.",
+        "A confirmation before actions that cannot be undone: marking a payment as paid, approving a receipt, and approving or rejecting a points redemption.",
+        "Approving or rejecting leave and advance requests no longer fails silently: a message appears if it does not go through.",
+        "Admin error messages are short and friendly (no internet, no permission) instead of raw Firebase text, and alerts that were English-only now follow the app language.",
+        "No change to Firestore rules and no new collections, so `firestore.rules` does not need to be published again."
+      ]
+    },
+    {
+      version: "1.21.0", date: "2026-10-20",
+      ar: [
+        "تطبيق العامل: في تبويب الطلبات كارت كبير فوق «شغلك دلوقتي»: الشغلة اللي شغال عليها أو اللي بعدها، بنوعها ومكانها واسم الساكن وزرار كبير للبدء أو الإنهاء. لو مفيش شغل بيقولك ترتاح.",
+        "قبل إنهاء أي شغلة بيطلع تأكيد «خلّصت الشغلة دي؟» عشان الزرار الكبير ما يتداسش بالغلط.",
+        "تبويب جديد «حسابي» فيه المرتب وسجل المرتبات وطلب السلفة والإجازات، فالرئيسية بقت قصيرة: التاريخ، الحضور والانصراف بزراير كبيرة، الطوارئ، جولة الأمن، المناوبات، والإعلانات.",
+        "سايت مانجر: كارت «النهارده في نظرة» أول الرئيسية: عدد الطلبات المتأخرة (أكتر من 24 ساعة)، اللي من غير عامل، الجاري، والعمال الفاضيين. الدوس على الرقم بيفتح التبويب المناسب.",
+        "رسائل الخطأ عند العامل وسايت مانجر بقت قصيرة وبالعربي بدل نص Firebase التقني، ودلوقتي في ملف مشترك `friendly-error.js` بيستخدمه تطبيق الساكن كمان.",
+        "مفيش تغيير في قواعد Firestore ومفيش مجموعات بيانات جديدة، فمش محتاج نشر `firestore.rules`."
+      ],
+      en: [
+        "Worker app: the Orders tab opens with a big \"Do this now\" card: the job in progress, or the next one, with its type, place, resident name and one big Start or Finish button. With no jobs it tells the worker to take a break.",
+        "Before finishing a job a \"Mark this job as finished?\" confirmation appears, so the big button is not tapped by mistake.",
+        "A new \"Me\" tab holds salary, salary history, advance requests and leave, so Home is short: date, big clock in/out buttons, emergency, patrol round, planned shifts and announcements.",
+        "Site manager: a \"Today at a glance\" card at the top of Home: late requests (over 24 hours), requests with no worker, jobs in progress and free workers. Tapping a number opens the right tab.",
+        "Error messages for workers and the site manager are short and friendly instead of raw Firebase text, via a shared `friendly-error.js` that the resident app now uses too.",
+        "No change to Firestore rules and no new collections, so `firestore.rules` does not need to be published again."
+      ]
+    },
+    {
+      version: "1.20.0", date: "2026-10-20",
+      ar: [
+        "تطبيق الساكن: الرئيسية بقت أبسط. فوق 3 اختصارات كبيرة: «عليّ كام؟» (المبلغ المستحق وعدد المتأخر)، «طلب صيانة»، و«دعوة ضيف»، وتحتهم إعلانات الإدارة.",
+        "زرار «ادفع / ارفع إيصال» بيظهر في الرئيسية على أقدم دفعة لسه محتاجة إيصال، من غير ما تدخل على تبويب المدفوعات. وقبل ما الإيصال يتبعت بيطلع تأكيد فيه اسم الدفعة والمبلغ.",
+        "طلب الصيانة بقى في 3 خطوات: اختار نوع المشكلة من أيقونات كبيرة، احكي المشكلة وضيف صورة لو حابب، وبعدين راجع وابعت. وفي «طلباتي» شريط بيوضّح الطلب وصل لفين (اتستلم، اتسند، جاري، خلص).",
+        "تبويب «المزيد» حلّ محل «المحلات» في الشريط السفلي، وفيه المحلات والنقاط والخدمات الدورية وبلاغ الكمبوند.",
+        "رسائل الخطأ بقت بالعربي وبسيطة (النت مش شغال، مفيش صلاحية) بدل نص Firebase التقني.",
+        "مفيش تغيير في قواعد Firestore ومفيش مجموعات بيانات جديدة، فمش محتاج نشر `firestore.rules`."
+      ],
+      en: [
+        "Resident app: a simpler Home. Three big shortcuts on top: \"How much do I owe?\" (amount due and how many are overdue), \"Maintenance request\" and \"Invite a guest\", with the management announcements below.",
+        "A \"Pay / upload receipt\" button on Home for the oldest payment that still needs a receipt, without opening the Finance tab. Before a receipt is sent, a confirmation shows the payment name and amount.",
+        "Maintenance requests now take 3 steps: pick the problem type from big icons, describe it and optionally add a photo, then review and send. In \"My requests\" a progress bar shows where the request is (received, assigned, in progress, done).",
+        "A \"More\" tab replaces \"Shops\" in the bottom bar and holds shops and points, regular services and the compound report.",
+        "Error messages are short and friendly (no internet, no permission) instead of raw Firebase text.",
+        "No change to Firestore rules and no new collections, so `firestore.rules` does not need to be published again."
+      ]
+    },
     {
       version: "1.19.1", date: "2026-10-07",
       ar: [

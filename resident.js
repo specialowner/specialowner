@@ -1,6 +1,7 @@
 import { db } from "./firebase-config.js";
 import { prepareProofFile, preparePhotoFile, openDataUrl } from "./proof-file.js";
 import { requireAuth, logout } from "./guard.js";
+import { makeErrorHelpers } from "./friendly-error.js";
 import {
   collection, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, Timestamp, doc, updateDoc, getDoc
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
@@ -14,6 +15,8 @@ function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
+
+const { friendlyError, failMsg } = makeErrorHelpers(t);
 
 function renderGreeting() {
   document.getElementById("greetName").textContent = `${t("hiThere")}, ${profile.name?.split(" ")[0] || ""} 👋`;
@@ -68,21 +71,37 @@ async function requestActivation() {
     alert(t("requestSent"));
   } catch (err) {
     console.error("Activation request failed:", err);
-    alert(err.message || err);
+    alert(failMsg(t("activationFailed"), err));
   }
 }
 document.getElementById("requestActivationBtnInvites").addEventListener("click", requestActivation);
 document.getElementById("requestActivationBtnMaint").addEventListener("click", requestActivation);
 
 // ---------- Tabs ----------
+// "Shops" now lives under the "More" tab, so it highlights "More" in the tab bar.
 const tabs = document.querySelectorAll(".tab-btn");
-tabs.forEach(btn => btn.addEventListener("click", () => {
-  tabs.forEach(b => b.classList.remove("active"));
-  btn.classList.add("active");
-  ["home", "finance", "invites", "maint", "shops"].forEach(t => {
-    document.getElementById(`tab-${t}`).style.display = (t === btn.dataset.tab) ? "block" : "none";
+const ALL_TABS = ["home", "finance", "invites", "maint", "shops", "more"];
+function showTab(name) {
+  const highlight = name === "shops" ? "more" : name;
+  tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === highlight));
+  ALL_TABS.forEach(k => {
+    const sec = document.getElementById(`tab-${k}`);
+    if (sec) sec.style.display = (k === name) ? "block" : "none";
   });
-}));
+  window.scrollTo(0, 0);
+}
+tabs.forEach(btn => btn.addEventListener("click", () => showTab(btn.dataset.tab)));
+// Any element with data-goto jumps to that tab (quick cards, "More" rows, back links).
+document.addEventListener("click", (e) => {
+  const go = e.target.closest("[data-goto]");
+  if (!go) return;
+  showTab(go.dataset.goto);
+  if (go.dataset.goto === "maint") {
+    const req = go.dataset.gotoReq;
+    if (req) document.querySelector(`#reqSwitch button[data-req="${req}"]`)?.click();
+    else markMaintSeen();
+  }
+});
 
 // ---------- Payments ----------
 // Proof-of-payment uploads: residents can attach a receipt/screenshot to any
@@ -123,7 +142,7 @@ window.addEventListener("so-lang-changed", () => renderPayments());
 
 function renderPayments() {
   const el = document.getElementById("paymentsList");
-  if (lastPaymentRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; return; }
+  if (lastPaymentRows.length === 0) { el.innerHTML = `<p class="empty-state">${t("noPayments")}</p>`; renderHomeDue(0, []); return; }
   let totalDue = 0;
   el.innerHTML = "";
   lastPaymentRows.forEach(p => {
@@ -141,6 +160,26 @@ function renderPayments() {
       </div>`;
   });
   document.getElementById("dueNum").textContent = money(totalDue);
+  renderHomeDue(totalDue, lastPaymentRows.filter(p => p.status !== "paid"));
+}
+
+// Home "How much do I owe?" card + a direct button for the oldest payment that still needs a receipt.
+function renderHomeDue(totalDue, unpaid) {
+  const num = document.getElementById("homeDueNum");
+  const sub = document.getElementById("homeDueSub");
+  const payBtn = document.getElementById("homePayBtn");
+  if (!num || !sub || !payBtn) return;
+  num.textContent = money(totalDue);
+  const overdue = unpaid.filter(p => p.status === "overdue").length;
+  const target = unpaid.slice()
+    .sort((a, b) => (a.dueDate || "").localeCompare(b.dueDate || ""))
+    .find(p => !uploadingPayments.has(p.id) && proofsByPayment[p.id]?.status !== "pending_review");
+  if (lastPaymentRows.length === 0) sub.textContent = t("qaNoDues");
+  else if (unpaid.length === 0) sub.textContent = t("qaAllPaid");
+  else if (!target) sub.textContent = t("qaProofReview");
+  else sub.textContent = overdue > 0 ? `⚠️ ${overdue} ${t("qaOverdueWord")}` : `${unpaid.length} ${t("qaDueWord")}`;
+  payBtn.style.display = target ? "flex" : "none";
+  payBtn.dataset.paymentId = target ? target.id : "";
 }
 
 function proofControlsHtml(paymentId) {
@@ -170,6 +209,12 @@ function proofControlsHtml(paymentId) {
 // Clicking any (current or future) "upload proof" button opens the shared
 // hidden file input; delegation is needed since the list is re-rendered often.
 let pendingProofPaymentId = null;
+document.getElementById("homePayBtn")?.addEventListener("click", (e) => {
+  const id = e.currentTarget.dataset.paymentId;
+  if (!id) return;
+  pendingProofPaymentId = id;
+  document.getElementById("proofFileInput").click();
+});
 document.getElementById("paymentsList").addEventListener("click", (e) => {
   const link = e.target.closest(".view-proof-link");
   if (link) {
@@ -192,6 +237,11 @@ document.getElementById("proofFileInput").addEventListener("change", async (e) =
 
   if (!/^image\/|^application\/pdf$/.test(file.type)) { alert(t("proofInvalidType")); return; }
   if (file.size > 25 * 1024 * 1024) { alert(t("proofTooLarge")); return; }
+
+  // Money-related: always confirm which payment the receipt is for before sending it.
+  const pay = lastPaymentRows.find(x => x.id === paymentId);
+  const payLabel = pay ? `${pay.description || t("monthlyFee")} — ${money(pay.amount)}` : "";
+  if (!confirm(`${t("confirmProofSend")}\n\n${payLabel}\n${file.name}`)) return;
 
   uploadingPayments.add(paymentId);
   renderPayments();
@@ -216,7 +266,7 @@ document.getElementById("proofFileInput").addEventListener("change", async (e) =
     const msg = err.code === "pdf_too_large" ? t("proofPdfTooLarge")
       : err.code === "too_large" ? t("proofTooLarge")
       : err.code === "bad_image" ? t("proofInvalidType")
-      : t("proofUploadFailed") + (err.message ? ` (${err.message})` : "");
+      : failMsg(t("proofUploadFailed"), err);
     alert(msg);
   } finally {
     uploadingPayments.delete(paymentId);
@@ -253,7 +303,7 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
   const guestName = document.getElementById("guestName").value.trim();
   const guestPhone = document.getElementById("guestPhone").value.trim();
   const guestDate = document.getElementById("guestDate").value;
-  if (!guestName || !guestDate) { alert("Please fill in the guest name and visit date."); return; }
+  if (!guestName || !guestDate) { alert(t("inviteFillFirst")); return; }
 
   const btn = document.getElementById("createInviteBtn");
   const originalLabel = btn.textContent;
@@ -292,7 +342,7 @@ document.getElementById("createInviteBtn").addEventListener("click", async () =>
     document.getElementById("guestDate").value = "";
   } catch (err) {
     console.error("Invite creation failed:", err);
-    alert("Could not create the invitation: " + (err.message || err));
+    alert(failMsg(t("inviteFailed"), err));
   } finally {
     btn.disabled = false;
     btn.textContent = originalLabel;
@@ -422,6 +472,54 @@ function makePhotoPicker(prefix) {
 const maintPhoto = makePhotoPicker("maint");
 const reportPhoto = makePhotoPicker("report");
 
+// ---------- Maintenance wizard (3 steps: problem -> details -> review) ----------
+let wizStep = 1;
+function setWizStep(n) {
+  wizStep = n;
+  [1, 2, 3].forEach(i => {
+    const p = document.getElementById(`wizPane${i}`);
+    if (p) p.style.display = (i === n) ? "block" : "none";
+  });
+  document.querySelectorAll("#wizDots .wiz-dot").forEach((d, i) => d.classList.toggle("active", i < n));
+  const lbl = document.getElementById("wizLabel");
+  if (lbl) lbl.textContent = t(`wizStep${n}`);
+}
+function renderWizSummary() {
+  const box = document.getElementById("wizSummary");
+  if (!box) return;
+  box.innerHTML = "";
+  const cat = document.createElement("div");
+  cat.className = "wiz-sum-cat";
+  cat.textContent = categoryLabel(document.getElementById("maintCategory").value);
+  const desc = document.createElement("div");
+  desc.className = "wiz-sum-desc";
+  desc.textContent = document.getElementById("maintDesc").value.trim();
+  const ph = document.createElement("div");
+  ph.className = "wiz-sum-photo";
+  ph.textContent = maintPhoto.dataUrl ? t("wizPhotoYes") : t("wizPhotoNo");
+  box.append(cat, desc, ph);
+}
+function resetWizard() {
+  document.querySelectorAll("#catTiles .cat-tile").forEach(x => x.classList.remove("selected"));
+  setWizStep(1);
+}
+document.getElementById("catTiles")?.addEventListener("click", (e) => {
+  const tile = e.target.closest(".cat-tile");
+  if (!tile) return;
+  document.getElementById("maintCategory").value = tile.dataset.cat;
+  document.querySelectorAll("#catTiles .cat-tile").forEach(x => x.classList.toggle("selected", x === tile));
+  setWizStep(2);
+});
+document.getElementById("wizBack2")?.addEventListener("click", () => setWizStep(1));
+document.getElementById("wizBack3")?.addEventListener("click", () => setWizStep(2));
+document.getElementById("wizNext")?.addEventListener("click", () => {
+  if (!document.getElementById("maintDesc").value.trim()) { alert(t("describeIssueFirst")); return; }
+  renderWizSummary();
+  setWizStep(3);
+});
+window.addEventListener("so-lang-changed", () => { setWizStep(wizStep); if (wizStep === 3) renderWizSummary(); });
+setWizStep(1);
+
 // ---------- Maintenance (inside the unit) ----------
 document.getElementById("createMaintBtn").addEventListener("click", async () => {
   if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
@@ -445,9 +543,11 @@ document.getElementById("createMaintBtn").addEventListener("click", async () => 
     });
     document.getElementById("maintDesc").value = "";
     maintPhoto.clear();
+    resetWizard();
+    alert(t("maintSent"));
   } catch (err) {
     console.error("Maintenance request failed:", err);
-    alert(t("requestFailed") + (err.message ? ` (${err.message})` : ""));
+    alert(failMsg(t("requestFailed"), err));
   } finally {
     btn.disabled = false;
   }
@@ -511,7 +611,7 @@ document.getElementById("createReportBtn").addEventListener("click", async () =>
     alert(t("reportSent"));
   } catch (err) {
     console.error("Compound report failed:", err);
-    alert(t("requestFailed") + (err.message ? ` (${err.message})` : ""));
+    alert(failMsg(t("requestFailed"), err));
   } finally {
     btn.disabled = false;
   }
@@ -529,6 +629,16 @@ const CATEGORY_I18N_KEY = {
 function categoryLabel(cat) {
   const key = CATEGORY_I18N_KEY[cat];
   return key ? t(key) : cat; // fallback for any legacy/custom value
+}
+
+// Small progress bar so a resident sees where the request is: received -> assigned -> in progress -> done.
+const REQ_STEPS = ["pending", "accepted", "in_progress", "completed"];
+function statusStepper(status) {
+  const idx = REQ_STEPS.indexOf(status);
+  if (idx < 0) return "";
+  return `<div class="req-steps">${REQ_STEPS.map((s, i) =>
+    `<div class="req-step${i <= idx ? " on" : ""}${i === idx ? " cur" : ""}"><span class="req-bar"></span><span class="req-lbl">${t(s)}</span></div>`
+  ).join("")}</div>`;
 }
 
 const maintQ = query(collection(db, "maintenanceRequests"), where("residentId", "==", user.uid));
@@ -563,6 +673,7 @@ onSnapshot(maintQ, (snap) => {
         <div class="meta">
           <div class="title">${categoryLabel(m.category)}</div>
           <div class="sub">${m.description}</div>
+          ${statusStepper(m.status)}
           ${queueLine}
           ${m.photoData ? `<img class="photo-thumb req-photo" src="${m.photoData}" data-id="${m.id}" alt="">` : ""}
           ${m.beforePhoto ? `<img class="photo-thumb req-photo" src="${m.beforePhoto}" title="${t("woPhotoBefore")}" alt="">` : ""}${m.afterPhoto ? `<img class="photo-thumb req-photo" src="${m.afterPhoto}" title="${t("woPhotoAfter")}" alt="">` : ""}
@@ -715,7 +826,7 @@ document.getElementById("servicesList").addEventListener("click", async (e) => {
       alert(t("svcRequestSent"));
     } catch (err) {
       console.error("Subscription failed:", err);
-      alert(t("requestFailed") + (err.message ? ` (${err.message})` : ""));
+      alert(failMsg(t("requestFailed"), err));
       subscribeBtn.disabled = false;
     }
     return;
@@ -730,7 +841,7 @@ document.getElementById("servicesList").addEventListener("click", async (e) => {
     });
   } catch (err) {
     console.error("Cancel failed:", err);
-    alert(t("requestFailed") + (err.message ? ` (${err.message})` : ""));
+    alert(failMsg(t("requestFailed"), err));
     cancelBtn.disabled = false;
   }
 });
@@ -791,7 +902,7 @@ function renderShops() {
     } catch (err) {
       console.error("Redeem request failed:", err);
       btn.disabled = false;
-      alert(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+      alert(failMsg(t("redeemFailed"), err));
     }
   }));
 }

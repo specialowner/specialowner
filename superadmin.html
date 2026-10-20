@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Special Owner — Super Admin</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">ع</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:10px">
+      <img src="icon-192.png" alt="" style="width:34px;height:34px;border-radius:9px">
+      <div>
+        <h1 id="greetName">Hi</h1>
+        <div class="sub" data-i18n="superAdmin">Super Admin</div>
+      </div>
+    </div>
+    <button class="icon-btn" id="logoutBtn">⎋</button>
+  </div>
+
+  <div class="content">
+    <section id="tab-overdue" style="margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+        <h3 style="margin:0" data-i18n="saOverdueList">Overdue residents</h3>
+        <button class="btn btn-sm btn-primary" id="saOverdueCsv" data-i18n="saExportCsv">Export CSV</button>
+      </div>
+      <p class="sub" style="margin-bottom:8px" data-i18n="saOverdueNote">Residents with overdue installments, largest balance first. Follows the building and search filters below.</p>
+      <div class="card">
+        <div class="sub" id="saOverdueCount" style="margin-bottom:6px"></div>
+        <div id="saOverdueList"></div>
+      </div>
+    </section>
+
+    <section id="tab-payments">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px">
+        <h3 style="margin:0" data-i18n="saPayments">Payments dashboard</h3>
+        <a class="btn btn-sm btn-outline" href="admin.html" data-i18n="saOpenAdmin">Open admin panel</a>
+      </div>
+
+      <!-- Totals (follow the filters below) -->
+      <div class="grid-2" style="margin-bottom:12px">
+        <div class="stat-box"><div class="num" id="saTotCollected">0</div><div class="lbl" data-i18n="saCollected">Collected</div></div>
+        <div class="stat-box"><div class="num" id="saTotLate" style="color:var(--danger)">0</div><div class="lbl" data-i18n="saLate">Overdue</div></div>
+        <div class="stat-box"><div class="num" id="saTotPending">0</div><div class="lbl" data-i18n="saPendingAmt">Not yet due</div></div>
+        <div class="stat-box"><div class="num" id="saTotRate">0%</div><div class="lbl" data-i18n="saRate">Collection rate</div></div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card">
+        <div class="grid-2">
+          <div class="field"><label data-i18n="saMonth">Month</label><select id="saMonth"></select></div>
+          <div class="field"><label data-i18n="saStatus">Status</label>
+            <select id="saStatus">
+              <option value="" data-i18n="saAllStatuses">All statuses</option>
+              <option value="paid" data-i18n="saStPaid">Paid</option>
+              <option value="unpaid" data-i18n="saStUnpaid">Not paid</option>
+              <option value="late" data-i18n="saStLate">Overdue</option>
+              <option value="review" data-i18n="saStReview">Receipt awaiting review</option>
+            </select>
+          </div>
+          <div class="field"><label data-i18n="saBuilding">Building</label><select id="saBuilding"></select></div>
+          <div class="field"><label>&nbsp;</label><input type="text" id="saSearch" data-i18n-placeholder="saSearchUnit" placeholder="Search unit or name"></div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="sub" id="saCount" style="margin-bottom:6px"></div>
+        <div id="saList"></div>
+      </div>
+    </section>
+
+    <section id="tab-log" style="margin-top:18px">
+      <h3 style="margin:0 0 10px" data-i18n="saActivityLog">Activity log</h3>
+      <p class="sub" style="margin-bottom:8px" data-i18n="saActivityNote">Who changed a payment's status and who promoted or removed an admin. Latest 100 entries.</p>
+      <div class="card"><div id="saLogList"></div></div>
+    </section>
+  </div>
+</div>
+
+<script src="version.js"></script>
+<script src="i18n.js"></script>
+<script src="lang-dock.js"></script>
+<script type="module" src="superadmin.js"></script>
+<script>
+  if ("serviceWorker" in navigator) {
+    window.addEventListener("load", () => {
+      navigator.serviceWorker.register("sw.js").catch(err => console.error("SW registration failed:", err));
+    });
+  }
+</script>
+</body>
+</html>

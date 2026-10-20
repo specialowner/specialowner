@@ -40,3 +40,16 @@ export async function exportDataset(db, name) {
   setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   return rows.length;
 }
+
+// Downloads rows with a fixed column order and caller-supplied (localized) headers.
+// rows = array of arrays of plain values. Same Excel-friendly format as above (UTF-8 BOM + CRLF).
+export function downloadCsv(fileBase, headers, rows) {
+  const lines = [headers.map(h => esc(String(h))).join(",")].concat(rows.map(r => r.map(v => esc(cell(v))).join(",")));
+  const blob = new Blob(["\uFEFF" + lines.join("\r\n")], { type: "text/csv;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${fileBase}-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  return rows.length;
+}

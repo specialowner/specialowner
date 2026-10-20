@@ -46,6 +46,16 @@
         </div>
       </div>
 
+      <div class="card">
+        <h3 data-i18n="myShift">My shift</h3>
+        <p style="font-size:13px;color:var(--muted);margin-bottom:10px" id="shiftStatusText" data-i18n="shiftClosed">You have no open shift.</p>
+        <button class="btn btn-lg btn-primary" id="clockInBtn" data-i18n="clockIn">Clock in</button>
+        <button class="btn btn-lg btn-danger" id="clockOutBtn" style="display:none" data-i18n="clockOut">Clock out</button>
+        <button class="btn btn-accent" id="startBreakBtn" style="display:none" data-i18n="startBreak">Start break</button>
+        <button class="btn btn-primary" id="endBreakBtn" style="display:none" data-i18n="endBreak">End break</button>
+      </div>
+
+
       <div class="card" id="sosCard" style="display:none;text-align:center">
         <h3 data-i18n="sosTitle">Emergency</h3>
         <p style="font-size:12px;color:var(--muted);margin:6px 0 10px" data-i18n="sosHint">Sends an alert to the admin and the site manager right away.</p>
@@ -71,14 +81,13 @@
       </div>
 
       <div class="card">
-        <h3 data-i18n="myShift">My shift</h3>
-        <p style="font-size:13px;color:var(--muted);margin-bottom:10px" id="shiftStatusText" data-i18n="shiftClosed">You have no open shift.</p>
-        <button class="btn btn-primary" id="clockInBtn" data-i18n="clockIn">Clock in</button>
-        <button class="btn btn-danger" id="clockOutBtn" style="display:none" data-i18n="clockOut">Clock out</button>
-        <button class="btn btn-accent" id="startBreakBtn" style="display:none" data-i18n="startBreak">Start break</button>
-        <button class="btn btn-primary" id="endBreakBtn" style="display:none" data-i18n="endBreak">End break</button>
+        <h3 data-i18n="staffAnnouncements">Staff announcements</h3>
+        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
       </div>
+    </section>
 
+    <!-- ME: salary, advances, leave -->
+    <section id="tab-me" style="display:none">
       <div class="card">
         <h3 data-i18n="mySalary">My salary</h3>
         <div class="sub-row"><span data-i18n="salaryBasic">Basic</span><span id="salaryBasicVal">—</span></div>
@@ -91,10 +100,12 @@
         </div>
       </div>
 
+
       <div class="card">
         <h3 data-i18n="salaryHistory">Salary history</h3>
         <div id="salaryHistoryList"><p class="empty-state" data-i18n="noSalaryHistory">No past months recorded yet.</p></div>
       </div>
+
 
       <div class="card">
         <h3 data-i18n="requestAdvance">Request advance</h3>
@@ -113,10 +124,12 @@
         <button class="btn btn-accent" id="submitAdvanceBtn" data-i18n="submitRequest">Submit request</button>
       </div>
 
+
       <div class="card">
         <h3 data-i18n="myAdvanceRequests">My advance requests</h3>
         <div id="advanceList"><p class="empty-state" data-i18n="noAdvanceRequests">No advance requests yet.</p></div>
       </div>
+
 
       <div class="card">
         <h3 data-i18n="requestLeave">Request leave</h3>
@@ -135,15 +148,12 @@
         <button class="btn btn-accent" id="submitLeaveBtn" data-i18n="submitRequest">Submit request</button>
       </div>
 
+
       <div class="card">
         <h3 data-i18n="myLeaveRequests">My leave requests</h3>
         <div id="leaveList"><p class="empty-state" data-i18n="noLeaveRequests">No leave requests yet.</p></div>
       </div>
 
-      <div class="card">
-        <h3 data-i18n="staffAnnouncements">Staff announcements</h3>
-        <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
-      </div>
     </section>
 
     <!-- SECURITY: QR SCANNER -->
@@ -177,6 +187,7 @@
         <button class="btn btn-accent" id="requestActivationBtnOrders" data-i18n="requestActivation">Request activation</button>
       </div>
       <div id="ordersUnlockedArea">
+        <div id="focusCard"></div>
         <div class="card">
           <h3 data-i18n="myAreasTitle">Areas I look after</h3>
           <div id="myAreasList"><p class="empty-state" data-i18n="noMyAreas">No areas assigned to you yet.</p></div>
@@ -195,6 +206,7 @@
     <button class="tab-btn active" data-tab="home"><span class="tab-icon">🏠</span><span data-i18n="tabHome">Home</span></button>
     <button class="tab-btn" data-tab="scanner" id="scannerTabBtn" style="display:none"><span class="tab-icon">🔑</span><span data-i18n="tabAccess">Access</span></button>
     <button class="tab-btn" data-tab="orders" id="ordersTabBtn" style="display:none"><span class="tab-icon">🛠️</span><span data-i18n="tabOrders">Orders</span></button>
+    <button class="tab-btn" data-tab="me"><span class="tab-icon">👤</span><span data-i18n="tabMe">Me</span></button>
   </div>
 </div>
 

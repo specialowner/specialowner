@@ -32,6 +32,27 @@
     <!-- HOME -->
     <section id="tab-home">
       <div class="card" id="statusBanner" style="display:none;background:#fbe9c9;color:#7a5410"></div>
+
+      <!-- Quick actions: the three things a resident does most -->
+      <div class="quick-grid">
+        <button type="button" class="quick-card quick-due" data-goto="finance">
+          <span class="quick-icon">💰</span>
+          <span class="quick-title" data-i18n="qaDueTitle">How much do I owe?</span>
+          <span class="quick-value" id="homeDueNum">—</span>
+          <span class="quick-sub" id="homeDueSub"></span>
+        </button>
+        <button type="button" class="quick-card" data-goto="maint" data-goto-req="maint">
+          <span class="quick-icon">🛠️</span>
+          <span class="quick-title" data-i18n="qaMaintTitle">Maintenance request</span>
+          <span class="quick-sub" data-i18n="qaMaintSub">Something broken? Tell us</span>
+        </button>
+        <button type="button" class="quick-card" data-goto="invites">
+          <span class="quick-icon">🎫</span>
+          <span class="quick-title" data-i18n="qaInviteTitle">Invite a guest</span>
+          <span class="quick-sub" data-i18n="qaInviteSub">QR code for your visitor</span>
+        </button>
+      </div>
+      <button type="button" class="btn btn-primary" id="homePayBtn" style="display:none;margin-bottom:14px" data-i18n="qaPayBtn">Pay / upload receipt</button>
       <div class="card">
         <h3 data-i18n="announcements">Announcements</h3>
         <div id="announcementsList"><p class="empty-state" data-i18n="noAnnouncements">No announcements yet.</p></div>
@@ -120,34 +141,63 @@
 
       <!-- 1) IN-UNIT MAINTENANCE -->
       <div id="req-maint">
-        <div class="card">
+        <div class="card" id="maintWizard">
           <h3 data-i18n="newMaintRequest">New maintenance request</h3>
           <p class="sub-note" data-i18n="maintIntro">Something broken inside your unit — a technician comes to you.</p>
-          <div class="field">
-            <label data-i18n="category">Category</label>
-            <select id="maintCategory">
+          <div class="wiz-steps" id="wizDots"><span class="wiz-dot active"></span><span class="wiz-dot"></span><span class="wiz-dot"></span></div>
+          <div class="wiz-label" id="wizLabel"></div>
+
+          <!-- Holds the chosen category; the tiles below set its value -->
+          <select id="maintCategory" style="display:none">
               <option value="Plumbing" data-i18n="catPlumbing">Plumbing</option>
               <option value="Electrical" data-i18n="catElectrical">Electrical</option>
               <option value="AC / Cooling" data-i18n="catAC">AC / Cooling</option>
               <option value="Carpentry" data-i18n="catCarpentry">Carpentry</option>
               <option value="Cleaning" data-i18n="catCleaning">Cleaning</option>
               <option value="Other" data-i18n="catOther">Other</option>
-            </select>
-          </div>
-          <div class="field">
-            <label data-i18n="describeIssue">Describe the issue</label>
-            <textarea id="maintDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
-          </div>
-          <div class="field">
-            <label data-i18n="photoOptional">Photo (optional)</label>
-            <button type="button" class="btn btn-outline btn-sm" id="maintPhotoBtn" data-i18n="addPhoto">Add photo</button>
-            <input type="file" id="maintPhotoInput" accept="image/*" capture="environment" style="display:none">
-            <div class="photo-preview" id="maintPhotoPreview" style="display:none">
-              <img id="maintPhotoImg" alt="">
-              <button type="button" class="photo-remove" id="maintPhotoRemove">✕</button>
+          </select>
+
+          <!-- Step 1: what kind of problem -->
+          <div class="wiz-pane" id="wizPane1">
+            <div class="cat-tiles" id="catTiles">
+              <button type="button" class="cat-tile" data-cat="Plumbing"><span class="cat-emoji">🚰</span><span data-i18n="catPlumbing">Plumbing</span></button>
+              <button type="button" class="cat-tile" data-cat="Electrical"><span class="cat-emoji">💡</span><span data-i18n="catElectrical">Electrical</span></button>
+              <button type="button" class="cat-tile" data-cat="AC / Cooling"><span class="cat-emoji">❄️</span><span data-i18n="catAC">AC / Cooling</span></button>
+              <button type="button" class="cat-tile" data-cat="Carpentry"><span class="cat-emoji">🪚</span><span data-i18n="catCarpentry">Carpentry</span></button>
+              <button type="button" class="cat-tile" data-cat="Cleaning"><span class="cat-emoji">🧹</span><span data-i18n="catCleaning">Cleaning</span></button>
+              <button type="button" class="cat-tile" data-cat="Other"><span class="cat-emoji">🧰</span><span data-i18n="catOther">Other</span></button>
             </div>
           </div>
-          <button class="btn btn-primary" id="createMaintBtn" data-i18n="submitRequest">Submit request</button>
+
+          <!-- Step 2: describe it (+ optional photo) -->
+          <div class="wiz-pane" id="wizPane2" style="display:none">
+            <div class="field">
+              <label data-i18n="describeIssue">Describe the issue</label>
+              <textarea id="maintDesc" placeholder="What's going on?" data-i18n-placeholder="describeIssuePh"></textarea>
+            </div>
+            <div class="field">
+              <label data-i18n="photoOptional">Photo (optional)</label>
+              <button type="button" class="btn btn-outline btn-sm" id="maintPhotoBtn" data-i18n="addPhoto">Add photo</button>
+              <input type="file" id="maintPhotoInput" accept="image/*" capture="environment" style="display:none">
+              <div class="photo-preview" id="maintPhotoPreview" style="display:none">
+                <img id="maintPhotoImg" alt="">
+                <button type="button" class="photo-remove" id="maintPhotoRemove">✕</button>
+              </div>
+            </div>
+            <div class="wiz-nav">
+              <button type="button" class="btn btn-outline" id="wizBack2" data-i18n="wizBack">Back</button>
+              <button type="button" class="btn btn-primary" id="wizNext" data-i18n="wizNext">Next</button>
+            </div>
+          </div>
+
+          <!-- Step 3: review and send -->
+          <div class="wiz-pane" id="wizPane3" style="display:none">
+            <div class="wiz-summary" id="wizSummary"></div>
+            <div class="wiz-nav">
+              <button type="button" class="btn btn-outline" id="wizBack3" data-i18n="wizBack">Back</button>
+              <button class="btn btn-primary" id="createMaintBtn" data-i18n="submitRequest">Submit request</button>
+            </div>
+          </div>
         </div>
         <div class="card">
           <h3 data-i18n="myRequests">My requests</h3>
@@ -210,8 +260,30 @@
       </div>
     </section>
 
+    <!-- MORE -->
+    <section id="tab-more" style="display:none">
+      <div class="card more-card">
+        <button type="button" class="more-row" data-goto="shops">
+          <span class="more-icon">🛍️</span>
+          <span class="more-text"><b data-i18n="moreShopsTitle">Shops & points</b><small data-i18n="moreShopsSub">Offers and redeem your points</small></span>
+          <span class="more-chev">›</span>
+        </button>
+        <button type="button" class="more-row" data-goto="maint" data-goto-req="subs">
+          <span class="more-icon">🔁</span>
+          <span class="more-text"><b data-i18n="moreServicesTitle">Regular services</b><small data-i18n="moreServicesSub">Car wash, cleaning, garden</small></span>
+          <span class="more-chev">›</span>
+        </button>
+        <button type="button" class="more-row" data-goto="maint" data-goto-req="report">
+          <span class="more-icon">📣</span>
+          <span class="more-text"><b data-i18n="moreReportTitle">Report in the compound</b><small data-i18n="moreReportSub">Lights, garbage, leaks…</small></span>
+          <span class="more-chev">›</span>
+        </button>
+      </div>
+    </section>
+
     <!-- SHOPS -->
     <section id="tab-shops" style="display:none">
+      <button type="button" class="back-link" data-goto="more" data-i18n="backLabel">← Back</button>
       <div class="card" style="text-align:center">
         <div class="label" data-i18n="yourPointsBalance">Your points balance</div>
         <div style="font-size:26px;font-weight:800;color:var(--primary)" id="shopsPoints">0</div>
@@ -234,7 +306,7 @@
     <button class="tab-btn" data-tab="finance"><span class="tab-icon">💰</span><span data-i18n="tabFinance">Finance</span></button>
     <button class="tab-btn" data-tab="invites"><span class="tab-icon">🎫</span><span data-i18n="tabInvites">Invites</span></button>
     <button class="tab-btn" data-tab="maint"><span class="tab-icon">🛠️</span><span data-i18n="tabRequests">Requests</span></button>
-    <button class="tab-btn" data-tab="shops"><span class="tab-icon">🛍️</span><span data-i18n="tabShops">Shops</span></button>
+    <button class="tab-btn" data-tab="more"><span class="tab-icon">☰</span><span data-i18n="tabMore">More</span></button>
   </div>
 </div>
 

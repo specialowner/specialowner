@@ -4,6 +4,7 @@ import { openDataUrl, preparePhotoFile } from "./proof-file.js";
 import { renderLeaveBalanceInto } from "./leave-accrual.js";
 import { openPayslip } from "./payslip.js";
 import { handleAccessScan } from "./access-flow.js";
+import { makeErrorHelpers } from "./friendly-error.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp, Timestamp
@@ -19,6 +20,8 @@ function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
 }
+
+const { failMsg } = makeErrorHelpers(t);
 
 const WORKER_TYPE_I18N_KEY = {
   security: "security",
@@ -57,7 +60,7 @@ const tabs = document.querySelectorAll(".tab-btn");
 let scannerStarted = false;
 function activateTab(tabName) {
   tabs.forEach(b => b.classList.toggle("active", b.dataset.tab === tabName));
-  ["home", "scanner", "orders"].forEach(tab => {
+  ["home", "scanner", "orders", "me"].forEach(tab => {
     const section = document.getElementById(`tab-${tab}`);
     if (section) section.style.display = (tab === tabName) ? "block" : "none";
   });
@@ -120,7 +123,7 @@ async function requestActivation() {
     alert(t("requestSent"));
   } catch (err) {
     console.error("Activation request failed:", err);
-    alert(err.message || err);
+    alert(failMsg(t("activationFailed"), err));
   }
 }
 document.getElementById("requestActivationBtnScanner").addEventListener("click", requestActivation);
@@ -422,6 +425,30 @@ function estimateLabel(h) {
   return `${h} ${h === 1 ? t("estHour") : t("estHours")}`;
 }
 let lastOrderRows = [];
+// "Do this now": the job in progress, or else the next one in the queue, as one big card.
+function orderWhere(o) {
+  if (o.source === "onsite") return o.location || "—";
+  if (o.source === "resident_report") return `${o.location || "—"} · ${t("unitLabel")} ${o.unit || "—"}`;
+  return `${t("unitLabel")} ${o.unit || "—"}`;
+}
+function renderFocus(o) {
+  const el = document.getElementById("focusCard");
+  if (!el) return;
+  if (!o) {
+    el.innerHTML = `<div class="focus-card focus-empty"><div class="focus-emoji">☕</div><div class="focus-title">${t("focusNone")}</div></div>`;
+    return;
+  }
+  const inProgress = o.status === "in_progress";
+  const who = o.residentName || (o.source === "onsite" ? t("originOnsite") : "—");
+  el.innerHTML = `
+    <div class="focus-card ${o.status}">
+      <div class="focus-kicker">${inProgress ? t("focusNow") : "⏭ " + t("woNextUp")}</div>
+      <div class="focus-title">${woEsc(categoryLabel(o.category))}</div>
+      ${o.description ? `<div class="focus-desc">${woEsc(o.description)}</div>` : ""}
+      <div class="focus-rows"><div>📍 ${woEsc(orderWhere(o))}</div><div>👤 ${woEsc(who)}</div></div>
+      <button type="button" class="btn btn-lg ${inProgress ? "btn-success" : "btn-primary"} order-action" data-id="${o.id}" data-next="${inProgress ? "completed" : "in_progress"}">${inProgress ? "✅ " + t("markComplete") : "▶️ " + t("startWork")}</button>
+    </div>`;
+}
 // The next job in the queue: the oldest assigned job that has not been started yet.
 function nextQueuedOrder(exceptId) {
   return lastOrderRows.filter(o => o.status === "accepted" && o.id !== exceptId)
@@ -431,7 +458,7 @@ if (!isSecurity) {
   const ordersQ = query(collection(db, "maintenanceRequests"), where("assignedWorkerId", "==", user.uid));
   onSnapshot(ordersQ, (snap) => {
     const el = document.getElementById("ordersList");
-    if (snap.empty) { renderOrdersSummary([]); el.innerHTML = `<p class="empty-state">${t("noWorkOrders")}</p>`; return; }
+    if (snap.empty) { renderFocus(null); renderOrdersSummary([]); el.innerHTML = `<p class="empty-state">${t("noWorkOrders")}</p>`; return; }
     el.innerHTML = "";
     const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     lastOrderRows = rows;
@@ -443,6 +470,8 @@ if (!isSecurity) {
     const done = rows.filter(o => o.status === "completed")
       .sort((a, b) => (b.completedAt?.seconds || b.createdAt?.seconds || 0) - (a.completedAt?.seconds || a.createdAt?.seconds || 0))
       .slice(0, 20);
+
+    renderFocus(open.find(o => o.status === "in_progress") || nextQueuedOrder());
 
     const orderCard = (o) => {
       // A worker only ever moves their own order forward one step at a time —
@@ -510,9 +539,11 @@ if (!isSecurity) {
     el.querySelectorAll(".order-photo").forEach(img => {
       img.addEventListener("click", () => openDataUrl(img.src));
     });
-    el.querySelectorAll(".order-action").forEach(btn => {
+    [...el.querySelectorAll(".order-action"), ...document.querySelectorAll("#focusCard .order-action")].forEach(btn => {
       btn.addEventListener("click", async () => {
         if (currentAccountStatus !== "active") { alert(t("lockedMsgSuspended")); return; }
+        // Big buttons are easy to tap by mistake: confirm before closing a job.
+        if (btn.dataset.next === "completed" && !confirm(t("woConfirmDone"))) return;
         btn.disabled = true;
         const payload = {
           status: btn.dataset.next,
@@ -535,9 +566,7 @@ if (!isSecurity) {
         } catch (err) {
           console.error("Failed to update work order status:", err);
           btn.disabled = false;
-          alert(err.code === "permission-denied"
-            ? "Permission denied — ask the admin to publish the latest Firestore rules."
-            : (err.message || String(err)));
+          alert(failMsg(t("workFailed"), err));
         }
       });
     });
@@ -562,9 +591,7 @@ if (!isSecurity) {
           console.error("Failed to save work photo:", err);
           if (label) label.style.opacity = "";
           inp.value = "";
-          alert(err.code === "permission-denied"
-            ? "Permission denied — ask the admin to publish the latest Firestore rules."
-            : (err.code === "too_large" || err.code === "bad_image" ? t("woPhotoError") : (err.message || String(err))));
+          alert(err.code === "too_large" || err.code === "bad_image" ? t("woPhotoError") : failMsg(t("workFailed"), err));
         }
       });
     });
@@ -582,9 +609,7 @@ if (!isSecurity) {
         } catch (err) {
           console.error("Failed to save duration estimate:", err);
           sel.value = previous; // put the control back where it was so it isn't misleading
-          alert(err.code === "permission-denied"
-            ? "Permission denied — ask the admin to publish the latest Firestore rules."
-            : (err.message || String(err)));
+          alert(failMsg(t("workFailed"), err));
         } finally {
           sel.disabled = false;
         }
@@ -634,9 +659,7 @@ if (isSecurity) {
       });
     } catch (err) {
       console.error("Failed to send SOS:", err);
-      alert(err.code === "permission-denied"
-        ? "Permission denied — ask the admin to publish the latest Firestore rules."
-        : (err.message || String(err)));
+      alert(failMsg(t("workFailed"), err));
     } finally {
       sosBtn.disabled = false;
     }
@@ -686,7 +709,7 @@ if (isSecurity) {
       startBtn.style.display = "none"; run.style.display = "block";
     } catch (err) {
       console.error("Failed to load checkpoints:", err);
-      alert(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+      alert(failMsg(t("workFailed"), err));
     } finally { startBtn.disabled = false; }
   });
   function endRun() { run.style.display = "none"; startBtn.style.display = ""; list.innerHTML = ""; showMsg(""); }
@@ -709,7 +732,7 @@ if (isSecurity) {
       endRun();
     } catch (err) {
       console.error("Failed to save patrol round:", err);
-      showMsg(err.code === "permission-denied" ? "Permission denied — ask the admin to publish the latest Firestore rules." : (err.message || String(err)));
+      showMsg(failMsg(t("workFailed"), err));
     } finally { btn.disabled = false; }
   });
 }

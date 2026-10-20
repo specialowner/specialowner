@@ -4,13 +4,15 @@ import { openDataUrl } from "./proof-file.js";
 import { handleAccessScan } from "./access-flow.js";
 import { computeLeave } from "./leave-accrual.js";
 import { exportDataset } from "./csv-export.js";
+import { markPaidLogged, logActivity, logInBatch } from "./activity-log.js";
+import { makeErrorHelpers } from "./friendly-error.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
 import {
   collection, addDoc, doc, getDoc, getDocs, updateDoc, setDoc, query, where, orderBy,
   onSnapshot, serverTimestamp, writeBatch, deleteDoc, runTransaction
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
-const { user, profile } = await requireAuth("admin");
+const { user, profile } = await requireAuth(["admin", "superadmin"]);
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
 // Emergency (SOS) banner. Optional module: if it fails to load, the rest of the panel keeps working.
@@ -22,6 +24,14 @@ function stLabel(st) { return (STATUS_KEYS[st] && t(STATUS_KEYS[st])) || st; }
 function t(key) {
   const lang = window.SO_I18N ? window.SO_I18N.getLang() : "en";
   return window.SO_I18N ? window.SO_I18N.translations[lang][key] : key;
+}
+// One short, friendly message for any failed admin action (the raw Firebase text stays in the console).
+const { failMsg } = makeErrorHelpers(t);
+function adminErr(err) { return failMsg(t("adminActionFailed"), err); }
+// Update a document and tell the admin if it did not go through (instead of failing silently).
+async function adminUpdate(ref, data) {
+  try { await updateDoc(ref, data); }
+  catch (err) { console.error("Update failed:", err); alert(adminErr(err)); }
 }
 
 // workerType values stored in Firestore (security | maintenance | cleaning | porter | garden)
@@ -57,6 +67,11 @@ let areaEditId = null;           // which area row is expanded
 // Declared up here for the same reason as the state above (snapshots can arrive early).
 const drillCache = { workers: [], pending: [], overdue: [], allPayments: [] };
 let drillStack = [];             // navigation stack: [{type, id?}, ...] — empty = overview
+
+// Counters behind the "Needs your attention" card (declared up here for the same reason as above).
+const attn = { activationRes: 0, activationStaff: 0, receipts: 0, redeem: 0, services: 0, leave: 0, advance: 0 };
+const attnLoaded = new Set();   // which sources have reported at least once
+function attnSet(key, n) { attn[key] = n; attnLoaded.add(key); renderAttention(); }
 
 // ---------- Dashboards (Residents / Operations) & tabs ----------
 // The admin panel is split into two dashboards: "res" (residents, finance, announcements)
@@ -122,6 +137,59 @@ tabs.forEach(btn => btn.addEventListener("click", () => {
 // panel's previous single-dashboard behavior for anyone who hasn't used the switch yet).
 activateDashboard(localStorage.getItem(DASH_STORAGE_KEY) || "res", true);
 
+// ---------- Needs your attention (top of the Residents home) ----------
+// One tile per kind of item waiting for an admin decision. Tapping a tile jumps to the tab
+// (in either dashboard) where it is handled.
+function goToTab(tabName) {
+  const dash = Object.keys(DASHBOARD_TABS).find(d => DASHBOARD_TABS[d].includes(tabName));
+  const current = document.querySelector(".dash-switch .dash-btn.active")?.dataset.dash;
+  if (dash && dash !== current) activateDashboard(dash);
+  showTab(tabName);
+  if (dash) localStorage.setItem(tabStorageKey(dash), tabName);
+}
+function renderAttention() {
+  const el = document.getElementById("adminAttn");
+  const hint = document.getElementById("adminAttnHint");
+  if (!el) return;
+  const activation = attn.activationRes + attn.activationStaff;
+  const staffReq = attn.leave + attn.advance;
+  const overdue = drillCache.overdue.length;
+  const newMaint = drillCache.pending.length;
+  const tile = (n, label, goto, urgent) =>
+    `<div class="ops-tile ${n === 0 ? "completed" : (urgent ? "alert" : "pending")}" data-open="${goto}" role="button" tabindex="0"><div class="n">${n}</div><div class="l">${label}</div></div>`;
+  el.innerHTML = [
+    tile(activation, t("adminAttnActivation"), (attn.activationRes === 0 && attn.activationStaff > 0) ? "workers" : "residents"),
+    tile(attn.receipts, t("adminAttnReceipts"), "finance"),
+    tile(overdue, t("overduePayments"), "finance", true),
+    tile(newMaint, t("adminAttnMaint"), "maint"),
+    tile(attn.services, t("adminAttnServices"), "maint"),
+    tile(attn.redeem, t("adminAttnRedeem"), "shops"),
+    tile(staffReq, t("adminAttnStaff"), "workers")
+  ].join("");
+  const total = activation + attn.receipts + overdue + newMaint + attn.services + attn.redeem + staffReq;
+  // "All clear" only once every source has reported, so it never shows before the data arrives.
+  if (hint) hint.textContent = (total === 0 && attnLoaded.size >= 8) ? t("adminAttnAllClear") : t("adminAttnHint");
+}
+document.getElementById("adminAttn")?.addEventListener("click", (e) => {
+  const tileEl = e.target.closest("[data-open]");
+  if (!tileEl) return;
+  goToTab(tileEl.dataset.open);
+  if (tileEl.dataset.open === "residents") document.getElementById("residentsList")?.scrollIntoView({ behavior: "smooth", block: "start" });
+});
+document.getElementById("adminAttn")?.addEventListener("keydown", (e) => {
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches("[data-open]")) { e.preventDefault(); e.target.click(); }
+});
+window.addEventListener("so-lang-changed", renderAttention);
+renderAttention();
+// Pending account-activation requests, residents and staff together.
+onSnapshot(query(collection(db, "users"), where("activationRequestStatus", "==", "pending")), (snap) => {
+  const resCount = snap.docs.filter(d => d.data().role === "resident").length;
+  attn.activationRes = resCount;
+  attn.activationStaff = snap.size - resCount;
+  attnLoaded.add("activation");
+  renderAttention();
+}, (err) => console.error("Activation requests listener failed:", err));
+
 // ---------- Stats (shown at the top of the Residents tab) ----------
 // Each counter is also clickable: the docs behind it are cached so the drill-down
 // screens show exactly the records that were counted.
@@ -136,11 +204,13 @@ onSnapshot(query(collection(db, "workers"), where("status", "==", "active")), (s
 onSnapshot(query(collection(db, "maintenanceRequests"), where("status", "==", "pending")), (snap) => {
   document.getElementById("statPending").textContent = snap.size;
   drillCache.pending = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  attnLoaded.add("pending"); renderAttention();
   refreshDrill();
 });
 onSnapshot(query(collection(db, "payments"), where("status", "==", "overdue")), (snap) => {
   document.getElementById("statOverdue").textContent = snap.size;
   drillCache.overdue = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  attnLoaded.add("overdue"); renderAttention();
   refreshDrill();
 });
 
@@ -395,6 +465,7 @@ document.getElementById("resDrill").addEventListener("click", async (e) => {
   if (!act) return;
   const kind = act.dataset.drillAct;
   if (kind === "maint") { showTab("maint"); return; }
+  if (kind === "pay" && !confirm(t("adminConfirmMarkPaid"))) return;
   act.disabled = true;
   try {
     if (kind === "suspend" || kind === "approve") {
@@ -403,11 +474,12 @@ document.getElementById("resDrill").addEventListener("click", async (e) => {
         activationRequestStatus: "none"
       });
     } else if (kind === "pay") {
-      await updateDoc(doc(db, "payments", act.dataset.id), { status: "paid", paidAt: serverTimestamp() });
+      const pay = drillCache.allPayments.find(x => x.id === act.dataset.id) || { id: act.dataset.id };
+      await markPaidLogged(db, user, profile, pay, "manual");
     }
   } catch (err) {
     console.error("Drill action failed:", err);
-    alert(err.message || String(err));
+    alert(adminErr(err));
     act.disabled = false;
   }
 });
@@ -704,9 +776,13 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap
 });
 
 // ---------- Admin accounts: promote / remove ----------
+// Only the Super Admin manages admin accounts (promote / remove / suspend). For a plain admin
+// the whole card is hidden, and Firestore rules enforce the same thing on the server.
+const IS_SUPER = profile.role === "superadmin";
+if (!IS_SUPER) document.getElementById("adminAccountsList")?.closest(".card")?.setAttribute("hidden", "");
 onSnapshot(query(collection(db, "users"), where("role", "==", "admin")), (snap) => {
   const el = document.getElementById("adminAccountsList");
-  if (!el) return;
+  if (!el || !IS_SUPER) return;
   el.innerHTML = snap.docs.map(d => {
     const r = { id: d.id, ...d.data() }, me = d.id === user.uid;
     return `<div class="list-item"><div class="meta"><div class="title">${opsEsc(r.name || r.email || "")}${me ? " ⭐" : ""}</div><div class="sub">${opsEsc(r.email || "")}</div></div>
@@ -715,10 +791,15 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "admin")), (snap) 
   el.querySelectorAll("button[data-demote]").forEach(btn => btn.addEventListener("click", async () => {
     if (!confirm(`${t("removeAdminConfirm")}: ${btn.dataset.name}`)) return;
     // Back to a suspended resident: no admin rights and no access until re-approved.
-    await updateDoc(doc(db, "users", btn.dataset.demote), { role: "resident", accountStatus: "suspended", demotedBy: user.uid, demotedAt: serverTimestamp() });
+    try {
+      const batch = writeBatch(db);
+      batch.update(doc(db, "users", btn.dataset.demote), { role: "resident", accountStatus: "suspended", demotedBy: user.uid, demotedAt: serverTimestamp() });
+      logInBatch(batch, db, user, profile, "admin_removed", { targetType: "user", targetId: btn.dataset.demote, targetName: btn.dataset.name || "" });
+      await batch.commit();
+    } catch (err) { console.error(err); alert(adminErr(err)); }
   }));
 });
-document.getElementById("promoteBtn")?.addEventListener("click", async () => {
+if (IS_SUPER) document.getElementById("promoteBtn")?.addEventListener("click", async () => {
   const msg = document.getElementById("promoteMsg"), input = document.getElementById("promoteEmail");
   const show = (txt, ok) => { msg.textContent = txt; msg.style.display = "block"; msg.style.color = ok ? "var(--primary)" : ""; };
   const email = input.value.trim();
@@ -731,9 +812,12 @@ document.getElementById("promoteBtn")?.addEventListener("click", async () => {
     }
     if (!found) { show(t("promoteNotFound")); return; }
     const u = found.data();
-    if (u.role === "admin") { show(t("promoteAlready")); return; }
+    if (u.role === "admin" || u.role === "superadmin") { show(t("promoteAlready")); return; }
     if (!confirm(`${t("promoteConfirm")}\n${u.name || ""} (${u.email})`)) return;
-    await updateDoc(doc(db, "users", found.id), { role: "admin", accountStatus: "active", promotedBy: user.uid, promotedAt: serverTimestamp() });
+    const batch = writeBatch(db);
+    batch.update(doc(db, "users", found.id), { role: "admin", accountStatus: "active", promotedBy: user.uid, promotedAt: serverTimestamp() });
+    logInBatch(batch, db, user, profile, "admin_promoted", { targetType: "user", targetId: found.id, targetName: u.name || u.email || "" });
+    await batch.commit();
     input.value = "";
     show(`${t("promoteDone")}: ${u.name || u.email}`, true);
   } catch (e) { console.error(e); show(t("promoteFailed")); }
@@ -868,6 +952,7 @@ function renderSalaryManageList() {
 
 // ---------- Advance requests review ----------
 onSnapshot(query(collection(db, "advanceRequests"), orderBy("createdAt", "desc")), (snap) => {
+  attnSet("advance", snap.docs.filter(d => d.data().status === "pending").length);
   const el = document.getElementById("advanceRequestsList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noAdvanceRequests")}</p>`; return; }
   el.innerHTML = "";
@@ -890,7 +975,7 @@ onSnapshot(query(collection(db, "advanceRequests"), orderBy("createdAt", "desc")
   });
   el.querySelectorAll("button[data-adv-action]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "advanceRequests", btn.dataset.id), { status: btn.dataset.advAction });
+      await adminUpdate(doc(db, "advanceRequests", btn.dataset.id), { status: btn.dataset.advAction });
     });
   });
 });
@@ -959,6 +1044,7 @@ onSnapshot(query(collection(db, "attendance"), orderBy("clockIn", "desc")), (sna
 
 // ---------- Leave requests review ----------
 onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")), (snap) => {
+  attnSet("leave", snap.docs.filter(d => d.data().status === "pending").length);
   window.__adminLeaveRows = snap.docs.map(d => d.data());
   updateLeaveHints();
   const el = document.getElementById("leaveRequestsList");
@@ -983,17 +1069,17 @@ onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")),
   });
   el.querySelectorAll("button[data-leave-approve]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveApprove), { status: "approved" });
+      await adminUpdate(doc(db, "leaveRequests", btn.dataset.leaveApprove), { status: "approved" });
     });
   });
   el.querySelectorAll("button[data-leave-undo]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveUndo), { status: "pending" });
+      await adminUpdate(doc(db, "leaveRequests", btn.dataset.leaveUndo), { status: "pending" });
     });
   });
   el.querySelectorAll("button[data-leave-reject]").forEach(btn => {
     btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "leaveRequests", btn.dataset.leaveReject), { status: "rejected" });
+      await adminUpdate(doc(db, "leaveRequests", btn.dataset.leaveReject), { status: "rejected" });
     });
   });
 });
@@ -1118,7 +1204,7 @@ document.getElementById("addWorkerBtn").addEventListener("click", async () => {
   const name = document.getElementById("workerName").value.trim();
   const role = document.getElementById("workerRole").value.trim();
   const phone = document.getElementById("workerPhone").value.trim();
-  if (!name || !role) { alert("Please enter the worker's name and role."); return; }
+  if (!name || !role) { alert(t("adminNeedWorker")); return; }
   await addDoc(collection(db, "workers"), {
     name, role, phone, status: "active", createdAt: serverTimestamp()
   });
@@ -1151,10 +1237,10 @@ document.getElementById("addPayBtn").addEventListener("click", async () => {
   const amount = Number(document.getElementById("payAmount").value);
   const due = document.getElementById("payDue").value;
   const description = document.getElementById("payDesc").value.trim();
-  if (!email || !amount || !due) { alert("Please fill in email, amount and due date."); return; }
+  if (!email || !amount || !due) { alert(t("adminNeedPayment")); return; }
 
   const usersSnap = await getDocs(query(collection(db, "users"), where("email", "==", email)));
-  if (usersSnap.empty) { alert("No resident found with that email."); return; }
+  if (usersSnap.empty) { alert(t("adminNoResident")); return; }
   const residentId = usersSnap.docs[0].id;
 
   await addDoc(collection(db, "payments"), {
@@ -1198,15 +1284,14 @@ onSnapshot(query(collection(db, "payments"), orderBy("createdAt", "desc")), (sna
   });
   el.querySelectorAll(".pay-mark-paid").forEach(btn => {
     btn.addEventListener("click", async () => {
+      if (!confirm(t("adminConfirmMarkPaid"))) return;
       btn.disabled = true;
       try {
-        await updateDoc(doc(db, "payments", btn.dataset.id), {
-          status: "paid",
-          paidAt: serverTimestamp()
-        });
+        const pay = drillCache.allPayments.find(x => x.id === btn.dataset.id) || { id: btn.dataset.id };
+        await markPaidLogged(db, user, profile, pay, "manual");
       } catch (err) {
         console.error(err);
-        alert("Could not update payment. Please try again.");
+        alert(adminErr(err));
         btn.disabled = false;
       }
     });
@@ -1221,6 +1306,7 @@ function safeUrl(u) { return /^https:\/\//.test(u || "") ? u : "#"; }
 const proofData = {}; // proofId -> data URL, for opening in a new tab
 
 onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc")), (snap) => {
+  attnSet("receipts", snap.docs.filter(d => d.data().status === "pending_review").length);
   const el = document.getElementById("proofsList");
   if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noReceipts")}</p>`; return; }
   el.innerHTML = "";
@@ -1253,7 +1339,7 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
         </div>
         ${pending ? `<div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
           <button class="btn btn-sm btn-primary proof-approve" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("approveProof")}</button>
-          <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}">${t("rejectProof")}</button>
+          <button class="btn btn-sm btn-outline proof-reject" data-id="${d.id}" data-payment="${escHtml(p.paymentId)}">${t("rejectProof")}</button>
         </div>` : ""}
         ${p.status === "rejected" ? `<div style="margin-top:8px"><button class="btn btn-sm btn-outline proof-reopen" data-id="${d.id}">${t("reopenProof")}</button></div>` : ""}
         ${p.status === "rejected" && p.reviewNote ? `<div class="sub" style="margin-top:4px">${escHtml(p.reviewNote)}</div>` : ""}
@@ -1265,17 +1351,17 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
   }));
   el.querySelectorAll(".proof-approve").forEach(btn => {
     btn.addEventListener("click", async () => {
+      if (!confirm(t("adminConfirmApproveProof"))) return;
       btn.disabled = true;
       try {
         // One atomic commit: the receipt is approved AND the payment is paid, or neither.
-        const batch = writeBatch(db);
-        batch.update(doc(db, "paymentProofs", btn.dataset.id), {
-          status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        // The activity-log entry is part of the same commit.
+        const pay = drillCache.allPayments.find(x => x.id === btn.dataset.payment) || { id: btn.dataset.payment };
+        await markPaidLogged(db, user, profile, pay, "receipt", (batch) => {
+          batch.update(doc(db, "paymentProofs", btn.dataset.id), {
+            status: "approved", reviewedBy: user.uid, reviewedAt: serverTimestamp()
+          });
         });
-        batch.update(doc(db, "payments", btn.dataset.payment), {
-          status: "paid", paidAt: serverTimestamp()
-        });
-        await batch.commit();
       } catch (err) {
         console.error(err);
         alert(t("proofActionFailed"));
@@ -1305,6 +1391,11 @@ onSnapshot(query(collection(db, "paymentProofs"), orderBy("uploadedAt", "desc"))
       try {
         await updateDoc(doc(db, "paymentProofs", btn.dataset.id), {
           status: "rejected", reviewNote: note.trim(), reviewedBy: user.uid, reviewedAt: serverTimestamp()
+        });
+        const pay = drillCache.allPayments.find(x => x.id === btn.dataset.payment) || {};
+        await logActivity(db, user, profile, "proof_rejected", {
+          targetType: "payment", targetId: btn.dataset.payment || "", unit: pay.unit || "",
+          amount: Number(pay.amount) || 0, residentId: pay.residentId || "", note: note.trim()
         });
       } catch (err) {
         console.error(err);
@@ -1458,7 +1549,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
       } catch (err) {
         console.error("Failed to update request status:", err);
-        alert(err.message || String(err));
+        alert(adminErr(err));
       }
     });
   });
@@ -1475,7 +1566,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
       } catch (err) {
         console.error("Failed to assign worker:", err);
-        alert(err.message || String(err));
+        alert(adminErr(err));
       }
     });
   });
@@ -1488,7 +1579,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
       } catch (err) {
         console.error("Failed to auto-assign worker:", err);
-        alert(err.message || String(err));
+        alert(adminErr(err));
       }
     });
   });
@@ -1513,6 +1604,7 @@ let lastSubDocs = [];
 
 onSnapshot(query(collection(db, "serviceSubscriptions"), orderBy("requestedAt", "desc")), (snap) => {
   lastSubDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  attnSet("services", lastSubDocs.filter(s => s.status === "requested").length);
   renderSubsList();
 }, (err) => console.error("Subscriptions listener failed:", err));
 
@@ -1560,7 +1652,7 @@ async function updateSub(btn, payload) {
     await updateDoc(doc(db, "serviceSubscriptions", btn.dataset.id), payload);
   } catch (err) {
     console.error("Failed to update subscription:", err);
-    alert(err.message || String(err));
+    alert(adminErr(err));
     btn.disabled = false;
   }
 }
@@ -1736,7 +1828,7 @@ function renderPlanList() {
     if (!confirm(t("planDeleteConfirm"))) return;
     btn.disabled = true;
     try { await deleteDoc(doc(db, "shiftPlans", btn.dataset.id)); }
-    catch (err) { console.error("Failed to delete planned shift:", err); btn.disabled = false; alert(err.message || String(err)); }
+    catch (err) { console.error("Failed to delete planned shift:", err); btn.disabled = false; alert(adminErr(err)); }
   }));
 }
 onSnapshot(query(collection(db, "users"), where("role", "==", "manager")), (snap) => {
@@ -1787,7 +1879,7 @@ function setMsg(id, text, ok) {
   el.style.color = ok ? "#0f6e5f" : "";
 }
 function permMsg(err) {
-  return err && err.code === "permission-denied" ? "Permission denied — publish the latest Firestore rules." : ((err && err.message) || String(err));
+  return err && err.code === "permission-denied" ? t("adminPermRules") : adminErr(err);
 }
 
 // Partner shops
@@ -1883,6 +1975,7 @@ onSnapshot(query(collection(db, "pointsTransactions")), (snap) => {
 
 // Redemption requests from residents
 onSnapshot(query(collection(db, "redemptions")), (snap) => {
+  attnSet("redeem", snap.docs.filter(d => d.data().status === "requested").length);
   const el = document.getElementById("redeemQueue");
   if (!el) return;
   const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -1906,6 +1999,7 @@ onSnapshot(query(collection(db, "redemptions")), (snap) => {
   const byId = Object.fromEntries(rows.map(r => [r.id, r]));
   el.querySelectorAll(".redeem-ok").forEach(btn => btn.addEventListener("click", async () => {
     const r = byId[btn.dataset.id];
+    if (!confirm(t("adminConfirmRedeemOk"))) return;
     btn.disabled = true;
     try {
       const rRef = doc(db, "redemptions", r.id);
@@ -1927,6 +2021,7 @@ onSnapshot(query(collection(db, "redemptions")), (snap) => {
     }
   }));
   el.querySelectorAll(".redeem-no").forEach(btn => btn.addEventListener("click", async () => {
+    if (!confirm(t("adminConfirmRedeemNo"))) return;
     btn.disabled = true;
     try { await updateDoc(doc(db, "redemptions", btn.dataset.id), { status: "rejected", rejectedBy: user.uid, rejectedAt: serverTimestamp() }); }
     catch (err) { btn.disabled = false; alert(permMsg(err)); }
@@ -2069,9 +2164,9 @@ document.getElementById("generateMasterBtn").addEventListener("click", async () 
   const label = document.getElementById("masterLabel").value.trim();
   const expiryVal = document.getElementById("masterExpiry").value;
   const zones = [...document.querySelectorAll(".zoneCheck:checked")].map(cb => cb.value);
-  if (!label) { alert("Please enter a label for this code."); return; }
-  if (zones.length === 0) { alert("Select at least one access zone."); return; }
-  if (typeof QRCode === "undefined") { alert("QR library did not load. Reload the page and try again."); return; }
+  if (!label) { alert(t("adminNeedCodeLabel")); return; }
+  if (zones.length === 0) { alert(t("adminNeedZone")); return; }
+  if (typeof QRCode === "undefined") { alert(t("adminQrLibMissing")); return; }
 
   const btn = document.getElementById("generateMasterBtn");
   btn.disabled = true;
@@ -2099,7 +2194,7 @@ document.getElementById("generateMasterBtn").addEventListener("click", async () 
     document.getElementById("masterExpiry").value = "";
   } catch (err) {
     console.error("Master QR generation failed:", err);
-    alert(err.message || err);
+    alert(adminErr(err));
   } finally {
     btn.disabled = false;
   }
@@ -2421,7 +2516,7 @@ function renderBuildingsList() {
       alert(t("unitsGenerated"));
     } catch (err) {
       console.error("Failed to add apartments:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
     } finally {
       btn.disabled = false;
     }
@@ -2439,7 +2534,7 @@ function renderBuildingsList() {
       renderUnitsList();
     } catch (err) {
       console.error("Failed to delete building:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
       btn.disabled = false;
     }
   }));
@@ -2590,7 +2685,7 @@ async function propSaveUnit(unitId, data, btn) {
     return true;
   } catch (err) {
     console.error("Failed to save apartment:", err);
-    alert(err.message || t("propSaveFailed"));
+    alert(failMsg(t("propSaveFailed"), err));
     return false;
   } finally {
     btn.disabled = false;
@@ -2693,7 +2788,7 @@ document.getElementById("bulkAreaBtn")?.addEventListener("click", async () => {
     alert(`${t("areaBulkDone")} (${targets.length})`);
   } catch (err) {
     console.error("Bulk area assignment failed:", err);
-    alert(err.message || String(err));
+    alert(adminErr(err));
   } finally {
     btn.disabled = false;
   }
@@ -2804,7 +2899,7 @@ document.getElementById("areaStandardBtn")?.addEventListener("click", async () =
     alert(t("areaStandardDone"));
   } catch (err) {
     console.error("Failed to create standard areas:", err);
-    alert(err.message || String(err));
+    alert(adminErr(err));
   } finally {
     btn.disabled = false;
   }
@@ -2918,7 +3013,7 @@ function renderAreasList() {
       });
     } catch (err) {
       console.error("Failed to assign area worker:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
     }
   }));
 
@@ -2928,7 +3023,7 @@ function renderAreasList() {
       await updateDoc(doc(db, "commonAreas", id), { frequency: sel.value });
     } catch (err) {
       console.error("Failed to change area frequency:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
     }
   }));
 
@@ -2947,7 +3042,7 @@ function renderAreasList() {
       alert(t("areaJobCreated"));
     } catch (err) {
       console.error("Failed to send routine job:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
     } finally {
       btn.disabled = false;
     }
@@ -2983,7 +3078,7 @@ function renderAreasList() {
       alert(t("areaJobCreated"));
     } catch (err) {
       console.error("Failed to send extraordinary job:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
       btn.disabled = false;
     }
   }));
@@ -2997,7 +3092,7 @@ function renderAreasList() {
       await propCommitOps([(batch) => batch.delete(doc(db, "commonAreas", btn.dataset.id))]);
     } catch (err) {
       console.error("Failed to delete area:", err);
-      alert(err.message || String(err));
+      alert(adminErr(err));
       btn.disabled = false;
     }
   }));

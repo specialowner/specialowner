@@ -4,6 +4,7 @@ import { doc, getDoc } from "https://www.gstatic.com/firebasejs/10.13.0/firebase
 
 const HOME_PAGE = {
   admin: "admin.html",
+  superadmin: "superadmin.html",
   worker: "worker.html",
   resident: "resident.html",
   manager: "manager.html",
@@ -11,7 +12,8 @@ const HOME_PAGE = {
 };
 
 // Resolves with { user, profile } once auth state is known and role matches.
-// requiredRole: 'resident' | 'admin' | 'worker' | 'manager' | null (null = any logged-in user)
+// requiredRole: a role string, an array of allowed roles (e.g. ['admin','superadmin']),
+// or null (null = any logged-in user)
 export function requireAuth(requiredRole) {
   return new Promise((resolve) => {
     onAuthStateChanged(auth, async (user) => {
@@ -21,7 +23,8 @@ export function requireAuth(requiredRole) {
       }
       const snap = await getDoc(doc(db, "users", user.uid));
       const profile = snap.exists() ? snap.data() : { role: "resident" };
-      if (requiredRole && profile.role !== requiredRole) {
+      const allowed = requiredRole ? [].concat(requiredRole) : null;
+      if (allowed && !allowed.includes(profile.role)) {
         window.location.href = HOME_PAGE[profile.role] || "resident.html";
         return;
       }

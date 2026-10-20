@@ -183,3 +183,68 @@ img.ann-media{background:#eef2f0}
 .drill-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .drill-title h3{font-size:18px;margin:0}
 .drill-photo{max-width:100%;max-height:260px;border-radius:10px;margin-top:10px}
+
+
+/* ---- Resident: quick actions on Home ---- */
+.quick-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px}
+.quick-card{background:var(--card);color:var(--text);border-radius:var(--radius);padding:16px 12px;box-shadow:var(--shadow);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;min-height:108px}
+.quick-card .quick-icon{font-size:28px}
+.quick-card .quick-title{font-size:14px;font-weight:800}
+.quick-card .quick-sub{font-size:11.5px;color:var(--muted)}
+.quick-due{grid-column:1/-1;background:linear-gradient(135deg,var(--primary),#17a085);color:#fff;min-height:120px}
+.quick-due .quick-value{font-size:28px;font-weight:800}
+.quick-due .quick-sub{color:rgba(255,255,255,.88);font-size:12.5px}
+
+/* ---- Resident: maintenance wizard ---- */
+.wiz-steps{display:flex;gap:6px;margin:4px 0 8px}
+.wiz-dot{flex:1;height:6px;border-radius:4px;background:#e3e9e6}
+.wiz-dot.active{background:var(--primary)}
+.wiz-label{font-size:13px;font-weight:800;color:var(--primary-dark);margin-bottom:12px}
+.cat-tiles{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.cat-tile{background:#f3f7f5;border:2px solid transparent;border-radius:12px;padding:14px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:12.5px;font-weight:700;color:var(--text)}
+.cat-tile .cat-emoji{font-size:26px}
+.cat-tile.selected{border-color:var(--primary);background:#eaf5f1}
+.wiz-nav{display:flex;gap:10px;margin-top:6px}
+.wiz-nav .btn{flex:1;width:auto}
+.wiz-summary{background:#f3f7f5;border-radius:12px;padding:14px;margin-bottom:12px}
+.wiz-sum-cat{font-size:15px;font-weight:800;margin-bottom:6px}
+.wiz-sum-desc{font-size:13.5px;line-height:1.5;white-space:pre-wrap;word-break:break-word}
+.wiz-sum-photo{font-size:12px;color:var(--muted);margin-top:8px}
+
+/* ---- Resident: request progress bar ---- */
+.req-steps{display:flex;gap:4px;margin:8px 0 4px}
+.req-step{flex:1;display:flex;flex-direction:column;gap:3px}
+.req-bar{height:5px;border-radius:3px;background:#e3e9e6;display:block}
+.req-step.on .req-bar{background:var(--primary)}
+.req-lbl{font-size:9.5px;color:var(--muted)}
+.req-step.cur .req-lbl{color:var(--primary-dark);font-weight:800}
+
+/* ---- Resident: More tab ---- */
+.more-card{padding:6px 8px}
+.more-row{width:100%;display:flex;align-items:center;gap:12px;background:none;padding:14px 8px;border-bottom:1px solid #eef2f0;color:var(--text);text-align:start}
+.more-row:last-child{border-bottom:none}
+.more-icon{font-size:24px}
+.more-text{flex:1;display:flex;flex-direction:column;gap:2px}
+.more-text b{font-size:14px}
+.more-text small{font-size:11.5px;color:var(--muted)}
+.more-chev{font-size:20px;color:var(--muted)}
+[dir="rtl"] .more-chev{transform:scaleX(-1)}
+.back-link{background:none;color:var(--primary);font-weight:800;font-size:13px;padding:4px 2px;margin-bottom:10px}
+
+
+/* ---- Worker: big focus card + large buttons ---- */
+.btn-lg{padding:18px 16px;font-size:17px;border-radius:14px;margin-top:8px}
+.btn-success{background:var(--success);color:#fff}
+.focus-card{background:linear-gradient(135deg,var(--primary),#17a085);color:#fff;border-radius:var(--radius);padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.focus-card.in_progress{background:linear-gradient(135deg,#2a5db0,#4a86d8)}
+.focus-kicker{font-size:12px;font-weight:800;opacity:.9;margin-bottom:6px}
+.focus-title{font-size:22px;font-weight:800}
+.focus-desc{font-size:14px;margin-top:6px;line-height:1.5;opacity:.95;word-break:break-word}
+.focus-rows{margin:12px 0 4px;display:flex;flex-direction:column;gap:6px;font-size:15px;font-weight:700}
+.focus-card .btn-lg{background:#fff;color:var(--primary-dark)}
+.focus-card.in_progress .btn-lg{background:#fff;color:#1d4a8f}
+.focus-empty{text-align:center;background:#eef6f2;color:var(--primary-dark);box-shadow:none}
+.focus-emoji{font-size:34px;margin-bottom:6px}
+
+.ops-tile.alert{background:#f7d7d2;color:var(--danger)}
+.ops-tile[data-open]{cursor:pointer}

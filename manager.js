@@ -2,12 +2,14 @@ import { db } from "./firebase-config.js";
 import { requireAuth, logout } from "./guard.js";
 import { renderLeaveBalanceInto } from "./leave-accrual.js";
 import { createStaffAccount, friendlyStaffCreateError } from "./create-staff-account.js";
+import { makeErrorHelpers } from "./friendly-error.js";
 import {
   collection, addDoc, doc, getDoc, updateDoc, query, where, orderBy,
   onSnapshot, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore.js";
 
 const { user, profile } = await requireAuth("manager");
+const { failMsg } = makeErrorHelpers(t);
 document.getElementById("logoutBtn").addEventListener("click", logout);
 
 // Shifts the admin planned for me. Optional module: the panel works without it.
@@ -113,7 +115,7 @@ async function requestActivation() {
     alert(t("requestSent"));
   } catch (err) {
     console.error("Activation request failed:", err);
-    alert(err.message || err);
+    alert(failMsg(t("activationFailed"), err));
   }
 }
 document.getElementById("requestActivationBtn").addEventListener("click", requestActivation);
@@ -242,6 +244,7 @@ onSnapshot(query(collection(db, "users"), where("role", "==", "worker")), (snap)
   renderAnnTargetList();
   renderMaintList();
   renderWorkload();
+  renderToday();
   renderOnsiteWorkerOptions();
 });
 
@@ -327,6 +330,36 @@ async function recomputeQueuePositions() {
 }
 
 // ---------- Workload per worker: on-site tasks + resident requests in one view ----------
+// ---------- Today at a glance ----------
+// Four numbers the site manager can act on: requests late (waiting more than a day),
+// requests nobody has been assigned to, jobs running now, and workers with nothing to do.
+const LATE_AFTER_HOURS = 24;
+function renderToday() {
+  const el = document.getElementById("mgrToday");
+  const hint = document.getElementById("mgrTodayHint");
+  if (!el) return;
+  const open = lastMaintDocs.filter(m => ["pending", "accepted", "in_progress"].includes(m.status));
+  const now = Date.now();
+  const late = open.filter(m => m.status !== "in_progress" && m.createdAt?.seconds && (now - m.createdAt.seconds * 1000) > LATE_AFTER_HOURS * 3600 * 1000).length;
+  const unassigned = open.filter(m => m.status === "pending" && !m.assignedWorkerId).length;
+  const running = open.filter(m => m.status === "in_progress").length;
+  const free = workersCache.filter(w => w.workerType !== "security" && (w.accountStatus || "active") === "active"
+    && !open.some(m => m.assignedWorkerId === w.id)).length;
+  const tile = (cls, n, label, goto) => `<div class="ops-tile ${cls}" data-open="${goto}"><div class="n">${n}</div><div class="l">${label}</div></div>`;
+  el.innerHTML = [
+    tile(late > 0 ? "alert" : "completed", late, t("mgrTodayLate"), "maint"),
+    tile(unassigned > 0 ? "pending" : "completed", unassigned, t("mgrTodayUnassigned"), "maint"),
+    tile("in_progress", running, t("mgrTodayRunning"), "maint"),
+    tile("accepted", free, t("mgrTodayFree"), "workers")
+  ].join("");
+  if (hint) hint.textContent = late > 0 ? t("mgrTodayHintLate") : (unassigned > 0 ? t("mgrTodayHintUnassigned") : t("mgrTodayHintOk"));
+}
+document.getElementById("mgrToday")?.addEventListener("click", (e) => {
+  const tileEl = e.target.closest("[data-open]");
+  if (tileEl) document.querySelector(`.tab-btn[data-tab="${tileEl.dataset.open}"]`)?.click();
+});
+window.addEventListener("so-lang-changed", renderToday);
+
 function renderWorkload() {
   const el = document.getElementById("mgrWorkload");
   if (!el) return;
@@ -404,7 +437,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
       } catch (err) {
         console.error("Failed to update request status:", err);
-        alert(err.message || String(err));
+        alert(failMsg(t("workFailed"), err));
       }
     });
   });
@@ -418,7 +451,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", sel.dataset.id), payload);
       } catch (err) {
         console.error("Failed to assign worker:", err);
-        alert(err.message || String(err));
+        alert(failMsg(t("workFailed"), err));
       }
     });
   });
@@ -431,7 +464,7 @@ function renderMaintList() {
         await updateDoc(doc(db, "maintenanceRequests", btn.dataset.id), { assignedWorkerId: worker.id, status: "accepted" });
       } catch (err) {
         console.error("Failed to auto-assign worker:", err);
-        alert(err.message || String(err));
+        alert(failMsg(t("workFailed"), err));
       }
     });
   });
@@ -441,6 +474,7 @@ onSnapshot(query(collection(db, "maintenanceRequests"), orderBy("createdAt", "de
   lastMaintDocs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   renderMaintList();
   renderWorkload();
+  renderToday();
   recomputeQueuePositions();
 });
 

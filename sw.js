@@ -12,6 +12,7 @@ const APP_SHELL = [
   "payslip.js",
   "access-flow.js",
   "csv-export.js",
+  "activity-log.js",
   "sos-alerts.js",
   "shift-plans.js",
   "lang-dock.js",
