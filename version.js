@@ -19,18 +19,18 @@
     {
       version: "1.25.0", date: "2026-11-09",
       ar: [
-        "الشقق بقت بتتقسم على الأدوار وترقيمها بيبدأ من 1 و2 و3 و4 ... بالتتابع جوه المبنى (مثلاً 4 شقق في الدور: 1–4 في الدور الأول و5–8 في التاني) بدل 101 و102 و201. كود الشقة بقى اسم المبنى + الرقم من غير أصفار زيادة (مثلاً P01-3).",
+        "ترقيم الشقق حسب الأدوار: الدور الأول 1 و2 و3 و4، التاني 101 و102 و103 و104، التالت 201 و202 و203 و204، وهكذا (بدل 101 للدور الأول). كود الشقة بقى اسم المبنى + الرقم من غير أصفار زيادة (مثلاً P01-3 أو P01-102). المباني من غير أدوار بتفضل بترقيم متتابع 1 و2 و3.",
         "في تبويب المباني ← افتح المبنى ← «تعديل» على أي شقة: تقدر تغيّر رقم الشقة ورقم الدور. لو الرقم متكرر في نفس المبنى بيرفض. ولو الشقة مربوطة بحساب ساكن، رقمها الجديد بيتنقل لحسابه تلقائياً.",
         "زرار «حذف الشقة» جوه نفس نموذج التعديل (بعد تأكيد). لو كان فيها ساكن مربوط بحساب، بتتفضى شقته من حسابه كمان.",
-        "زرار «إضافة شقق» بقى بيكمّل من أكبر رقم موجود، فمش هيكرر رقم حتى لو مسحت أو غيّرت أرقام شقق قبل كده.",
+        "زرار «إضافة شقق» بقى بيكمّل بعد آخر شقة موجودة، فمش هيكرر رقم حتى لو مسحت أو غيّرت أرقام شقق قبل كده.",
         "الشقق اللي اتعملت قبل الإصدار ده مش بتتغير لوحدها (كودها زي ما هو)، وتقدر تعدّل أرقامها من زرار «تعديل». الدفعات وطلبات الصيانة القديمة بتفضل مكتوب عليها رقم الشقة القديم.",
         "مفيش تغيير في قواعد Firestore ومفيش مجموعات بيانات جديدة، فمش محتاج نشر firestore.rules.",
       ],
       en: [
-        "Apartments are now laid out by floor and numbered 1, 2, 3, 4 … straight through the building (e.g. 4 per floor: 1–4 on floor 1, 5–8 on floor 2) instead of 101, 102, 201. The apartment code is the building code + the number with no extra zeros (e.g. P01-3).",
+        "Apartments are numbered by floor: the first floor is 1, 2, 3, 4, the second 101, 102, 103, 104, the third 201, 202, 203, 204, and so on (instead of 101 on the first floor). The apartment code is the building code + the number with no extra zeros (e.g. P01-3 or P01-102). Buildings without floors keep a plain running number 1, 2, 3.",
         "Property tab → open a building → \"Edit\" on any apartment: you can change the apartment number and the floor. A number already used in the same building is refused. If the apartment is linked to a resident account, the new number is carried over to that account automatically.",
         "A \"Delete apartment\" button in the same edit form (with a confirmation). If a resident account was linked to it, that account's apartment is emptied too.",
-        "\"Add apartments\" now continues from the highest existing number, so it never repeats a number even after you deleted or renumbered apartments.",
+        "\"Add apartments\" now continues after the last existing apartment, so it never repeats a number even after you deleted or renumbered apartments.",
         "Apartments created before this version are not changed automatically (their codes stay as they are); you can edit their numbers with \"Edit\". Old payments and maintenance requests keep the old apartment number written on them.",
         "No change to Firestore rules and no new collections, so firestore.rules does not need to be published again.",
       ]

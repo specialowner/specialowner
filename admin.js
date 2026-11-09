@@ -2353,15 +2353,28 @@ async function propCommitOps(ops) {
   }
 }
 
-function propNewUnitOps(building, buildingId, startNumber, count, floors, perFloor) {
+// Numbering with floors: the first floor is 1, 2, 3, 4 …, the second floor 101, 102, 103 …,
+// the third 201, 202, 203 …, and so on. `seq` is the apartment's position in the
+// building (1 = first apartment of the first floor); without floors it is just a running number.
+function propSlot(seq, floors, perFloor) {
+  if (!(floors > 0 && perFloor > 0)) return { floor: 0, number: seq };
+  const floor = Math.ceil(seq / perFloor);
+  const k = ((seq - 1) % perFloor) + 1;
+  return { floor, number: floor === 1 ? k : (floor - 1) * 100 + k };
+}
+// The reverse, to continue after the last existing apartment of a building.
+function propSeqOfNumber(number, perFloor) {
+  const n = Number(number) || 0;
+  if (!(perFloor > 0)) return n;
+  const floor = n < 100 ? 1 : Math.floor(n / 100) + 1;
+  const k = n < 100 ? n : n % 100;
+  return (floor - 1) * perFloor + k;
+}
+
+function propNewUnitOps(building, buildingId, startSeq, count, floors, perFloor) {
   const ops = [];
   for (let i = 0; i < count; i++) {
-    // Apartments are numbered 1, 2, 3, 4 … straight through the building. When the
-    // building has floors × apartments-per-floor, the floor is worked out from the
-    // number (4 per floor: 1–4 on floor 1, 5–8 on floor 2); the number itself stays
-    // plain, and can be changed afterwards from the apartment's Edit form.
-    const number = startNumber + i;
-    const floor = (floors > 0 && perFloor > 0) ? Math.ceil(number / perFloor) : 0;
+    const { floor, number } = propSlot(startSeq + i, floors, perFloor);
     const code = `${building.code}-${number}`;
     const ref = doc(collection(db, "units"));
     ops.push((batch) => batch.set(ref, {
@@ -2507,7 +2520,8 @@ function renderBuildingsList() {
     btn.disabled = true;
     try {
       const existing = propUnitsOf(b.id);
-      const start = existing.reduce((m, u) => Math.max(m, Number(u.number) || 0), 0) + 1;
+      // Continue after the last apartment (so a deleted or renumbered one never causes a repeat).
+      const start = existing.reduce((m, u) => Math.max(m, propSeqOfNumber(u.number, b.floors > 0 ? b.unitsPerFloor : 0)), 0) + 1;
       await propCommitOps(propNewUnitOps(b, b.id, start, count, b.floors || 0, b.unitsPerFloor || 0));
       alert(t("unitsGenerated"));
     } catch (err) {
