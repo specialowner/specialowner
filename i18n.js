@@ -248,6 +248,11 @@ const translations = {
     noUnitsInBuilding: "No apartments in this building yet.",
     unitsShowing: "showing",
     propSaveFailed: "Could not save. Please try again.",
+    unitNumberLabel: "Apartment number",
+    unitDelete: "Delete apartment",
+    unitDeleteConfirm: "Delete this apartment? This cannot be undone.",
+    unitNumberInvalid: "Enter a whole apartment number (1 or more) and a floor (0 or more).",
+    unitNumberTaken: "Another apartment in this building already has this number:",
 
     // ---- Common areas (admin -> Areas) ----
     tabAreas: "Areas",
@@ -1143,6 +1148,11 @@ const translations = {
     noUnitsInBuilding: "مفيش شقق في المبنى ده لسه.",
     unitsShowing: "ظاهر",
     propSaveFailed: "الحفظ ما تمّش. حاول تاني.",
+    unitNumberLabel: "رقم الشقة",
+    unitDelete: "حذف الشقة",
+    unitDeleteConfirm: "تحذف الشقة دي؟ مفيش رجوع بعد الحذف.",
+    unitNumberInvalid: "اكتب رقم شقة صحيح (1 أو أكتر) ورقم دور (0 أو أكتر).",
+    unitNumberTaken: "فيه شقة تانية في المبنى ده بنفس الرقم:",
 
     // ---- الأماكن المشتركة (لوحة الأدمن ← الأماكن) ----
     tabAreas: "الأماكن",

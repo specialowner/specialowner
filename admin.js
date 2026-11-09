@@ -2356,17 +2356,13 @@ async function propCommitOps(ops) {
 function propNewUnitOps(building, buildingId, startNumber, count, floors, perFloor) {
   const ops = [];
   for (let i = 0; i < count; i++) {
-    const seq = startNumber + i;
-    // With floors/apartments-per-floor the number reads like a real address
-    // (floor 3, apartment 2 → 302); without them it's a plain running number.
-    let floor = 0, number = seq, code;
-    if (floors > 0 && perFloor > 0) {
-      floor = Math.floor((seq - 1) / perFloor) + 1;
-      number = ((seq - 1) % perFloor) + 1;
-      code = `${building.code}-${floor}${propPad(number, 2)}`;
-    } else {
-      code = `${building.code}-${propPad(seq, 2)}`;
-    }
+    // Apartments are numbered 1, 2, 3, 4 … straight through the building. When the
+    // building has floors × apartments-per-floor, the floor is worked out from the
+    // number (4 per floor: 1–4 on floor 1, 5–8 on floor 2); the number itself stays
+    // plain, and can be changed afterwards from the apartment's Edit form.
+    const number = startNumber + i;
+    const floor = (floors > 0 && perFloor > 0) ? Math.ceil(number / perFloor) : 0;
+    const code = `${building.code}-${number}`;
     const ref = doc(collection(db, "units"));
     ops.push((batch) => batch.set(ref, {
       buildingId,
@@ -2511,7 +2507,7 @@ function renderBuildingsList() {
     btn.disabled = true;
     try {
       const existing = propUnitsOf(b.id);
-      const start = existing.length + 1;
+      const start = existing.reduce((m, u) => Math.max(m, Number(u.number) || 0), 0) + 1;
       await propCommitOps(propNewUnitOps(b, b.id, start, count, b.floors || 0, b.unitsPerFloor || 0));
       alert(t("unitsGenerated"));
     } catch (err) {
@@ -2585,6 +2581,16 @@ function renderUnitsList() {
     const editing = propEditUnitId === u.id;
     const who = (u.residentName || "").trim();
     const form = !editing ? "" : `
+          <div class="grid-2" style="gap:10px;margin:6px 0 0">
+            <div class="field" style="margin:0">
+              <label>${t("unitNumberLabel")}</label>
+              <input type="number" class="unit-number" min="1" step="1" value="${propEsc(u.number || "")}">
+            </div>
+            <div class="field" style="margin:0">
+              <label>${t("unitFloorLabel")}</label>
+              <input type="number" class="unit-floor" min="0" step="1" value="${propEsc(u.floor || "")}">
+            </div>
+          </div>
           <div class="field" style="margin:6px 0 0">
             <label>${t("unitResidentAccount")}</label>
             <select class="unit-acc">${residentOptions(u.residentId || "")}</select>
@@ -2600,6 +2606,7 @@ function renderUnitsList() {
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <button type="button" class="btn btn-sm btn-primary unit-save">${t("unitSave")}</button>
             ${occupied ? `<button type="button" class="btn btn-sm btn-outline unit-clear">${t("unitClear")}</button>` : ""}
+            <button type="button" class="btn btn-sm btn-danger unit-delete">${t("unitDelete")}</button>
           </div>`;
     return `
       <div class="list-item unit-row" data-id="${u.id}">
@@ -2629,6 +2636,8 @@ function renderUnitsList() {
   el.querySelectorAll(".unit-save").forEach(btn => btn.addEventListener("click", async () => {
     const row = btn.closest(".unit-row");
     const saved = await propSaveUnit(row.dataset.id, {
+      number: row.querySelector(".unit-number").value,
+      floor: row.querySelector(".unit-floor").value,
       residentId: row.querySelector(".unit-acc").value || null,
       residentName: row.querySelector(".unit-name").value.trim(),
       residentPhone: row.querySelector(".unit-phone").value.trim()
@@ -2641,6 +2650,37 @@ function renderUnitsList() {
     const cleared = await propSaveUnit(row.dataset.id, { residentId: null, residentName: "", residentPhone: "" }, btn);
     if (cleared) { propEditUnitId = null; renderUnitsList(); }
   }));
+
+  el.querySelectorAll(".unit-delete").forEach(btn => btn.addEventListener("click", async () => {
+    const row = btn.closest(".unit-row");
+    if (await propDeleteUnit(row.dataset.id, btn)) { propEditUnitId = null; renderUnitsList(); }
+  }));
+}
+
+// Removes one apartment. If an app account was linked to it, that account's own
+// unit is emptied too (only when it still points at this apartment), so nobody is
+// left "living" in an apartment that no longer exists.
+async function propDeleteUnit(unitId, btn) {
+  const u = propUnits.find(x => x.id === unitId);
+  if (!u) return false;
+  if (!confirm(`${t("unitDeleteConfirm")}\n${u.code}`)) return false;
+  btn.disabled = true;
+  try {
+    const ops = [(batch) => batch.delete(doc(db, "units", unitId))];
+    if (u.residentId) {
+      const r = residentsCache.find(x => x.id === u.residentId);
+      if (r && r.unit === u.code) {
+        ops.push((batch) => batch.update(doc(db, "users", u.residentId), { unit: "", buildingId: null, buildingName: "" }));
+      }
+    }
+    await propCommitOps(ops);
+    return true;
+  } catch (err) {
+    console.error("Failed to delete apartment:", err);
+    alert(failMsg(t("propSaveFailed"), err));
+    btn.disabled = false;
+    return false;
+  }
 }
 
 // Returns true when the apartment was actually written, so the caller knows
@@ -2649,6 +2689,23 @@ async function propSaveUnit(unitId, data, btn) {
   const u = propUnits.find(x => x.id === unitId);
   if (!u) return false;
   const previousResidentId = u.residentId || null;
+
+  // The apartment number (and floor) can be changed here. The code shown everywhere
+  // is the building code + the number, so it is rebuilt from the new number, and two
+  // apartments of the same building can never share one.
+  const number = data.number === undefined ? Number(u.number) : Number(data.number);
+  const floor = data.floor === undefined ? (Number(u.floor) || 0) : (data.floor === "" ? 0 : Number(data.floor));
+  if (!Number.isInteger(number) || number < 1 || !Number.isInteger(floor) || floor < 0) {
+    alert(t("unitNumberInvalid"));
+    return false;
+  }
+  const newCode = `${u.buildingCode}-${number}`;
+  if (propUnits.some(x => x.id !== unitId && x.buildingId === u.buildingId && x.code === newCode)) {
+    alert(`${t("unitNumberTaken")}\n${newCode}`);
+    return false;
+  }
+  const oldCode = u.code;
+
   // One account can only live in one apartment: if it already sits somewhere else,
   // the admin is asked, and the old apartment is emptied rather than duplicated.
   const clash = data.residentId ? propUnits.find(x => x.id !== unitId && x.residentId === data.residentId) : null;
@@ -2657,6 +2714,7 @@ async function propSaveUnit(unitId, data, btn) {
   try {
     const ops = [];
     ops.push((batch) => batch.update(doc(db, "units", unitId), {
+      code: newCode, number, floor,
       residentId: data.residentId,
       residentName: data.residentName,
       residentPhone: data.residentPhone,
@@ -2670,14 +2728,15 @@ async function propSaveUnit(unitId, data, btn) {
     }
     // Keep the resident's own profile in step: everything else in the app (payments,
     // call center lookup, maintenance requests) is keyed on users/{uid}.unit.
+    // This also carries a renamed apartment number over to the resident.
     if (data.residentId) {
       ops.push((batch) => batch.update(doc(db, "users", data.residentId), {
-        unit: u.code, buildingId: u.buildingId, buildingName: u.buildingName || ""
+        unit: newCode, buildingId: u.buildingId, buildingName: u.buildingName || ""
       }));
     }
     if (previousResidentId && previousResidentId !== data.residentId) {
       const old = residentsCache.find(r => r.id === previousResidentId);
-      if (old && old.unit === u.code) {
+      if (old && old.unit === oldCode) {
         ops.push((batch) => batch.update(doc(db, "users", previousResidentId), { unit: "", buildingId: null, buildingName: "" }));
       }
     }
