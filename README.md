@@ -77,3 +77,7 @@ I can't compile a signed Android package directly in this chat (that needs the A
 - Points ledger: write to `pointsTransactions` and increment `users/{uid}.points` in a transaction whenever a shop purchase happens
 - Worker time/attendance stats (clock-in QR similar to guest QR, tied to `workers/{id}`)
 - Payroll + bank account linking module (flagged as future work in your outline)
+
+
+## Accesso QR (v1.26)
+Vedere `docs/QR_ACCESS.md` (architettura, installazione, limiti). Test: `node --test "tests/*.test.js"`. Collaudo browser: cartella `qa/`.

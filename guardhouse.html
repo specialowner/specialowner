@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>Special Owner · Guardhouse</title>
+<meta name="theme-color" content="#0a4f45">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+</head>
+<body class="gh-body">
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<header class="gh-top">
+  <div class="gh-title"><img src="icon-192.png" alt="" width="28" height="28"> <b data-i18n="ghTitle">Guardhouse</b></div>
+  <div class="gh-status"><span class="gh-dot" id="ghDot"></span><span id="ghStatus" data-i18n="ghConnecting">Connecting…</span></div>
+  <button class="btn btn-sm btn-outline gh-sound" id="ghSoundBtn" data-i18n="ghSoundOn">🔔 Sound on</button>
+</header>
+<main class="gh-main">
+  <section class="gh-hero idle" id="ghHero">
+    <div class="gh-photo"><img id="ghPhoto" alt="" style="display:none"><div class="gh-photo-ph" id="ghPhotoPh">👤</div></div>
+    <div class="gh-info">
+      <div class="gh-verdict" id="ghVerdict" data-i18n="ghWaiting">Waiting for the next person…</div>
+      <div class="gh-name" id="ghName"></div>
+      <div class="gh-line" id="ghLine1"></div>
+      <div class="gh-line" id="ghLine2"></div>
+      <div class="gh-line" id="ghLine3"></div>
+    </div>
+  </section>
+  <section class="gh-list-wrap">
+    <h3 data-i18n="ghRecent">Latest movements</h3>
+    <div id="ghList" class="gh-list"></div>
+  </section>
+</main>
+<script src="version.js"></script>
+<script src="i18n.js"></script>
+<script src="guardhouse.js"></script>
+</body>
+</html>

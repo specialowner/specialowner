@@ -9,6 +9,7 @@
 <link rel="stylesheet" href="style.css">
 <link rel="icon" href="icon-192.png">
 <script src="qrcode.min.js"></script>
+<script src="qr-core.js"></script>
 </head>
 <body>
 <div class="lang-toggle">
@@ -89,8 +90,48 @@
         <button class="btn btn-accent" id="requestActivationBtnInvites" data-i18n="requestActivation">Request activation</button>
       </div>
       <div id="invitesUnlockedArea">
+
+      <!-- My access QR (dynamic) -->
+      <div class="card sq-card">
+        <div class="sq-head">
+          <h3 data-i18n="sqMyQrTitle">My access QR</h3>
+          <span class="sq-chip off" id="sqChip" data-i18n="sqChipOff">Not active</span>
+        </div>
+        <div id="sqOff" class="sq-off">
+          <p class="sub-note" id="sqOffMsg" data-i18n="sqOffMsg">Switch on the access QR on this phone. The code changes every 30 seconds, so a screenshot is useless.</p>
+          <button class="btn btn-primary" id="sqActivateBtn" data-i18n="sqActivate">Activate on this phone</button>
+        </div>
+        <div id="sqOn" class="sq-on" style="display:none">
+          <div class="qr-box sq-live"><canvas id="sqCanvas" width="236" height="236"></canvas></div>
+          <div class="sq-bar"><div class="sq-bar-fill" id="sqBarFill"></div></div>
+          <div class="sq-secs"><span data-i18n="sqRefreshIn">New code in</span> <b id="sqSecs">30</b> s</div>
+          <p class="sub-note" data-i18n="sqHowTo">Hold the screen towards the reader. Works without internet.</p>
+          <div class="sq-warn" id="sqSkewWarn" style="display:none"></div>
+          <button class="btn btn-sm btn-outline" id="sqNextBtn" data-i18n="sqNextCode">Show next code</button>
+        </div>
+        <div id="sqDevices" style="display:none;margin-top:14px">
+          <h4 class="sq-sub" data-i18n="sqDevicesTitle">Phones with active QR</h4>
+          <div id="sqDevicesList"></div>
+        </div>
+      </div>
+
+      <!-- Photo for the guardhouse -->
+      <div class="card sq-card">
+        <h3 data-i18n="sqPhotoTitle">Photo for the guardhouse</h3>
+        <div class="sq-photo-row">
+          <div class="sq-photo"><img id="sqPhotoImg" alt="" style="display:none"><div id="sqPhotoPh" class="sq-photo-ph">👤</div></div>
+          <div style="flex:1">
+            <p class="sub-note" data-i18n="sqPhotoHelp">The guard sees your photo when you arrive. It becomes active after management approval.</p>
+            <span class="badge pending" id="sqPhotoState" style="display:none"></span>
+            <div style="margin-top:8px"><button class="btn btn-sm btn-outline" id="sqPhotoBtn" data-i18n="sqPhotoChoose">Choose photo</button></div>
+            <input type="file" id="sqPhotoInput" accept="image/*" style="display:none">
+          </div>
+        </div>
+      </div>
+
+      <!-- New guest / courier / maintenance pass -->
       <div class="card">
-        <h3 data-i18n="newInvitation">New invitation</h3>
+        <h3 data-i18n="sqNewPass">New access pass</h3>
         <div class="field">
           <label data-i18n="guestName">Guest name</label>
           <input type="text" id="guestName" placeholder="e.g. Mona Youssef" data-i18n-placeholder="guestNamePh">
@@ -100,19 +141,60 @@
           <input type="text" id="guestPhone" placeholder="01xxxxxxxxx" data-i18n-placeholder="guestPhonePh">
         </div>
         <div class="field">
-          <label data-i18n="visitDate">Visit date & time</label>
+          <label data-i18n="sqKindLabel">Who is it for?</label>
+          <select id="passKind">
+            <option value="guest" data-i18n="sqKind_guest">Visitor</option>
+            <option value="courier" data-i18n="sqKind_courier">Courier / delivery</option>
+            <option value="maintenance" data-i18n="sqKind_maintenance">Maintenance / technician</option>
+          </select>
+        </div>
+        <div class="field" id="passUnitField" style="display:none">
+          <label data-i18n="unitLabel">Unit</label>
+          <select id="passUnit"></select>
+        </div>
+        <div class="field">
+          <label data-i18n="sqValidFromLabel">Valid from (empty = now)</label>
           <input type="datetime-local" id="guestDate">
         </div>
-        <button class="btn btn-primary" id="createInviteBtn" data-i18n="generateQr">Generate QR invitation</button>
+        <div class="field">
+          <label data-i18n="sqDurationLabel">Valid for</label>
+          <select id="passDuration">
+            <option value="1" data-i18n="sqDur1">1 hour</option>
+            <option value="2" selected data-i18n="sqDur2">2 hours</option>
+            <option value="4" data-i18n="sqDur4">4 hours</option>
+            <option value="8" data-i18n="sqDur8">8 hours</option>
+            <option value="12" data-i18n="sqDur12">12 hours</option>
+            <option value="24" data-i18n="sqDur24">24 hours</option>
+            <option value="48" data-i18n="sqDur48">2 days</option>
+            <option value="72" data-i18n="sqDur72">3 days</option>
+          </select>
+        </div>
+        <div class="field">
+          <label data-i18n="sqModeLabel">Entries</label>
+          <select id="passMode">
+            <option value="single" data-i18n="sqModeSingle">Single entry (one use)</option>
+            <option value="window" data-i18n="sqModeWindow">Free entry and exit within the time window</option>
+          </select>
+        </div>
+        <label class="sq-check"><input type="checkbox" id="passVehicle"> <span data-i18n="sqVehicle">Arrives by car (opens the vehicle barrier)</span></label>
+        <button class="btn btn-primary" id="createInviteBtn" style="margin-top:12px" data-i18n="sqGeneratePass">Generate pass</button>
       </div>
 
       <div class="card" id="qrResultCard" style="display:none">
         <h3 data-i18n="shareQr">Share this QR with your guest</h3>
-        <div class="qr-box"><canvas id="qrCanvas"></canvas></div>
+        <div class="qr-box"><canvas id="qrCanvas" width="236" height="236"></canvas></div>
+        <p class="sq-summary" id="sqPassSummary"></p>
+        <p class="sub-note" id="sqPassMode" style="text-align:center"></p>
         <button class="btn" id="shareWhatsappBtn" style="background:#25D366;color:#fff;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:8px">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.29-1.39a9.87 9.87 0 0 0 4.75 1.21h.005c5.46 0 9.9-4.45 9.9-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm0 18.13h-.005a8.2 8.2 0 0 1-4.19-1.15l-.3-.18-3.14.82.84-3.06-.19-.31a8.2 8.2 0 0 1-1.26-4.38c0-4.54 3.7-8.24 8.25-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.55-3.7 8.25-8.25 8.25zm4.52-6.18c-.25-.12-1.47-.72-1.69-.81-.23-.08-.39-.12-.56.13-.17.25-.64.81-.78.97-.14.17-.29.19-.53.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.38-1.72-.15-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.15.16-.25.25-.42.08-.17.04-.31-.02-.44-.06-.12-.56-1.36-.77-1.86-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.44.06-.67.31s-.88.86-.88 2.1.9 2.44 1.03 2.6c.12.17 1.77 2.7 4.29 3.79.6.26 1.07.41 1.43.53.6.19 1.15.16 1.58.1.48-.07 1.47-.6 1.68-1.18.2-.58.2-1.08.14-1.18-.06-.1-.23-.16-.48-.28z"/></svg>
           <span data-i18n="shareWhatsapp">Send via WhatsApp</span>
         </button>
+        <div class="sq-share-row">
+          <button class="btn btn-sm btn-outline" id="shareEmailBtn" data-i18n="sqShareEmail">E-mail</button>
+          <button class="btn btn-sm btn-outline" id="shareLinkBtn" data-i18n="sqShareOther">Share…</button>
+          <button class="btn btn-sm btn-outline" id="copyLinkBtn" data-i18n="sqCopyLink">Copy link</button>
+          <button class="btn btn-sm btn-outline" id="shareImageBtn" data-i18n="sqShareImage">Image</button>
+        </div>
       </div>
 
       <div class="card">

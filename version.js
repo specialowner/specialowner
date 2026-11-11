@@ -13,9 +13,30 @@
 //   - the service-worker cache name follows the version, so every release refreshes the cache.
 // ==========================================================================
 (function (g) {
-  var APP_VERSION = "1.25.0";
+  var APP_VERSION = "1.26.0";
 
   var CHANGELOG = [
+    {
+      version: "1.26.0", date: "2026-11-09",
+      ar: [
+        "دخول بالـ QR متكامل: رمز QR شخصي ديناميكي على تليفون الساكن بيتغيّر كل 30 ثانية ومشفّر AES-256، فلقطة الشاشة أو النسخ مالهمش فايدة. بيشتغل من غير إنترنت.",
+        "تصاريح مؤقتة للضيوف والمناديب والفنيين: دخول مرة واحدة أو خلال مدة محددة (ساعة، ساعتين... لحد 3 أيام)، مع خيار السيارة، وبتتبعت برابط على واتساب أو بريد أو أي محادثة.",
+        "شاشة بوابة الأمن: صورة واسم الساكن أو بيانات الضيف والمضيف لحظة الدخول، مع صوت عند الرفض. بتشتغل من وحدة التحكم المحلية حتى لو الإنترنت قطع، أو من السحابة.",
+        "وحدة تحكم محلية (مجلد edge): بتقرأ القارئات (OSDP أو TCP أو HTTP)، بتفتح البوابات وحواجز السيارات وريليه المصاعد، وبتكمل شغل من غير إنترنت بمفاتيح مخزّنة مشفّرة. حاجز السيارات مش بيفتح إلا لو الحساس المغناطيسي شاف سيارة. المصعد: الساكن بيفتح دوره والأدوار المشتركة، والضيف دور مضيفه فقط.",
+        "لوحة المدير: نقاط الدخول وخريطة أدوار المصعد، حالة وحدات التحكم، الهواتف المفعّلة، موافقة صور السكان، تصريح رئيسي بمدة صلاحية، وأحداث الدخول المباشرة.",
+        "ملاحظة مهمة: بروتوكول Wiegand ما يقدرش ينقل الرمز الديناميكي (طويل)، فالقارئات لازم تكون OSDP أو RS-485 أو شبكة. التصاريح والدعوات القديمة لسه بتتحقق منها يدويًا بالماسح القديم.",
+        "لازم تنشر firestore.rules (مجموعات جديدة) وتشغّل وحدة تحكم واحدة على الأقل. تفاصيل التركيب في docs/QR_ACCESS.md.",
+      ],
+      en: [
+        "Integrated QR access: a personal dynamic QR on the resident's phone that changes every 30 seconds and is encrypted with AES-256, so a screenshot or copy is useless. Works without internet.",
+        "Temporary passes for guests, couriers and technicians: single entry or a time window (1 hour up to 3 days), optional vehicle access, shared as a link by WhatsApp, e-mail or any chat.",
+        "Guardhouse screen: the resident's photo and name, or the guest's and host's details, at the moment of entry, with a sound on denial. Runs from the local controller even when the internet is down, or from the cloud.",
+        "Local site controller (edge folder): reads the readers (OSDP, TCP or HTTP), opens gates, vehicle barriers and lift relays, and keeps working offline with an encrypted key cache. The vehicle barrier opens only if the magnetic loop sees a car. Lifts: a resident unlocks their own floor and the common areas, a guest only the floor of the host.",
+        "Admin panel: access points and lift floor map, controller status, active phones, approval of resident photos, a master pass with expiry, and live access events.",
+        "Important: Wiegand cannot carry the (long) dynamic code, so readers must be OSDP, RS-485 or network based. Old invitations and master codes can still be checked by hand with the old scanner.",
+        "firestore.rules must be published (new collections) and at least one site controller must run. Installation details are in docs/QR_ACCESS.md.",
+      ],
+    },
     {
       version: "1.25.0", date: "2026-11-09",
       ar: [

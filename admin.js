@@ -2154,90 +2154,10 @@ onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (s
   renderAccessLog();
 });
 
-// ---------- QR scanner ----------
-// ---------- Master access QR ----------
-function cryptoToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
-}
-
-document.getElementById("generateMasterBtn").addEventListener("click", async () => {
-  const label = document.getElementById("masterLabel").value.trim();
-  const expiryVal = document.getElementById("masterExpiry").value;
-  const zones = [...document.querySelectorAll(".zoneCheck:checked")].map(cb => cb.value);
-  if (!label) { alert(t("adminNeedCodeLabel")); return; }
-  if (zones.length === 0) { alert(t("adminNeedZone")); return; }
-  if (typeof QRCode === "undefined") { alert(t("adminQrLibMissing")); return; }
-
-  const btn = document.getElementById("generateMasterBtn");
-  btn.disabled = true;
-  try {
-    const token = cryptoToken();
-    const ref = await addDoc(collection(db, "invitations"), {
-      type: "master",
-      label,
-      accessZones: zones,
-      token,
-      status: "active",
-      createdBy: user.uid,
-      createdAt: serverTimestamp(),
-      expiresAt: expiryVal ? new Date(expiryVal) : null
-    });
-
-    const qrPayload = JSON.stringify({ inviteId: ref.id, token, ts: Date.now() });
-    const canvas = document.getElementById("masterQrCanvas");
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0a4f45" } });
-    document.getElementById("masterQrResultCard").style.display = "block";
-    document.getElementById("revokeMasterBtn").dataset.id = ref.id;
-    document.getElementById("masterLabel").value = "";
-    document.getElementById("masterExpiry").value = "";
-  } catch (err) {
-    console.error("Master QR generation failed:", err);
-    alert(adminErr(err));
-  } finally {
-    btn.disabled = false;
-  }
-});
-
-document.getElementById("revokeMasterBtn").addEventListener("click", async () => {
-  const id = document.getElementById("revokeMasterBtn").dataset.id;
-  if (!id) return;
-  await updateDoc(doc(db, "invitations", id), { status: "revoked" });
-  document.getElementById("masterQrResultCard").style.display = "none";
-});
-
-onSnapshot(query(collection(db, "invitations"), where("type", "==", "master")), (snap) => {
-  const el = document.getElementById("masterCodesList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noMasterCodes")}</p>`; return; }
-  el.innerHTML = "";
-  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }))
-    .sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  rows.forEach(m => {
-    const expired = m.expiresAt && m.expiresAt.toDate() < new Date();
-    const status = m.status === "revoked" ? "revoked" : expired ? "expired" : "active";
-    el.innerHTML += `
-      <div class="list-item">
-        <div class="meta">
-          <div class="title">${m.label}</div>
-          <div class="sub">${(m.accessZones || []).map(z => t(z)).join("، ")}</div>
-        </div>
-        <span class="badge ${status}">${stLabel(status)}</span>
-        ${status === "active" ? `<button class="btn btn-sm btn-danger" data-revoke-id="${m.id}" style="margin-inline-start:6px">${t("revoke")}</button>` : ""}
-        ${m.status === "revoked" && !expired ? `<button class="btn btn-sm btn-outline" data-reactivate-id="${m.id}" style="margin-inline-start:6px">${t("reactivateInvite")}</button>` : ""}
-      </div>`;
-  });
-  el.querySelectorAll("button[data-reactivate-id]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "invitations", btn.dataset.reactivateId), { status: "active" });
-    });
-  });
-  el.querySelectorAll("button[data-revoke-id]").forEach(btn => {
-    btn.addEventListener("click", async () => {
-      await updateDoc(doc(db, "invitations", btn.dataset.revokeId), { status: "revoked" });
-    });
-  });
-});
+// ---------- QR access system (v1.26): master passes, access points, controllers, photos, live events ----------
+import("./qr-admin.js")
+  .then((m) => m.initAdminQr({ db, user, t, adminErr, stLabel }))
+  .catch((e) => console.error("QR admin module failed to load:", e));
 
 let scannerStarted = false;
 function startScanner() {

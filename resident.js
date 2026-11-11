@@ -295,119 +295,11 @@ onSnapshot(annQ, (snap) => {
   });
 });
 
-// ---------- Invitations ----------
-let lastInviteInfo = null;
-
-document.getElementById("createInviteBtn").addEventListener("click", async () => {
-  if (currentAccountStatus !== "active") { alert(currentAccountStatus === "suspended" ? t("lockedMsgSuspended") : t("lockedMsgPending")); return; }
-  const guestName = document.getElementById("guestName").value.trim();
-  const guestPhone = document.getElementById("guestPhone").value.trim();
-  const guestDate = document.getElementById("guestDate").value;
-  if (!guestName || !guestDate) { alert(t("inviteFillFirst")); return; }
-
-  const btn = document.getElementById("createInviteBtn");
-  const originalLabel = btn.textContent;
-  btn.disabled = true;
-  btn.textContent = "…";
-
-  try {
-    if (typeof QRCode === "undefined") {
-      throw new Error("QR library did not load. Check your internet connection or ad-blocker and reload the page.");
-    }
-
-    const token = cryptoToken();
-    const ref = await addDoc(collection(db, "invitations"), {
-      residentId: user.uid,
-      residentUnit: profile.unit || "",
-      guestName, guestPhone,
-      visitDate: guestDate,
-      token,
-      status: "pending",
-      type: "guest",
-      createdAt: serverTimestamp()
-    });
-
-    const qrPayload = JSON.stringify({ inviteId: ref.id, token, ts: Date.now() });
-    const canvas = document.getElementById("qrCanvas");
-    const ctx = canvas.getContext("2d");
-    ctx.clearRect(0, 0, canvas.width, canvas.height); // wipe any previously drawn QR first
-    await QRCode.toCanvas(canvas, qrPayload, { width: 220, margin: 1, color: { dark: "#0f6e5f" } });
-    document.getElementById("qrResultCard").style.display = "block";
-
-    // Keep the message/guest details available for the WhatsApp share button below.
-    lastInviteInfo = { guestName, visitDate: guestDate, residentUnit: profile.unit || "" };
-
-    document.getElementById("guestName").value = "";
-    document.getElementById("guestPhone").value = "";
-    document.getElementById("guestDate").value = "";
-  } catch (err) {
-    console.error("Invite creation failed:", err);
-    alert(failMsg(t("inviteFailed"), err));
-  } finally {
-    btn.disabled = false;
-    btn.textContent = originalLabel;
-  }
-});
-
-const invitesQ = query(collection(db, "invitations"), where("residentId", "==", user.uid));
-onSnapshot(invitesQ, (snap) => {
-  const el = document.getElementById("invitesList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noInvitations")}</p>`; return; }
-  el.innerHTML = "";
-  const rows = snap.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  const INVITE_KEYS = { pending: "pending", used: "statusUsed", revoked: "revoked", expired: "expired" };
-  rows.forEach(i => {
-    el.innerHTML += `
-      <div class="list-item">
-        <div class="meta">
-          <div class="title">${i.guestName}</div>
-          <div class="sub">${t("visitDate")}: ${fmtVisitDateTime(i.visitDate)}</div>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <span class="badge ${i.status}">${(INVITE_KEYS[i.status] && t(INVITE_KEYS[i.status])) || i.status}</span>
-          ${i.status === "pending" ? `<button class="btn btn-sm btn-danger" data-cancel-invite="${i.id}" data-name="${String(i.guestName || "").replace(/"/g, "&quot;")}">${t("cancelInvite")}</button>` : ""}
-        </div>
-      </div>`;
-  });
-  el.querySelectorAll("button[data-cancel-invite]").forEach(btn => btn.addEventListener("click", async () => {
-    if (!confirm(`${t("cancelInviteConfirm")}: ${btn.dataset.name}`)) return;
-    btn.disabled = true;
-    try {
-      await updateDoc(doc(db, "invitations", btn.dataset.cancelInvite), { status: "revoked", revokedAt: serverTimestamp(), revokedBy: user.uid });
-    } catch (e) { console.error(e); alert(t("cancelInviteFailed")); btn.disabled = false; }
-  }));
-});
-
-// ---------- WhatsApp share ----------
-document.getElementById("shareWhatsappBtn").addEventListener("click", async () => {
-  if (!lastInviteInfo) return;
-  const message =
-    `دعوة دخول - ${lastInviteInfo.guestName}\n` +
-    `${t("unitLabel")}: ${lastInviteInfo.residentUnit || "—"}\n` +
-    `${t("visitDate")}: ${fmtVisitDateTime(lastInviteInfo.visitDate)}\n` +
-    `يرجى إظهار رمز QR المرفق عند البوابة.`;
-
-  const canvas = document.getElementById("qrCanvas");
-
-  // Try the native share sheet first (works on most mobile browsers) so the
-  // QR image and the message go together in one share action.
-  try {
-    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/png"));
-    const file = new File([blob], "invitation-qr.png", { type: "image/png" });
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file], text: message });
-      return;
-    }
-  } catch (err) {
-    // If the user just cancels the native share sheet, don't fall through to the wa.me link too.
-    if (err && err.name === "AbortError") return;
-    console.warn("Native share unavailable, falling back to wa.me link:", err);
-  }
-
-  // Fallback: open WhatsApp with the text pre-filled; the image has to be attached manually.
-  alert(t("whatsappShareUnsupported"));
-  window.open(`https://wa.me/?text=${encodeURIComponent(message)}`, "_blank");
-});
+// ---------- Access QR + guest passes (v1.26) ----------
+// Isolated in its own module: a failure here must never break the rest of the resident app.
+import("./resident-qr.js")
+  .then((m) => m.initResidentQr({ db, user, profile, t, failMsg, getStatus: () => currentAccountStatus }))
+  .catch((e) => console.error("QR module failed to load:", e));
 
 // ---------- Requests tab: three entry points ----------
 // One tab, three different things a resident can send: a maintenance job inside their
@@ -936,16 +828,4 @@ function fmtDate(v) {
   if (!v) return "—";
   if (v.toDate) return v.toDate().toLocaleDateString();
   return v;
-}
-function fmtVisitDateTime(v) {
-  if (!v) return "—";
-  const d = new Date(v); // v is a "datetime-local" string, e.g. 2026-08-23T14:30
-  if (isNaN(d.getTime())) return v;
-  return d.toLocaleString(window.SO_I18N && window.SO_I18N.getLang() === "ar" ? "ar-EG" : "en-GB", {
-    dateStyle: "medium",
-    timeStyle: "short"
-  });
-}
-function cryptoToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(16))).map(b => b.toString(16).padStart(2, "0")).join("");
 }

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="referrer" content="no-referrer">
+<meta name="robots" content="noindex,nofollow">
+<title>Special Owner · Access pass</title>
+<meta name="theme-color" content="#0f6e5f">
+<link rel="stylesheet" href="style.css">
+<link rel="icon" href="icon-192.png">
+</head>
+<body>
+<div class="lang-toggle">
+  <button data-lang="ar" class="active">عربي</button>
+  <button data-lang="en">EN</button>
+</div>
+<div class="app-shell">
+  <div class="center-screen" style="justify-content:flex-start;padding-top:28px">
+    <img src="icon-192.png" alt="Special Owner" class="logo-mark-img" style="width:64px;height:64px">
+    <h2 style="margin:8px 0 2px" data-i18n="passPageTitle">Your access pass</h2>
+    <p class="sub-note" data-i18n="passPageSub">Show this code to the reader at the gate.</p>
+    <div class="card" id="passCard" style="width:100%;max-width:340px;text-align:center">
+      <div class="qr-box"><canvas id="passCanvas" width="236" height="236"></canvas></div>
+      <p class="sq-summary" id="passWho"></p>
+      <div class="sub-note" id="passWhen" style="margin:2px 0"></div>
+      <div class="sub-note" id="passMode" style="margin:2px 0"></div>
+      <span class="badge pending" id="passState" style="display:none"></span>
+    </div>
+    <div class="card" id="passBad" style="display:none;width:100%;max-width:340px;text-align:center">
+      <div style="font-size:30px">⚠️</div>
+      <p data-i18n="passBad">This link is not a valid access pass. Ask the resident to send it again.</p>
+    </div>
+    <p class="sub-note" style="max-width:340px;text-align:center" data-i18n="passPrivacy">Do not share this page: whoever holds it can use the pass.</p>
+  </div>
+</div>
+<script src="qrcode.min.js"></script>
+<script src="qr-core.js"></script>
+<script src="version.js"></script>
+<script src="i18n.js"></script>
+<script src="pass.js"></script>
+</body>
+</html>

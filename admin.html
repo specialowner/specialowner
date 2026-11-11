@@ -197,6 +197,48 @@
       </div>
 
       <div class="card">
+        <h3 data-i18n="sqAdmTitle">QR access system</h3>
+        <p class="sub-note"><span data-i18n="sqSiteKey">Site key</span>: <span class="badge pending" id="sqSiteFp">…</span></p>
+        <p class="sub-note"><span data-i18n="sqCredActive">Phones with active QR</span>: <b id="credCount">0</b> · <a href="guardhouse.html" target="_blank" rel="noopener" data-i18n="sqOpenGuardhouse">Open guardhouse screen</a></p>
+        <h4 class="ops-subtitle" data-i18n="sqCtrlTitle">Site controllers</h4>
+        <div id="ctrlList"><p class="empty-state" data-i18n="sqCtrlNone">No controller connected yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="sqApTitle">Access points</h3>
+        <p class="sub-note" data-i18n="sqApHelp">Describe gates, vehicle barriers, lobbies and lifts. Wiring (relay channels) stays in the controller configuration.</p>
+        <div class="field"><label data-i18n="sqApId">Identifier (letters, digits, dashes)</label><input type="text" id="apId" placeholder="gate-main-in"></div>
+        <div class="field"><label data-i18n="label">Label</label><input type="text" id="apName"></div>
+        <div class="field"><label data-i18n="sqApTypeLabel">Type</label>
+          <select id="apType"><option value="gate" data-i18n="sqApType_gate">Pedestrian gate</option><option value="vehicle" data-i18n="sqApType_vehicle">Vehicle barrier</option><option value="lobby" data-i18n="sqApType_lobby">Building lobby</option><option value="elevator" data-i18n="sqApType_elevator">Elevator</option></select></div>
+        <div class="field"><label data-i18n="sqApDirLabel">Direction</label>
+          <select id="apDir"><option value="in" data-i18n="ghEntry">Entry</option><option value="out" data-i18n="ghExit">Exit</option></select></div>
+        <div class="field"><label data-i18n="sqApBuilding">Building (optional)</label><select id="apBuilding"><option value="">—</option></select></div>
+        <div class="field" id="apStopsField" style="display:none"><label data-i18n="sqApStopsLabel">Elevator stops, one per line: label ; floor ; common (1/0) ; relay</label>
+          <textarea id="apStops" rows="5" placeholder="Garage ; -1 ; 1 ; 0&#10;Floor 1 ; 1 ; 0 ; 1&#10;Roof ; 12 ; 1 ; 12"></textarea></div>
+        <label class="sq-check" id="apLoopField" style="display:none"><input type="checkbox" id="apLoopRequired" checked> <span data-i18n="sqApLoop">Open only if the magnetic loop detects a vehicle</span></label>
+        <label class="sq-check"><input type="checkbox" id="apRequireEntry"> <span data-i18n="sqApRequireEntry">Exit only for people who entered</span></label>
+        <label class="sq-check"><input type="checkbox" id="apEnabled" checked> <span data-i18n="sqApEnabled">Enabled</span></label>
+        <button class="btn btn-primary" id="apSaveBtn" style="margin-top:10px" data-i18n="sqApSave">Save access point</button>
+        <div id="apList"><p class="empty-state" data-i18n="sqApNone">No access points yet.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="sqPhotoReviewTitle">Resident photos to approve</h3>
+        <div id="photoList"><p class="empty-state" data-i18n="sqPhotoNonePending">No photos awaiting approval.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="sqCredTitle">Resident phones</h3>
+        <div id="credList"><p class="empty-state" data-i18n="sqCredNone">No active phones.</p></div>
+      </div>
+
+      <div class="card">
+        <h3 data-i18n="sqEventsTitle">Live access events</h3>
+        <div id="evList"><p class="empty-state" data-i18n="noEntries">No entries yet.</p></div>
+      </div>
+
+      <div class="card">
         <h3 data-i18n="scanQr">Scan guest / worker QR</h3>
         <select id="scanMode" style="width:100%;margin-bottom:8px"><option value="entry" data-i18n="scanModeEntry">Scan mode: Entry</option><option value="exit" data-i18n="scanModeExit">Scan mode: Exit</option></select>
         <div id="qrReader" style="border-radius:10px;overflow:hidden;min-height:60px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px" data-i18n="cameraLoading">Loading camera…</div>
@@ -568,6 +610,7 @@
   </div>
 </div>
 
+<script src="qr-core.js"></script>
 <script src="version.js"></script>
 <script src="i18n.js"></script>
 <script src="windows.js"></script>

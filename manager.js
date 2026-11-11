@@ -578,23 +578,28 @@ onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (s
   });
 });
 
-// ---------- Guest visits (read-only) ----------
-onSnapshot(query(collection(db, "invitations"), where("type", "==", "guest")), (snap) => {
-  const el = document.getElementById("mgrVisitsList");
-  if (snap.empty) { el.innerHTML = `<p class="empty-state">${t("noVisits")}</p>`; return; }
-  el.innerHTML = "";
-  const rows = snap.docs.map(d => d.data()).sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-  rows.slice(0, 50).forEach(i => {
-    el.innerHTML += `
-      <div class="list-item">
-        <div class="meta">
-          <div class="title">${i.guestName || ""} · ${t("unitLabel") || ""} ${i.residentUnit || "—"}</div>
-          <div class="sub">${t("visitDate")}: ${i.visitDate || "—"}</div>
-        </div>
-        <span class="badge ${i.status}">${i.status}</span>
-      </div>`;
-  });
-});
+// ---------- Guest visits (read-only): new-style passes + invitations issued before v1.26 ----------
+{
+  let passes = [], legacy = [];
+  const msOf = (v) => (v && v.toMillis ? v.toMillis() : v && v.seconds ? v.seconds * 1000 : 0);
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const render = () => {
+    const el = document.getElementById("mgrVisitsList");
+    const rows = [
+      ...passes.filter((p) => p.kind !== "master").map((p) => ({ at: msOf(p.createdAt), html: (() => {
+        const st = p.status === "revoked" ? "revoked" : msOf(p.validUntil) < Date.now() && !p.inside ? "expired" : p.maxUses != null && (p.uses || 0) >= p.maxUses ? "used" : p.inside ? "inside" : "active";
+        return `<div class="list-item"><div class="meta"><div class="title">${esc(p.label)} · ${t("unitLabel") || ""} ${esc(p.unit || "—")}</div>
+          <div class="sub">${t("sqKind_" + (p.kind || "guest"))} · ${new Date(msOf(p.validFrom)).toLocaleString()} → ${new Date(msOf(p.validUntil)).toLocaleString()}</div></div>
+          <span class="badge ${st === "inside" ? "inside" : st}">${t("sqSt_" + st)}</span></div>`; })() })),
+      ...legacy.map((i) => ({ at: msOf(i.createdAt), html: `<div class="list-item"><div class="meta"><div class="title">${esc(i.guestName)} · ${t("unitLabel") || ""} ${esc(i.residentUnit || "—")}</div>
+          <div class="sub">${t("visitDate")}: ${esc(i.visitDate || "—")}</div></div><span class="badge ${esc(i.status)}">${esc(i.status)}</span></div>` })),
+    ].sort((a, b) => b.at - a.at).slice(0, 50);
+    el.innerHTML = rows.length ? rows.map((r) => r.html).join("") : `<p class="empty-state">${t("noVisits")}</p>`;
+  };
+  onSnapshot(query(collection(db, "accessPasses")), (snap) => { passes = snap.docs.map((d) => d.data()); render(); }, (e) => console.error(e));
+  onSnapshot(query(collection(db, "invitations"), where("type", "==", "guest")), (snap) => { legacy = snap.docs.map((d) => d.data()); render(); });
+  window.addEventListener("so-lang-changed", render);
+}
 
 // ---------- Workers' leave requests (approve/reject — never your own) ----------
 onSnapshot(query(collection(db, "leaveRequests"), orderBy("createdAt", "desc")), (snap) => {

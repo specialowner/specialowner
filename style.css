@@ -248,3 +248,60 @@ img.ann-media{background:#eef2f0}
 
 .ops-tile.alert{background:#f7d7d2;color:var(--danger)}
 .ops-tile[data-open]{cursor:pointer}
+
+/* ===== QR access (v1.26) ===== */
+.badge.used,.badge.inside{background:#e3ebf7;color:#2a4d8f}
+.badge.cancelled{background:#eceeed;color:var(--muted)}
+.sq-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px}
+.sq-head h3{margin:0}
+.sq-chip{font-size:11px;font-weight:700;padding:4px 10px;border-radius:999px}
+.sq-chip.live{background:#d7f0e2;color:var(--success)}
+.sq-chip.off{background:#eceeed;color:var(--muted)}
+.sq-off{text-align:center;padding:6px 0}
+.sq-on{text-align:center}
+.sq-live{background:#fff;border-radius:16px;padding:10px;display:inline-block;box-shadow:0 2px 14px rgba(15,110,95,.18)}
+.sq-live canvas,#qrCanvas{display:block;max-width:100%;height:auto!important;width:236px!important}
+.sq-bar{height:6px;border-radius:99px;background:#e4ece9;margin:12px auto 6px;max-width:236px;overflow:hidden}
+.sq-bar-fill{height:100%;width:100%;background:var(--primary);border-radius:99px;transition:width .25s linear,background .3s}
+.sq-bar-fill.warn{background:var(--accent)}
+.sq-bar-fill.danger{background:var(--danger)}
+.sq-secs{font-size:13px;color:var(--muted)}
+.sq-secs b{color:var(--primary);font-size:15px}
+.sq-warn{margin:8px 0;padding:8px 10px;border-radius:10px;background:#fbe9c9;color:var(--warning);font-size:12px}
+.sq-sub{font-size:13px;margin:0 0 6px;color:var(--muted)}
+.sq-photo-row{display:flex;gap:14px;align-items:center}
+.sq-photo{width:76px;height:76px;border-radius:50%;overflow:hidden;background:#eaf5f1;flex:none;display:flex;align-items:center;justify-content:center}
+.sq-photo img{width:100%;height:100%;object-fit:cover}
+.sq-photo-ph{font-size:34px;display:flex;align-items:center;justify-content:center}
+.sq-check{display:flex;align-items:center;gap:8px;font-size:13px}
+.sq-summary{text-align:center;font-weight:700;margin:10px 0 2px;font-size:14px}
+.sq-share-row{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:10px}
+.sq-kind{font-size:11px;color:var(--muted);font-weight:600;margin-inline-start:6px}
+[dir=rtl] .gh-top{padding:12px 16px 12px 150px}
+[dir=rtl] .sq-bar-fill{margin-inline-start:auto}
+
+/* ===== Guardhouse screen ===== */
+.gh-body{background:#0b1f1b;color:#eaf5f1;min-height:100vh}
+.gh-top{display:flex;align-items:center;gap:14px;padding:12px 150px 12px 16px;background:#0a4f45;flex-wrap:wrap}
+.gh-title{display:flex;align-items:center;gap:8px;font-size:18px}
+.gh-status{display:flex;align-items:center;gap:6px;font-size:13px;flex:1;opacity:.9}
+.gh-dot{width:10px;height:10px;border-radius:50%;background:#888}
+.gh-dot.ok{background:#3ddc84}.gh-dot.warn{background:#f0b429}.gh-dot.bad{background:#ff5a4d}
+.gh-sound{color:#eaf5f1;border-color:#eaf5f1}
+.gh-main{max-width:1100px;margin:0 auto;padding:16px}
+.gh-hero{display:flex;gap:22px;align-items:center;border-radius:22px;padding:22px;min-height:230px;background:#143a33;border:3px solid #1f5a4f;flex-wrap:wrap}
+.gh-hero.ok{background:#12452f;border-color:#3ddc84}
+.gh-hero.bad{background:#4a1a16;border-color:#ff5a4d}
+.gh-hero.offline{box-shadow:0 0 0 3px #f0b429 inset}
+.gh-photo{width:190px;height:190px;border-radius:50%;overflow:hidden;background:#0b1f1b;display:flex;align-items:center;justify-content:center;flex:none}
+.gh-photo img{width:100%;height:100%;object-fit:cover}
+.gh-photo-ph{font-size:84px;display:flex;align-items:center;justify-content:center}
+.gh-info{flex:1;min-width:240px}
+.gh-verdict{font-size:20px;font-weight:800;letter-spacing:.02em;margin-bottom:6px}
+.gh-name{font-size:40px;font-weight:800;line-height:1.15;margin-bottom:8px;word-break:break-word}
+.gh-line{font-size:19px;opacity:.95;margin:2px 0}
+.gh-list-wrap h3{margin:22px 0 8px;font-size:15px;opacity:.8}
+.gh-row{display:grid;grid-template-columns:90px 1.4fr 1.2fr 1.4fr;gap:10px;padding:9px 12px;border-radius:10px;margin-bottom:6px;background:#12302a;font-size:14px;border-inline-start:5px solid #3ddc84}
+.gh-row.bad{background:#3a1c19;border-inline-start-color:#ff5a4d}
+.gh-time{opacity:.7;font-variant-numeric:tabular-nums}
+@media (max-width:640px){.gh-name{font-size:28px}.gh-row{grid-template-columns:70px 1fr}.gh-ap,.gh-res{grid-column:2}.gh-photo{width:130px;height:130px}}

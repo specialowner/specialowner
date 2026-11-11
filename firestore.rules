@@ -83,7 +83,10 @@ service cloud.firestore {
     }
 
     match /invitations/{inviteId} {
-      allow read: if isSignedIn(); // security/admin/manager need to read any invite to validate a scan or view visits
+      // Security/admin/manager read any invite to validate a scan or view visits; a resident reads only their own.
+      // (It used to be readable by EVERY signed-in account, which exposed every guest token and every master token.)
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker() ||
+        (isSignedIn() && resource.data.residentId == request.auth.uid);
       allow create: if isAdmin() ||
         (isOwner(resource == null ? request.resource.data.residentId : resource.data.residentId) && isActiveResident());
       // Admin or security staff mark an invite as used. A resident may cancel (revoke) their own
@@ -304,6 +307,121 @@ service cloud.firestore {
     match /salaryRecords/{recordId} {
       allow read: if isAdmin() || ((isWorker() || isManager()) && resource.data.workerId == request.auth.uid);
       allow write: if isAdmin(); // admin builds and archives the monthly breakdown
+    }
+
+    // =====================================================================================
+    // QR access system (v1.26): dynamic resident QR, guest passes, gates, lifts, offline edge controllers.
+    // The edge controllers use a service account (Admin SDK) and therefore bypass these rules:
+    // they are the only writers of accessEvents, controllers and scanRequests answers.
+    // =====================================================================================
+
+    // Public key that residents' phones seal their credential secret to. Only the Super Admin may change it
+    // (replacing it makes every existing credential unreadable by the controllers).
+    match /siteConfig/{docId} {
+      allow read: if isSignedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    // One document per phone: the secret is stored ONLY sealed (ECDH + AES-256-GCM) to the site key, so a
+    // Firestore reader — admin included — cannot generate codes. The owner may switch their own device off.
+    match /qrCredentials/{credId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.uid == request.auth.uid);
+      allow create: if isActiveResident() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.status == 'active' &&
+        credId.matches('^[A-Za-z0-9_-]{8}$') &&
+        request.resource.data.keys().hasOnly(['uid', 'label', 'status', 'sealed', 'keyFp', 'createdAt']) &&
+        request.resource.data.createdAt == request.time;
+      allow update: if isAdmin() ||
+        (isSignedIn() && resource.data.uid == request.auth.uid &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'revokedBy']));
+      allow delete: if false;
+    }
+
+    // Guest / courier / maintenance passes (created by the resident) and master passes (created by the admin).
+    // Only SHA-256 of the secret is stored. uses / inside / lastUsedAt are maintained by the controllers.
+    match /accessPasses/{passId} {
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker() ||
+        (isSignedIn() && resource.data.residentId == request.auth.uid);
+      allow create: if
+        (isActiveResident() &&
+         passId.matches('^[A-Za-z0-9_-]{16}$') &&
+         request.resource.data.keys().hasOnly(['residentId', 'residentName', 'residentPhone', 'unit', 'unitId', 'buildingId', 'floor', 'kind', 'label', 'guestPhone', 'mode', 'validFrom', 'validUntil', 'maxUses', 'uses', 'vehicle', 'zones', 'secretHash', 'status', 'inside', 'createdAt']) &&
+         request.resource.data.residentId == request.auth.uid &&
+         request.resource.data.residentName == myData().name &&
+         request.resource.data.kind in ['guest', 'courier', 'maintenance'] &&
+         request.resource.data.mode in ['single', 'window'] &&
+         request.resource.data.status == 'active' &&
+         request.resource.data.uses == 0 &&
+         request.resource.data.inside == false &&
+         request.resource.data.zones.size() == 0 &&
+         request.resource.data.secretHash is string && request.resource.data.secretHash.size() == 43 &&
+         request.resource.data.label is string && request.resource.data.label.size() > 0 && request.resource.data.label.size() <= 80 &&
+         request.resource.data.validUntil > request.resource.data.validFrom &&
+         request.resource.data.validFrom >= request.time - duration.value(1, 'h') &&
+         request.resource.data.validUntil <= request.time + duration.value(72, 'h') &&
+         (request.resource.data.maxUses == null || (request.resource.data.maxUses is int && request.resource.data.maxUses >= 1 && request.resource.data.maxUses <= 50)) &&
+         request.resource.data.createdAt == request.time &&
+         // the pass must hang on an apartment this resident really lives in (floor + building are copied from it)
+         ((request.resource.data.unitId == null && request.resource.data.floor == 0 && request.resource.data.buildingId == null) ||
+          (get(/databases/$(database)/documents/units/$(request.resource.data.unitId)).data.residentId == request.auth.uid &&
+           get(/databases/$(database)/documents/units/$(request.resource.data.unitId)).data.floor == request.resource.data.floor &&
+           get(/databases/$(database)/documents/units/$(request.resource.data.unitId)).data.buildingId == request.resource.data.buildingId))) ||
+        (isAdmin() &&
+         request.resource.data.kind == 'master' &&
+         request.resource.data.createdBy == request.auth.uid);
+      allow update: if isAdmin() ||
+        (isSignedIn() && resource.data.residentId == request.auth.uid &&
+         request.resource.data.status == 'revoked' &&
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'revokedAt', 'revokedBy']));
+      allow delete: if isAdmin();
+    }
+
+    // Copy of the pass secret, readable ONLY by the resident who made it, so the pass can be shared again later.
+    match /users/{userId}/passKeys/{passId} {
+      allow read, create, delete: if isOwner(userId);
+      allow update: if false;
+    }
+
+    // Logical description of gates, vehicle barriers, lobbies and lifts (floor/relay map). Wiring lives on the controller.
+    match /accessPoints/{apId} {
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker();
+      allow write: if isAdmin();
+    }
+
+    // Every attempt (allowed or denied) as seen by a controller. Written by the controllers only.
+    match /accessEvents/{eventId} {
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker();
+      allow write: if false;
+    }
+
+    // Heartbeat of each controller (online/offline, queue, cache age).
+    match /controllers/{controllerId} {
+      allow read: if isAdmin() || isActiveManager();
+      allow write: if false;
+    }
+
+    // Photo shown on the guardhouse screen. The resident uploads it as 'pending'; only an admin can approve it.
+    match /accessIdentities/{uid} {
+      allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker() || isOwner(uid);
+      allow create, update: if isAdmin() ||
+        (isActiveResident() && isOwner(uid) &&
+         request.resource.data.keys().hasOnly(['photo', 'photoStatus', 'updatedAt']) &&
+         request.resource.data.photoStatus == 'pending' &&
+         request.resource.data.photo is string && request.resource.data.photo.size() < 60000);
+      allow delete: if isAdmin() || isOwner(uid);
+    }
+
+    // A guard's phone asks a controller to check a QR it scanned; the controller answers on the same document.
+    match /scanRequests/{requestId} {
+      allow read: if isAdmin() || (isSignedIn() && resource.data.requestedBy == request.auth.uid);
+      allow create: if (isAdmin() || isActiveSecurityWorker()) &&
+        request.resource.data.requestedBy == request.auth.uid &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.token is string && request.resource.data.token.size() < 200 &&
+        request.resource.data.createdAt == request.time;
+      allow update, delete: if false;
     }
   }
 }
