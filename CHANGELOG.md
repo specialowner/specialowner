@@ -1,8 +1,22 @@
 # Special Owner — Update archive
 
-Current version: **v1.26.0**
+Current version: **v1.26.1**
 
 _Generated from `version.js` — do not edit by hand. Newest first; each entry lists what changed compared to the previous version._
+
+## v1.26.1 — 2026-11-15
+
+**English**
+- QR access now works with no server and no subscription: the admin device is the controller. In Access press «Create site key» once, then copy the backup.
+- The admin verifies codes instantly. When guards scan from their phones, an admin page holding the key must stay open on at least one device.
+- Camera frame fixed: the scan square was off-centre; it is now centred and sized to the screen for admin and security.
+- Suspending an account takes effect immediately. Note: automatic opening of gates and lifts with hardware still needs the edge controller. Republish firestore.rules.
+
+**العربية**
+- الدخول بالـ QR صار يشتغل بدون سيرفر ولا اشتراكات: جهاز الأدمن هو وحدة التحكم. في «الدخول» اضغط «إنشاء مفتاح الموقع» مرة واحدة ثم انسخ النسخة الاحتياطية.
+- الأدمن يتحقق من الرمز فورًا. وعند مسح الحراس من تليفوناتهم، لازم صفحة الأدمن تبقى مفتوحة على جهاز واحد على الأقل.
+- إصلاح إطار الكاميرا: المربع كان مزاحًا؛ الآن متمركز ومناسب لحجم الشاشة للأدمن والأمن.
+- إيقاف الحساب يسري فورًا. ملاحظة: فتح البوابات والمصاعد تلقائيًا بالأجهزة ما زال يحتاج وحدة edge. لازم تنشر firestore.rules من جديد.
 
 ## v1.26.0 — 2026-11-09
 

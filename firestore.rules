@@ -319,7 +319,7 @@ service cloud.firestore {
     // (replacing it makes every existing credential unreadable by the controllers).
     match /siteConfig/{docId} {
       allow read: if isSignedIn();
-      allow write: if isSuperAdmin();
+      allow write: if isAdmin();
     }
 
     // One document per phone: the secret is stored ONLY sealed (ECDH + AES-256-GCM) to the site key, so a
@@ -393,13 +393,15 @@ service cloud.firestore {
     // Every attempt (allowed or denied) as seen by a controller. Written by the controllers only.
     match /accessEvents/{eventId} {
       allow read: if isAdmin() || isActiveManager() || isActiveSecurityWorker();
-      allow write: if false;
+      allow create: if isAdmin();          // the admin's browser acts as controller (cloud-controller.js); the edge controller uses the Admin SDK
+      allow update, delete: if false;
     }
 
     // Heartbeat of each controller (online/offline, queue, cache age).
     match /controllers/{controllerId} {
       allow read: if isAdmin() || isActiveManager();
-      allow write: if false;
+      allow create, update: if isAdmin();
+      allow delete: if false;
     }
 
     // Photo shown on the guardhouse screen. The resident uploads it as 'pending'; only an admin can approve it.
@@ -421,7 +423,9 @@ service cloud.firestore {
         request.resource.data.status == 'pending' &&
         request.resource.data.token is string && request.resource.data.token.size() < 200 &&
         request.resource.data.createdAt == request.time;
-      allow update, delete: if false;
+      allow update: if isAdmin() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'result', 'by', 'token', 'answeredAt']);
+      allow delete: if false;
     }
   }
 }

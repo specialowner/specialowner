@@ -9,7 +9,7 @@ const Q = window.SOQR;
 const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const ms = (v) => (v && v.toMillis ? v.toMillis() : v && v.seconds ? v.seconds * 1000 : 0);
 
-export function initAdminQr({ db, user, t, adminErr, stLabel }) {
+export function initAdminQr({ db, user, t, adminErr, stLabel, cc }) {
   const $ = (id) => document.getElementById(id);
   const lang = () => window.SO_I18N.getLang();
   const loc = () => (lang() === "ar" ? "ar-EG" : "en-GB");
@@ -74,12 +74,49 @@ export function initAdminQr({ db, user, t, adminErr, stLabel }) {
     }));
   }
 
-  // ================================================== site key
+  // ================================================== site key + browser controller (no server needed)
+  let fpCloud = null;
   onSnapshot(doc(db, "siteConfig", "qr"), (s) => {
-    const d = s.exists() ? s.data() : null;
-    $("sqSiteFp").textContent = d && d.fingerprint ? d.fingerprint : t("sqSiteNoKey");
-    $("sqSiteFp").className = "badge " + (d && d.fingerprint ? "active" : "pending");
+    const d = s.exists() ? s.data() : null; fpCloud = d && d.fingerprint ? d.fingerprint : null;
+    $("sqSiteFp").textContent = fpCloud || t("sqSiteNoKey");
+    $("sqSiteFp").className = "badge " + (fpCloud ? "active" : "pending");
   }, (e) => console.error(e));
+
+  function renderCc(s) {
+    if (!cc) return;
+    s = s || cc.status();
+    let msg;
+    if (s.mismatch) msg = t("ccMsgMismatch");
+    else if (s.hasKey) msg = t("ccMsgOk");
+    else if (s.noKeyOnThisDevice) msg = t("ccMsgOtherDevice");
+    else msg = t("ccMsgNone");
+    $("ccMsg").textContent = msg;
+    $("ccCreateBtn").style.display = s.hasKey || s.noKeyOnThisDevice ? "none" : "";
+    $("ccBackupBtn").style.display = s.hasKey ? "" : "none";
+    $("ccImportBtn").style.display = s.hasKey ? "none" : "";
+    $("ccState").textContent = s.hasKey ? `${t("ccState")}: ${s.credentials} / ${s.passes} · ${s.stats.allowed}✓ ${s.stats.denied}✗${s.error ? " · ⚠ " + s.error : ""}` : "";
+  }
+  window.addEventListener("so-cc", (e) => renderCc(e.detail));
+  renderCc();
+  $("ccCreateBtn").addEventListener("click", async () => {
+    $("ccCreateBtn").disabled = true;
+    try { await cc.createKey(); renderCc(); await copyBackup(true); }
+    catch (e) { console.error(e); alert(adminErr(e)); }
+    finally { $("ccCreateBtn").disabled = false; }
+  });
+  async function copyBackup(first) {
+    try {
+      const text = cc.exportBackup();
+      try { await navigator.clipboard.writeText(text); alert((first ? t("ccCreated") + "\n\n" : "") + t("ccBackupCopied")); }
+      catch (e) { window.prompt(t("ccBackupManual"), text); }
+    } catch (e) { console.error(e); alert(adminErr(e)); }
+  }
+  $("ccBackupBtn").addEventListener("click", () => copyBackup(false));
+  $("ccImportBtn").addEventListener("click", () => { $("ccImportBox").style.display = $("ccImportBox").style.display === "none" ? "block" : "none"; });
+  $("ccImportGo").addEventListener("click", async () => {
+    try { await cc.importBackup($("ccImportText").value); $("ccImportText").value = ""; $("ccImportBox").style.display = "none"; renderCc(); }
+    catch (e) { alert(e && e.message === "other-site-key" ? t("ccImportOtherKey") : e && e.message === "bad-backup" ? t("ccImportBad") : adminErr(e)); }
+  });
 
   // ================================================== access points
   let aps = [], buildings = [];
@@ -218,5 +255,5 @@ export function initAdminQr({ db, user, t, adminErr, stLabel }) {
     }).join("");
   }, (e) => console.error(e));
 
-  window.addEventListener("so-lang-changed", () => { renderMasters(); renderAps(); renderCreds(); renderPhotos(); });
+  window.addEventListener("so-lang-changed", () => { renderCc(); renderMasters(); renderAps(); renderCreds(); renderPhotos(); });
 }

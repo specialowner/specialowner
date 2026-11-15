@@ -199,6 +199,19 @@
       <div class="card">
         <h3 data-i18n="sqAdmTitle">QR access system</h3>
         <p class="sub-note"><span data-i18n="sqSiteKey">Site key</span>: <span class="badge pending" id="sqSiteFp">…</span></p>
+        <div class="sq-cc" id="ccBox">
+          <p class="sub-note" id="ccMsg"></p>
+          <div class="sq-cc-row">
+            <button class="btn btn-sm btn-primary" id="ccCreateBtn" data-i18n="ccCreate">Create site key</button>
+            <button class="btn btn-sm btn-outline" id="ccBackupBtn" data-i18n="ccBackup">Copy key backup</button>
+            <button class="btn btn-sm btn-outline" id="ccImportBtn" data-i18n="ccImport">Import backup</button>
+          </div>
+          <div id="ccImportBox" style="display:none;margin-top:8px">
+            <textarea id="ccImportText" rows="3" placeholder="SO-SITEKEY-1.…" style="width:100%"></textarea>
+            <button class="btn btn-sm btn-primary" id="ccImportGo" style="margin-top:6px" data-i18n="ccImportGo">Use this key</button>
+          </div>
+          <p class="sub-note" id="ccState" style="margin-top:8px"></p>
+        </div>
         <p class="sub-note"><span data-i18n="sqCredActive">Phones with active QR</span>: <b id="credCount">0</b> · <a href="guardhouse.html" target="_blank" rel="noopener" data-i18n="sqOpenGuardhouse">Open guardhouse screen</a></p>
         <h4 class="ops-subtitle" data-i18n="sqCtrlTitle">Site controllers</h4>
         <div id="ctrlList"><p class="empty-state" data-i18n="sqCtrlNone">No controller connected yet.</p></div>
@@ -611,6 +624,7 @@
 </div>
 
 <script src="qr-core.js"></script>
+<script src="qr-engine.js"></script>
 <script src="version.js"></script>
 <script src="i18n.js"></script>
 <script src="windows.js"></script>

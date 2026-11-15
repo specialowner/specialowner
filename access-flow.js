@@ -6,8 +6,19 @@ import { auth } from "./firebase-config.js";
 
 // New-style codes (dynamic phone QR "SO1D.…" and guest/master passes "SO1P.…") are verified by an edge controller:
 // the phone only forwards the text, the controller answers on the same scanRequest document.
+function showControllerResult(r, t, resultEl) {
+  const k = "ghR_" + String(r.reason || "").replace(/-/g, "_");
+  const who = [r.name, r.unit ? t("unitLabel") + " " + r.unit : ""].filter(Boolean).join(" · ");
+  if (r.allow) resultEl.textContent = "✅ " + t("sqScanAllowed") + (who ? ": " + who : "") + (r.hostName ? " → " + r.hostName + (r.hostPhone ? " " + r.hostPhone : "") : "");
+  else resultEl.textContent = "⛔ " + t("sqScanDenied") + ": " + ((window.SO_I18N.translations[window.SO_I18N.getLang()] || {})[k] || t("ghR_other")) + (who ? " (" + who + ")" : "");
+}
 async function handleControllerScan(db, text, mode, t, resultEl) {
   resultEl.textContent = "⏳ " + t("sqScanChecking");
+  const cc = window.SOCloudController;                       // this device holds the site key (admin): answer at once, no round trip
+  if (cc && cc.ready) {
+    try { showControllerResult(await cc.verify(text, mode, {}), t, resultEl); return; }
+    catch (e) { console.error("local verification failed, falling back to a request:", e); }
+  }
   let ref;
   try {
     ref = await addDoc(collection(db, "scanRequests"), {

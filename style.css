@@ -305,3 +305,11 @@ img.ann-media{background:#eef2f0}
 .gh-row.bad{background:#3a1c19;border-inline-start-color:#ff5a4d}
 .gh-time{opacity:.7;font-variant-numeric:tabular-nums}
 @media (max-width:640px){.gh-name{font-size:28px}.gh-row{grid-template-columns:70px 1fr}.gh-ap,.gh-res{grid-column:2}.gh-photo{width:130px;height:130px}}
+
+/* ===== QR scanner frame: centred, square, fits the screen (admin + security) ===== */
+#qrReader{width:100%;max-width:360px;margin:0 auto;position:relative;overflow:hidden;border-radius:12px;background:#000}
+#qrReader video{width:100%!important;height:auto!important;display:block;object-fit:cover}
+#qrReader canvas{max-width:100%}
+#qrReader > div{margin:0 auto!important}
+.sq-cc{background:#f2f8f6;border-radius:12px;padding:10px 12px;margin:8px 0 12px}
+.sq-cc-row{display:flex;flex-wrap:wrap;gap:6px}

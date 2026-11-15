@@ -12,6 +12,8 @@ const APP_SHELL = [
   "payslip.js",
   "access-flow.js",
   "qr-core.js",
+  "qr-engine.js",
+  "cloud-controller.js",
   "qr-wallet.js",
   "resident-qr.js",
   "qr-admin.js",

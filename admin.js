@@ -2155,10 +2155,15 @@ onSnapshot(query(collection(db, "accessLogs"), orderBy("timestamp", "desc")), (s
 });
 
 // ---------- QR access system (v1.26): master passes, access points, controllers, photos, live events ----------
-import("./qr-admin.js")
-  .then((m) => m.initAdminQr({ db, user, t, adminErr, stLabel }))
+import("./cloud-controller.js")
+  .then((c) => {
+    const cc = c.initCloudController({ db, user, onChange: (s) => window.dispatchEvent(new CustomEvent("so-cc", { detail: s })) });
+    return import("./qr-admin.js").then((m) => m.initAdminQr({ db, user, t, adminErr, stLabel, cc }));
+  })
   .catch((e) => console.error("QR admin module failed to load:", e));
 
+// The scan square follows the real video size (a fixed 220 px box was drawn off-centre on small / large screens).
+const scanBox = (w, h) => { const s = Math.max(120, Math.floor(Math.min(w, h) * 0.7)); return { width: s, height: s }; };
 let scannerStarted = false;
 function startScanner() {
   if (scannerStarted) return;
@@ -2166,7 +2171,7 @@ function startScanner() {
   const reader = new Html5Qrcode("qrReader");
   reader.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 220 },
+    { fps: 10, qrbox: scanBox, aspectRatio: 1 },
     (decodedText) => handleAccessScan(db, decodedText, (document.getElementById("scanMode") || {}).value || "entry", t, document.getElementById("scanResult")),
     () => {} // ignore per-frame scan failures
   ).catch(() => {

@@ -738,13 +738,15 @@ if (isSecurity) {
 }
 
 // ---------- QR scanner (security only) ----------
+// The scan square follows the real video size (a fixed 220 px box was drawn off-centre on small / large screens).
+const scanBox = (w, h) => { const s = Math.max(120, Math.floor(Math.min(w, h) * 0.7)); return { width: s, height: s }; };
 function startScanner() {
   if (scannerStarted || currentAccountStatus !== "active") return;
   scannerStarted = true;
   const reader = new Html5Qrcode("qrReader");
   reader.start(
     { facingMode: "environment" },
-    { fps: 10, qrbox: 220 },
+    { fps: 10, qrbox: scanBox, aspectRatio: 1 },
     (decodedText) => handleAccessScan(db, decodedText, (document.getElementById("scanMode") || {}).value || "entry", t, document.getElementById("scanResult"), { scannedBy: user.uid }),
     () => {}
   ).catch(() => {
